@@ -18,6 +18,8 @@ export interface SwCodeName {
 
 // 行业资金流数据项接口
 export interface IndustryFundFlowDataItem {
+  total_net_inflow_amount?: number        // 全部净流入金额（元）- 计算字段
+  total_net_inflow_ratio?: number         // 全部净流入占比（%）- 计算字段
   main_net_inflow_amount: number          // 主力净流入金额（元）
   main_net_inflow_ratio: number           // 主力净流入占比（%）
   super_large_net_inflow_amount: number   // 超大单净流入金额（元）
@@ -55,6 +57,8 @@ export interface IndustryFundFlowResponse {
 
 // 资金流指标类型枚举
 export enum FundFlowMetricType {
+  TOTAL_NET_INFLOW_AMOUNT = 'total_net_inflow_amount',
+  TOTAL_NET_INFLOW_RATIO = 'total_net_inflow_ratio',
   MAIN_NET_INFLOW_AMOUNT = 'main_net_inflow_amount',
   MAIN_NET_INFLOW_RATIO = 'main_net_inflow_ratio',
   SUPER_LARGE_NET_INFLOW_AMOUNT = 'super_large_net_inflow_amount',
@@ -76,6 +80,23 @@ export interface FundFlowMetricConfig {
 
 // 资金流指标配置映射
 export const FUND_FLOW_METRICS: Record<FundFlowMetricType, FundFlowMetricConfig> = {
+  [FundFlowMetricType.TOTAL_NET_INFLOW_AMOUNT]: {
+    name: '全部净流入金额',
+    unit: '元',
+    formatter: (value: number) => {
+      if (Math.abs(value) >= 100000000) {
+        return (value / 100000000).toFixed(2) + '亿'
+      } else if (Math.abs(value) >= 10000) {
+        return (value / 10000).toFixed(2) + '万'
+      }
+      return value.toFixed(2)
+    }
+  },
+  [FundFlowMetricType.TOTAL_NET_INFLOW_RATIO]: {
+    name: '全部净流入占比',
+    unit: '%',
+    formatter: (value: number) => value.toFixed(2)
+  },
   [FundFlowMetricType.MAIN_NET_INFLOW_AMOUNT]: {
     name: '主力净流入金额',
     unit: '元',
