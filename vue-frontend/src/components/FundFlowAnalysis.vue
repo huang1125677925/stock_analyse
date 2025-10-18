@@ -1,6 +1,18 @@
 <template>
   <div class="fund-flow-analysis">
     <div class="controls">
+      
+      <!-- 数据周期选择 -->
+      <el-select 
+        v-model="weekFlag" 
+        @change="updateChart" 
+        placeholder="数据周期" 
+        style="width: 120px; margin-right: 10px;"
+      >
+        <el-option label="按天" :value="false" />
+        <el-option label="按周" :value="true" />
+      </el-select>
+      
       <!-- 资金流指标选择 -->
       <FundFlowMetricSelector 
         v-model="selectedFundFlowMetric" 
@@ -11,8 +23,8 @@
       <!-- 日期范围选择 -->
       <DateRangeSelector 
         v-model="selectedDateRange" 
+        :week-flag="weekFlag"
         @change="updateChart" 
-        style="margin-right: 10px;"
       />
       
       <!-- 数值过滤选择 -->
@@ -53,16 +65,19 @@
  * 事件：chart-ready, chart-click
  */
 import { ref, onMounted } from 'vue'
+import { watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchIndustryFundFlowData, FundFlowMetricType } from '@/services/industry-fund-flow'
+import FundFlowMetricSelector from './FundFlowMetricSelector.vue'
+import DateRangeSelector from './DateRangeSelector.vue'
+import FundFlowHeatmap from './FundFlowHeatmap.vue'
+import { FundFlowMetricType } from '@/services/industry-fund-flow'
+import { fetchIndustryFundFlowData } from '@/services/industry-fund-flow'
 import type { IndustryFundFlowData } from '@/services/industry-fund-flow'
-import FundFlowMetricSelector from '@/components/FundFlowMetricSelector.vue'
-import DateRangeSelector from '@/components/DateRangeSelector.vue'
-import FundFlowHeatmap from '@/components/FundFlowHeatmap.vue'
 
 // 响应式变量
 const selectedFundFlowMetric = ref(FundFlowMetricType.MAIN_NET_INFLOW_AMOUNT)
-const selectedDateRange = ref('20')
+const selectedDateRange = ref('5') // 修改默认值为5（按天时为5天，按周时为5周）
+const weekFlag = ref(false) // 数据周期标志，false为按天，true为按周
 const valueFilter = ref<'all' | 'positive' | 'negative'>('all')
 const sortAscending = ref(true)
 const loading = ref(false)
@@ -78,13 +93,22 @@ const fetchFundFlowData = async () => {
     const today = new Date()
     const endDate = today.toISOString().split('T')[0]
     
-    // 根据选择的日期范围计算开始日期
-    const days = selectedDateRange.value === 'all' ? 30 : parseInt(selectedDateRange.value)
+    // 根据选择的日期范围和周期标志计算开始日期
+    let days: number
+    if (weekFlag.value) {
+      // 按周模式：将周数转换为天数
+      const weeks = selectedDateRange.value === 'all' ? 5 : parseInt(selectedDateRange.value)
+      days = weeks * 7
+    } else {
+      // 按天模式：直接使用天数
+      days = selectedDateRange.value === 'all' ? 30 : parseInt(selectedDateRange.value)
+    }
+    
     const startDate = new Date(today)
     startDate.setDate(today.getDate() - days)
     const formattedStartDate = startDate.toISOString().split('T')[0]
     
-    const response = await fetchIndustryFundFlowData(formattedStartDate, endDate)
+    const response = await fetchIndustryFundFlowData(formattedStartDate, endDate, weekFlag.value)
     
     if (response) {
       industryFundFlowData.value = response
@@ -104,7 +128,13 @@ const updateChart = () => {
   fetchFundFlowData()
 }
 
-// 按最后一列排序
+// 监听周期标志变化，重置日期范围为默认值
+watch(weekFlag, (newWeekFlag: boolean) => {
+  selectedDateRange.value = '5' // 重置为默认值5（按天时为5天，按周时为5周）
+  updateChart() // 更新图表
+})
+
+// 更新图表
 const sortByLastColumn = () => {
   sortAscending.value = !sortAscending.value
 }

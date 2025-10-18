@@ -188,16 +188,19 @@ export const FUND_FLOW_METRICS: Record<FundFlowMetricType, FundFlowMetricConfig>
  * 获取行业资金流数据
  * @param startDate 开始日期，格式：YYYY-MM-DD，默认为30天前
  * @param endDate 结束日期，格式：YYYY-MM-DD，默认为当前日期
+ * @param weekFlag 数据周期标志，false为按天，true为按周，默认为false
  * @returns Promise<IndustryFundFlowData | null> 行业资金流数据
  */
 export async function fetchIndustryFundFlowData(
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  weekFlag?: boolean
 ): Promise<IndustryFundFlowData | null> {
   try {
     const params: any = {}
     if (startDate) params.start_date = startDate
     if (endDate) params.end_date = endDate
+    if (weekFlag !== undefined) params.week_flag = weekFlag
 
     const response = await axios.get<IndustryFundFlowData>(`${API_BASE_URL}/industry/fund-flow/data/`, {
       params
