@@ -224,19 +224,14 @@ const menuItems = computed(() => {
       icon: 'TrendCharts',
       children: [
         {
-          path: '/industries',
-          title: '行业分析',
-          icon: 'Document'
-        },
-        {
           path: '/analysis/congestion',
-          title: '行业热力图',
+          title: '行业整体分析',
           icon: 'TrendCharts'
         },
         {
-          path: '/analysis/industry-treemap',
-          title: '行业矩形树图',
-          icon: 'DataAnalysis'
+          path: '/industries',
+          title: '单一行业分析',
+          icon: 'Document'
         },
         {
           path: '/strategy/index-rps',

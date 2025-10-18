@@ -105,12 +105,14 @@ export const HEATMAP_METRICS: Record<HeatmapMetricType, HeatmapMetricConfig> = {
   [HeatmapMetricType.OPERATING_REVENUE_GROWTH]: {
     name: '营业收入增长率',
     unit: '%',
-    description: '平均营业收入增长率'
+    description: '平均营业收入增长率',
+    formatter: (value: number) => value.toFixed(2)
   },
   [HeatmapMetricType.NET_PROFIT_GROWTH]: {
     name: '净利润增长率',
     unit: '%',
-    description: '平均净利润增长率'
+    description: '平均净利润增长率',
+    formatter: (value: number) => value.toFixed(2)
   },
   [HeatmapMetricType.TOTAL_OPERATING_REVENUE]: {
     name: '总营业收入',
@@ -127,26 +129,31 @@ export const HEATMAP_METRICS: Record<HeatmapMetricType, HeatmapMetricConfig> = {
   [HeatmapMetricType.EARNINGS_PER_SHARE]: {
     name: '每股收益',
     unit: '元',
-    description: '平均每股收益'
+    description: '平均每股收益',
+    formatter: (value: number) => value.toFixed(2)
   },
   [HeatmapMetricType.ROE]: {
     name: '净资产收益率',
     unit: '%',
-    description: '平均净资产收益率'
+    description: '平均净资产收益率',
+    formatter: (value: number) => value.toFixed(2)
   },
   [HeatmapMetricType.GROSS_PROFIT_MARGIN]: {
     name: '毛利率',
     unit: '%',
-    description: '平均毛利率'
+    description: '平均毛利率',
+    formatter: (value: number) => value.toFixed(2)
   },
   [HeatmapMetricType.NET_ASSETS_PER_SHARE]: {
     name: '每股净资产',
     unit: '元',
-    description: '平均每股净资产'
+    description: '平均每股净资产',
+    formatter: (value: number) => value.toFixed(2)
   },
   [HeatmapMetricType.OPERATING_CASH_FLOW_PER_SHARE]: {
     name: '每股经营现金流',
     unit: '元',
-    description: '平均每股经营现金流'
+    description: '平均每股经营现金流',
+    formatter: (value: number) => value.toFixed(2)
   }
 }
