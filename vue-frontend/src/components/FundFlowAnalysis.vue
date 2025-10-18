@@ -66,6 +66,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import FundFlowMetricSelector from './FundFlowMetricSelector.vue'
 import DateRangeSelector from './DateRangeSelector.vue'
@@ -75,6 +76,7 @@ import { fetchIndustryFundFlowData } from '@/services/industry-fund-flow'
 import type { IndustryFundFlowData } from '@/services/industry-fund-flow'
 
 // 响应式变量
+const router = useRouter()
 const selectedFundFlowMetric = ref(FundFlowMetricType.MAIN_NET_INFLOW_AMOUNT)
 const selectedDateRange = ref('5') // 修改默认值为5（按天时为5天，按周时为5周）
 const weekFlag = ref(false) // 数据周期标志，false为按天，true为按周
@@ -144,9 +146,20 @@ const handleChartReady = (chartInstance: any) => {
   // 图表准备就绪
 }
 
-const handleChartClick = (params: any) => {
-  // 图表点击事件
-  console.log('Fund flow chart clicked:', params)
+const handleChartClick = (payload: any) => {
+  // 图表点击事件（来自子组件已计算好的行业与日期）
+  console.log('Fund flow chart clicked payload:', payload)
+
+  const industryName = payload?.industry?.indexName || payload?.industry?.indexCode
+  if (!industryName) return
+
+  // 跳转到股票列表页面，传递行业参数
+  router.push({
+    path: '/stock-list',
+    query: { industry: industryName }
+  })
+
+  ElMessage.success(`正在跳转到 ${industryName} 的股票列表`)
 }
 
 // 组件挂载时获取数据

@@ -1,21 +1,5 @@
 <template>
   <div class="index-rps-view" v-loading="loading" element-loading-text="正在加载指数RPS数据...">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <el-card shadow="hover">
-        <div class="header-content">
-          <div class="strategy-info">
-            <h1 class="strategy-title">指数RPS强度排名</h1>
-            <p class="strategy-subtitle">板块轮动与强势指数分析</p>
-          </div>
-          <div class="header-actions">
-            <el-button @click="refreshData" :loading="loading" :icon="Refresh" type="primary">刷新数据</el-button>
-            <el-button @click="saveToDatabase" :loading="saving" type="success">保存数据</el-button>
-          </div>
-        </div>
-      </el-card>
-    </div>
-
     <!-- 已移除周期选择 -->
 
     <!-- RPS数据表格 -->
@@ -155,7 +139,6 @@ import type { IndexRpsItem } from '@/services/strategyApi'
 
 // 数据加载状态
 const loading = ref(false)
-const saving = ref(false)
 
 // RPS数据
 const rpsData = ref<IndexRpsItem[]>([])
@@ -304,27 +287,6 @@ const refreshData = async () => {
   }
 }
 
-// 保存数据到数据库
-const saveToDatabase = async () => {
-  if (saving.value) return
-  
-  saving.value = true
-  try {
-    const periodsStr = displayPeriods.value.join(',')
-    const response = await getIndexRps(periodsStr, true)
-    
-    // 由于在axiosConfig.ts中已经处理了非200状态码的情况
-    // 这里直接使用返回的数据，不需要再次检查code
-    const savedCount = response.saved_count
-    ElMessage.success(`成功保存${savedCount}条RPS数据到数据库`)
-  } catch (error) {
-    console.error('保存RPS数据失败:', error)
-    ElMessage.error('保存RPS数据失败，请稍后重试')
-  } finally {
-    saving.value = false
-  }
-}
-
 // 组件挂载时加载数据
 onMounted(() => {
   refreshData()
@@ -334,27 +296,6 @@ onMounted(() => {
 <style scoped>
 .index-rps-view {
   padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.strategy-title {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
-
-.strategy-subtitle {
-  margin: 5px 0 0;
-  color: #909399;
 }
 
 .period-selection {

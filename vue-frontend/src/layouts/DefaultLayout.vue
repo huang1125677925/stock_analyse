@@ -23,18 +23,14 @@
               </el-icon>
               <span>{{ item.title }}</span>
             </template>
-            <el-menu-item 
-              v-for="child in item.children" 
-              :key="child.path" 
-              :index="child.path"
-            >
+            <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
               <el-icon>
                 <component :is="child.icon" />
               </el-icon>
               <template #title>{{ child.title }}</template>
             </el-menu-item>
           </el-sub-menu>
-          
+
           <!-- 没有子菜单的项 -->
           <el-menu-item v-else :index="item.path">
             <el-icon>
@@ -50,22 +46,14 @@
       <!-- 顶栏 -->
       <el-header class="header">
         <div class="header-left">
-          <el-button
-            type="text"
-            @click="toggleSidebar"
-            class="collapse-btn"
-          >
+          <el-button type="text" @click="toggleSidebar" class="collapse-btn">
             <el-icon>
               <Expand v-if="isCollapse" />
               <Fold v-if="!isCollapse" />
             </el-icon>
           </el-button>
           <el-breadcrumb separator="/" class="breadcrumb">
-            <el-breadcrumb-item 
-              v-for="item in breadcrumbs" 
-              :key="item.path" 
-              :to="item.path"
-            >
+            <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path">
               {{ item.title }}
             </el-breadcrumb-item>
           </el-breadcrumb>
@@ -84,11 +72,14 @@
               <el-button size="small">注册</el-button>
             </router-link>
           </div>
-          
+
           <!-- 已登录状态 -->
           <el-dropdown v-else @command="handleCommand">
             <span class="user-info">
-              <el-avatar :size="32" src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" />
+              <el-avatar
+                :size="32"
+                src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png"
+              />
               <span class="username">{{ currentUser?.username || '用户' }}</span>
             </span>
             <template #dropdown>
@@ -128,7 +119,7 @@ import {
   DataLine,
   List,
   Timer,
-  Calendar
+  Calendar,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -144,23 +135,25 @@ function handleCommand(command: string) {
   switch (command) {
     case 'profile':
       ElMessageBox.alert('个人中心功能暂未实现', '提示', {
-        confirmButtonText: '确定'
+        confirmButtonText: '确定',
       })
       break
     case 'changePassword':
       ElMessageBox.alert('修改密码功能暂未实现', '提示', {
-        confirmButtonText: '确定'
+        confirmButtonText: '确定',
       })
       break
     case 'logout':
       ElMessageBox.confirm('确定要退出登录吗？', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        logout()
-        router.push('/login')
-      }).catch(() => {})
+        type: 'warning',
+      })
+        .then(() => {
+          logout()
+          router.push('/login')
+        })
+        .catch(() => {})
       break
   }
 }
@@ -177,7 +170,7 @@ const menuItems = computed(() => {
     {
       path: '/',
       title: '首页',
-      icon: 'HomeFilled'
+      icon: 'HomeFilled',
     },
     {
       path: '/market-fundamentals',
@@ -187,36 +180,14 @@ const menuItems = computed(() => {
         {
           path: '/analysis/market',
           title: '大盘分析',
-          icon: 'TrendCharts'
+          icon: 'TrendCharts',
         },
         {
           path: '/analysis/news-list',
           title: 'CCTV新闻',
-          icon: 'Document'
-        }
-        ]
-      },
-      {
-        path: '/stock-picker',
-        title: '智能选股',
-        icon: 'MagicStick',
-        children: [
-          {
-            path: '/strategy-results',
-            title: '策略选股',
-            icon: 'List'
-          },
-          {
-            path: '/stock-list',
-            title: '股票列表',
-            icon: 'List'
-          },
-          {
-            path: '/stock-history',
-            title: '历史行情',
-            icon: 'Calendar'
-          },
-      ]
+          icon: 'Document',
+        },
+      ],
     },
     {
       path: '/analysis',
@@ -226,67 +197,85 @@ const menuItems = computed(() => {
         {
           path: '/analysis/congestion',
           title: '行业整体分析',
-          icon: 'TrendCharts'
+          icon: 'TrendCharts',
         },
         {
           path: '/industries',
           title: '单一行业分析',
-          icon: 'Document'
+          icon: 'Document',
+        }
+      ],
+    },
+    {
+      path: '/stock-picker',
+      title: '智能选股',
+      icon: 'MagicStick',
+      children: [
+        {
+          path: '/stock-list',
+          title: '股票列表',
+          icon: 'List',
         },
         {
-          path: '/strategy/index-rps',
-          title: '指数RPS强度排名',
-          icon: 'DataAnalysis'
+          path: '/stock-history',
+          title: '个股分析',
+          icon: 'Calendar',
         },
-    ]
-  },
-  {
-    path: '/quant',
-    title: '量化分析',
-    icon: 'DataAnalysis',
-    children: [
-      {
-        path: '/strategy-list',
-        title: '回测策略列表',
-        icon: 'Document'
-      },
-      {
-        path: '/backtest-strategy',
-        title: '创建回测任务',
-        icon: 'Setting'
-      },
-      {
-        path: '/backtest-history',
-        title: '回测任务历史',
-        icon: 'Clock'
-      }
-    ]
-  },
-  // {
-  //       path: '/forum/posts',
-  //       title: '论坛讨论区',
-  //       icon: 'Document'
-  //     }
-  ];
-  
+        {
+          path: '/strategy-results',
+          title: '策略选股',
+          icon: 'List',
+        },
+        
+      ],
+    },
+    {
+      path: '/quant',
+      title: '量化分析',
+      icon: 'DataAnalysis',
+      children: [
+        {
+          path: '/strategy-list',
+          title: '回测策略列表',
+          icon: 'Document',
+        },
+        {
+          path: '/backtest-strategy',
+          title: '创建回测任务',
+          icon: 'Setting',
+        },
+        {
+          path: '/backtest-history',
+          title: '回测任务历史',
+          icon: 'Clock',
+        },
+      ],
+    },
+    // {
+    //       path: '/forum/posts',
+    //       title: '论坛讨论区',
+    //       icon: 'Document'
+    //     }
+  ]
+
   // 只有管理员用户才能看到系统设置菜单
   if (currentUser.value && currentUser.value.is_admin) {
     baseMenuItems.push({
       path: '/settings',
       title: '系统设置',
-      icon: 'Setting'
-    });
+      icon: 'Setting',
+    })
   }
-  
-  return baseMenuItems;
+
+  return baseMenuItems
 })
 
 // 面包屑导航
 const breadcrumbs = computed(() => {
-  const matched = route.matched.filter(item => item.meta && item.meta.title)
-  return matched.map(item => ({
+  const matched = route.matched.filter((item) => item.meta && item.meta.title)
+  return matched.map((item) => ({
     path: item.path,
-    title: item.meta?.title || '未知页面'
+    title: item.meta?.title || '未知页面',
   }))
 })
 

@@ -15,6 +15,23 @@
       <!-- 搜索和筛选区域 -->
       <div class="search-section">
         <el-form :inline="true" class="search-form">
+          <el-form-item label="选择行业">
+            <el-select
+              v-model="industry"
+              placeholder="请选择行业"
+              style="width: 200px"
+              clearable
+              filterable
+              @change="handleIndustryChange"
+            >
+              <el-option
+                v-for="industryItem in industryList"
+                :key="industryItem.name"
+                :label="industryItem.name"
+                :value="industryItem.name"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item label="股票代码/名称">
             <el-input v-model="searchKeyword" placeholder="请输入股票代码或名称" clearable @clear="handleSearch" />
           </el-form-item>
@@ -36,47 +53,48 @@
           @sort-change="handleSortChange"
           fit
         >
-          <el-table-column prop="code" label="股票代码" min-width="100" sortable />
-          <el-table-column prop="name" label="股票名称" min-width="120" sortable />
-          <el-table-column prop="industry" label="行业" min-width="120" />
-          <el-table-column prop="latest_price" label="最新价" min-width="100" sortable />
-          <el-table-column prop="change_percent" label="涨跌幅" min-width="100" sortable>
+          <el-table-column prop="code" label="股票代码" min-width="100" sortable align="center" header-align="center" />
+          <el-table-column prop="name" label="股票名称" min-width="120" sortable align="center" header-align="center" />
+          <el-table-column prop="industry" label="行业" min-width="120" align="center" header-align="center" />
+          <el-table-column prop="total_market_cap" label="总市值" min-width="100" sortable align="center" header-align="center">
+            <template #default="scope">
+              {{ formatMarketCap(scope.row.total_market_cap) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="pe_ratio" label="市盈率" min-width="80" sortable align="center" header-align="center" />
+          <el-table-column prop="pb_ratio" label="市净率" min-width="80" sortable align="center" header-align="center" />
+          <el-table-column prop="latest_price" label="最新价" min-width="100" sortable align="center" header-align="center" />
+          <el-table-column prop="change_percent" label="涨跌幅" min-width="100" sortable align="center" header-align="center">
             <template #default="scope">
               <span :class="scope.row.change_percent >= 0 ? 'text-success' : 'text-danger'">
                 {{ scope.row.change_percent ? scope.row.change_percent.toFixed(2) + '%' : '-' }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="change_amount" label="涨跌额" min-width="100" sortable>
+          <el-table-column prop="change_amount" label="涨跌额" min-width="100" sortable align="center" header-align="center">
             <template #default="scope">
               <span :class="scope.row.change_amount >= 0 ? 'text-success' : 'text-danger'">
                 {{ scope.row.change_amount ? scope.row.change_amount.toFixed(2) : '-' }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="volume" label="成交量" min-width="100" sortable>
+          <el-table-column prop="volume" label="成交量" min-width="100" sortable align="center" header-align="center">
             <template #default="scope">
               {{ formatVolume(scope.row.volume) }}
             </template>
           </el-table-column>
-          <el-table-column prop="amount" label="成交额" min-width="100" sortable>
+          <el-table-column prop="amount" label="成交额" min-width="100" sortable align="center" header-align="center">
             <template #default="scope">
               {{ formatMarketCap(scope.row.amount) }}
             </template>
           </el-table-column>
-          <el-table-column prop="turnover_rate" label="换手率" min-width="80" sortable>
+          <el-table-column prop="turnover_rate" label="换手率" min-width="80" sortable align="center" header-align="center">
             <template #default="scope">
               {{ scope.row.turnover_rate ? scope.row.turnover_rate.toFixed(2) + '%' : '-' }}
             </template>
           </el-table-column>
-          <el-table-column prop="total_market_cap" label="总市值" min-width="100" sortable>
-            <template #default="scope">
-              {{ formatMarketCap(scope.row.total_market_cap) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="pe_ratio" label="市盈率" min-width="80" sortable />
-          <el-table-column prop="pb_ratio" label="市净率" min-width="80" sortable />
-          <el-table-column label="操作" min-width="180" fixed="right">
+          
+          <el-table-column label="操作" min-width="180" fixed="right" align="center" header-align="center">
             <template #default="scope">
               <el-button 
                 type="primary" 
@@ -115,26 +133,30 @@
  * 2. 支持按股票代码、名称进行后端搜索
  * 3. 支持排序和分页
  * 4. 提供跳转到实时行情和历史行情的入口
+ * 5. 支持从路由参数接收行业筛选条件
  * 
  * 参数：
  * - searchKeyword: 搜索关键词，用于后端搜索
  * - currentPage: 当前页码
  * - pageSize: 每页显示数量
+ * - industry: 行业筛选条件，可从路由参数获取
  * 
  * 事件：
  * - handleSearch: 触发后端搜索
  * - resetSearch: 重置搜索条件并刷新数据
  * - fetchStockList: 从后端获取股票列表数据
  */
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Search, RefreshLeft, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getStockList } from '@/services/individualStockApi'
 import type { StockInfo } from '@/services/individualStockApi'
+import { getIndustrySectors, type IndustrySector } from '@/services/industryAnalysisApi'
 
 // 路由
 const router = useRouter()
+const route = useRoute()
 
 // 数据加载状态
 const loading = ref(false)
@@ -142,6 +164,10 @@ const loading = ref(false)
 // 股票数据
 const stocks = ref<StockInfo[]>([])
 const searchKeyword = ref('')
+
+// 行业筛选
+const industry = ref('')
+const industryList = ref<IndustrySector[]>([])
 
 // 排序
 const sortField = ref('')
@@ -152,31 +178,12 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const totalStocks = ref(0)
 
-// 计算属性：过滤后的股票列表
+/**
+ * 计算过滤后的股票列表
+ */
 const filteredStocks = computed(() => {
-  let result = stocks.value
-
-  // 排序 (搜索已经在后端实现)
-  if (sortField.value) {
-    result = [...result].sort((a, b) => {
-      const fieldA = a[sortField.value as keyof StockInfo]
-      const fieldB = b[sortField.value as keyof StockInfo]
-
-      // 处理不同类型的字段
-      if (typeof fieldA === 'string' && typeof fieldB === 'string') {
-        return sortOrder.value === 'asc' 
-          ? fieldA.localeCompare(fieldB) 
-          : fieldB.localeCompare(fieldA)
-      } else {
-        // 数字类型
-        const numA = fieldA === null || fieldA === undefined ? -Infinity : Number(fieldA)
-        const numB = fieldB === null || fieldB === undefined ? -Infinity : Number(fieldB)
-        return sortOrder.value === 'asc' ? numA - numB : numB - numA
-      }
-    })
-  }
-
-  return result
+  // 由于现在使用后端筛选，直接返回stocks数组
+  return stocks.value
 })
 
 
@@ -187,7 +194,8 @@ const fetchStockList = async () => {
     const response = await getStockList({
       page: currentPage.value,
       page_size: pageSize.value,
-      keyword: searchKeyword.value // 添加搜索关键词参数
+      keyword: searchKeyword.value, // 添加搜索关键词参数
+      industry: industry.value || undefined
     })
     stocks.value = response.data
     
@@ -203,15 +211,33 @@ const fetchStockList = async () => {
   }
 }
 
+// 方法：获取行业列表
+const fetchIndustryList = async () => {
+  try {
+    const response = await getIndustrySectors()
+    industryList.value = response.sectors
+  } catch (error) {
+    console.error('获取行业列表失败:', error)
+    ElMessage.error('获取行业列表失败')
+  }
+}
+
+// 方法：行业筛选变化
+const handleIndustryChange = () => {
+  currentPage.value = 1 // 重置到第一页
+  fetchStockList() // 重新获取数据
+}
+
 // 方法：搜索
 const handleSearch = () => {
-  currentPage.value = 1
-  fetchStockList() // 调用后端搜索
+  currentPage.value = 1 // 重置到第一页
+  fetchStockList() // 重新获取数据
 }
 
 // 方法：重置搜索
 const resetSearch = () => {
   searchKeyword.value = ''
+  industry.value = ''
   currentPage.value = 1
   fetchStockList() // 重置后调用后端搜索
 }
@@ -275,8 +301,26 @@ const formatVolume = (value: number | null | undefined): string => {
 
 // 生命周期：组件挂载时获取数据
 onMounted(() => {
+  // 检查路由参数中是否有行业筛选条件
+  const industryFromQuery = route.query.industry as string
+  if (industryFromQuery) {
+    industry.value = industryFromQuery
+    ElMessage.success(`已自动筛选行业：${industryFromQuery}`)
+  }
+  
   fetchStockList()
+  fetchIndustryList()
 })
+
+// 监听路由参数变化
+watch(() => route.query.industry, (newIndustry) => {
+  if (newIndustry && typeof newIndustry === 'string') {
+    industry.value = newIndustry
+    currentPage.value = 1 // 重置到第一页
+    fetchStockList() // 重新获取数据
+    ElMessage.success(`已切换到行业：${newIndustry}`)
+  }
+}, { immediate: false })
 </script>
 
 <style scoped>
@@ -298,6 +342,10 @@ onMounted(() => {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
+}
+
+.filter-section {
+  margin-bottom: 16px;
 }
 
 .search-section {

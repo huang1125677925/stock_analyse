@@ -18,6 +18,10 @@
         <el-tab-pane label="行业矩形树图" name="treemap">
           <IndustryTreemap />
         </el-tab-pane>
+        
+        <el-tab-pane label="指数RPS强度排名" name="indexrps">
+          <IndexRpsView />
+        </el-tab-pane>
       </el-tabs>
     </el-card>
   </div>
@@ -36,6 +40,7 @@ import TurnoverAnalysis from '@/components/TurnoverAnalysis.vue'
 import PerformanceAnalysis from '@/components/PerformanceAnalysis.vue'
 import FundFlowAnalysis from '@/components/FundFlowAnalysis.vue'
 import IndustryTreemap from '@/components/IndustryTreemap.vue'
+import IndexRpsView from '@/views/strategy/IndexRpsView.vue'
 
 // 当前激活的tab
 const activeTab = ref('turnover')

@@ -33,6 +33,7 @@
  * 事件：chart-ready, chart-click
  */
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryTurnoverPercentile } from '@/services/industry-turnover-percentile'
 import type { IndustryTurnoverPercentileItem } from '@/services/industry-turnover-percentile'
@@ -51,6 +52,7 @@ interface IndustryData {
 }
 
 // 响应式变量
+const router = useRouter()
 const sortMetric = ref('amount')
 const selectedDateRange = ref('20')
 const sortAscending = ref(true)
@@ -149,9 +151,19 @@ const handleChartReady = (chartInstance: any) => {
   // 图表准备就绪
 }
 
-const handleChartClick = (params: any) => {
-  // 图表点击事件
-  console.log('Chart clicked:', params)
+const handleChartClick = (payload: any) => {
+  // 图表点击事件 - 跳转到股票列表页面（使用子组件提供的结构化 payload，避免索引错位）
+  console.log('Chart clicked payload:', payload)
+
+  const industryName = payload?.industry?.name
+  if (!industryName) return
+
+  router.push({
+    path: '/stock-list',
+    query: { industry: industryName }
+  })
+
+  ElMessage.success(`正在跳转到 ${industryName} 行业的股票列表`)
 }
 
 // 组件挂载时获取数据

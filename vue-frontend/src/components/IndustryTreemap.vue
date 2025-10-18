@@ -110,8 +110,12 @@
  * 事件：无
  */
 import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { fetchIndustryStatistics, type IndustryStatistics } from '@/services/industryApi'
+
+// 路由实例
+const router = useRouter()
 
 // 响应式数据
 const loading = ref(false)
@@ -190,6 +194,23 @@ async function loadIndustryData() {
  */
 async function refreshData() {
   await loadIndustryData()
+}
+
+/**
+ * 处理矩形树图节点点击事件
+ * @param params ECharts点击事件参数
+ */
+function handleTreemapClick(params: any) {
+  const industryName = params.data.name
+  console.log('点击行业:', industryName)
+  
+  // 跳转到股票列表页面，并传递行业参数
+  router.push({
+    path: '/stock-list',
+    query: {
+      industry: industryName
+    }
+  })
 }
 
 /**
@@ -285,6 +306,7 @@ function updateTreemap() {
             <div style="font-weight: bold; margin-bottom: 4px;">${data.name}</div>
             <div>${currentMetricLabel.value}: ${formatValue(data.originalValue)}</div>
             <div>占比: ${sum > 0 ? ((data.value / sum) * 100).toFixed(2) : '0.00'}%</div>
+            <div style="color: #999; font-size: 12px; margin-top: 4px;">点击查看该行业股票列表</div>
           </div>
         `
       }
@@ -293,7 +315,7 @@ function updateTreemap() {
       type: 'treemap',
       data: treemapData,
       roam: false,
-      nodeClick: false,
+      nodeClick: true, // 启用节点点击
       breadcrumb: { show: false },
       label: {
         show: true,
@@ -322,6 +344,11 @@ function updateTreemap() {
 
   console.log('设置ECharts选项:', option)
   chartInstance.setOption(option)
+  
+  // 绑定点击事件
+  chartInstance.off('click') // 先移除之前的事件监听器
+  chartInstance.on('click', handleTreemapClick)
+  
   console.log('ECharts选项设置完成')
 }
 

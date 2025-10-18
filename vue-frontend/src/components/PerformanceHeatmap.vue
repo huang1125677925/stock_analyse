@@ -50,8 +50,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  chartReady: [chart: echarts.ECharts]
-  chartClick: [params: any]
+  'chart-ready': [chart: echarts.ECharts]
+  'chart-click': [payload: { industry?: { indexCode: string; indexName: string }, date?: string, value?: number, metric: HeatmapMetricType, rawParams: any }]
 }>()
 
 // 过滤和排序后的行业数据
@@ -228,12 +228,22 @@ const chartOption = computed((): echarts.EChartsOption => {
 
 // 处理图表就绪事件
 const handleChartReady = (chart: echarts.ECharts) => {
-  emit('chartReady', chart)
+  emit('chart-ready', chart)
 }
 
 // 处理图表点击事件
 const handleChartClick = (params: any) => {
-  emit('chartClick', params)
+  const dataPoint = params?.data as [number, number, number] | undefined
+  const [dateIndex, industryIndex, value] = dataPoint ?? []
+  const industry = typeof industryIndex === 'number' ? processedIndustries.value[industryIndex] : undefined
+  const date = typeof dateIndex === 'number' ? props.data?.dates[dateIndex] : undefined
+  emit('chart-click', {
+    industry,
+    date,
+    value,
+    metric: props.selectedMetric,
+    rawParams: params
+  })
 }
 </script>
 

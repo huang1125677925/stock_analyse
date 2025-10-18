@@ -40,6 +40,7 @@
  * 事件：chart-ready, chart-click
  */
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryHeatmapData, HeatmapMetricType } from '@/services/industry-heatmap'
 import type { IndustryHeatmapData } from '@/services/industry-heatmap'
@@ -48,6 +49,7 @@ import ReportTypeSelector from '@/components/ReportTypeSelector.vue'
 import PerformanceHeatmap from '@/components/PerformanceHeatmap.vue'
 
 // 响应式变量
+const router = useRouter()
 const selectedMetric = ref(HeatmapMetricType.OPERATING_REVENUE_GROWTH)
 const reportType = ref('annual')
 const sortAscending = ref(true)
@@ -95,9 +97,19 @@ const handleChartReady = (chartInstance: any) => {
   // 图表准备就绪
 }
 
-const handleChartClick = (params: any) => {
-  // 图表点击事件
-  console.log('Performance chart clicked:', params)
+const handleChartClick = (payload: any) => {
+  // 图表点击事件：使用结构化 payload 的行业对象进行跳转，避免索引错位
+  console.log('Performance chart clicked payload:', payload)
+
+  const industryName = payload?.industry?.indexName || payload?.industry?.indexCode
+  if (!industryName) return
+
+  router.push({
+    path: '/stock-list',
+    query: { industry: industryName }
+  })
+
+  ElMessage.success(`正在跳转到 ${industryName} 的股票列表`)
 }
 
 // 组件挂载时获取数据
