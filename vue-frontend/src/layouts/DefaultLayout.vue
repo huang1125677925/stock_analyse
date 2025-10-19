@@ -183,6 +183,11 @@ const menuItems = computed(() => {
           icon: 'TrendCharts',
         },
         {
+          path: '/analysis/index-list',
+          title: '指数列表',
+          icon: 'List',
+        },
+        {
           path: '/analysis/news-list',
           title: 'CCTV新闻',
           icon: 'Document',
@@ -220,6 +225,11 @@ const menuItems = computed(() => {
           path: '/stock-history',
           title: '个股分析',
           icon: 'Calendar',
+        },
+        {
+          path: '/analysis/factor-stock-picker',
+          title: '因子选股',
+          icon: 'List',
         },
         {
           path: '/strategy-results',

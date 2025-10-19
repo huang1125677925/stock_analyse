@@ -154,6 +154,18 @@ const router = createRouter({
           name: 'industry-treemap',
           component: () => import('@/views/analysis/IndustryTreemapView.vue'),
           meta: { title: '行业矩形树图分析' }
+        },
+        {
+          path: '/analysis/index-list',
+          name: 'index-list',
+          component: () => import('@/views/analysis/IndexList.vue'),
+          meta: { title: '指数列表' }
+        },
+        {
+          path: '/analysis/factor-stock-picker',
+          name: 'factor-stock-picker',
+          component: () => import('@/views/analysis/FactorStockPickerView.vue'),
+          meta: { title: '因子选股' }
         }
       ]
     },

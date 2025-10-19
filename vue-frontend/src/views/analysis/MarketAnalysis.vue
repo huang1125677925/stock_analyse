@@ -1,219 +1,246 @@
 <template>
   <div class="market-analysis" v-loading="loading" element-loading-text="正在加载大盘数据...">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <el-card shadow="hover">
-        <div class="header-content">
-          <div class="market-info">
-            <h1 class="market-title">上证A股指数 大盘分析</h1>
-            <p class="market-subtitle">实时行情与历史趋势分析</p>
-          </div>
-          <div class="header-actions">
-            <el-button @click="refreshData" :loading="loading" :icon="Refresh" type="primary">刷新数据</el-button>
-          </div>
-        </div>
-      </el-card>
-    </div>
-
-    <!-- 最新数据概览 -->
-    <div class="latest-data-section" v-if="latestData">
+    <!-- 大盘资金流热力图 -->
+    <div class="fund-flow-section">
       <el-card shadow="hover">
         <template #header>
-          <h3>最新行情数据 ({{ latestData.date }})</h3>
-        </template>
-        <el-row :gutter="20" class="metrics-grid">
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value price" :class="{ 'up': latestData.涨跌幅 > 0, 'down': latestData.涨跌幅 < 0 }">
-                {{ latestData.收盘.toFixed(2) }}
-              </div>
-              <div class="metric-label">收盘点位</div>
-              <div class="metric-change" :class="{ 'up': latestData.涨跌幅 > 0, 'down': latestData.涨跌幅 < 0 }">
-                {{ latestData.涨跌幅 > 0 ? '+' : '' }}{{ latestData.涨跌幅.toFixed(2) }}%
-              </div>
-            </div>
-          </el-col>
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value">{{ latestData.开盘.toFixed(2) }}</div>
-              <div class="metric-label">开盘点位</div>
-            </div>
-          </el-col>
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value">{{ latestData.最高.toFixed(2) }}</div>
-              <div class="metric-label">最高点位</div>
-            </div>
-          </el-col>
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value">{{ latestData.最低.toFixed(2) }}</div>
-              <div class="metric-label">最低点位</div>
-            </div>
-          </el-col>
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value">{{ latestData.振幅.toFixed(2) }}%</div>
-              <div class="metric-label">振幅</div>
-            </div>
-          </el-col>
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value">{{ formatVolume(latestData.成交量) }}</div>
-              <div class="metric-label">成交量</div>
-            </div>
-          </el-col>
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value">{{ formatAmount(latestData.成交额) }}</div>
-              <div class="metric-label">成交额</div>
-            </div>
-          </el-col>
-          <el-col :xs="12" :sm="8" :md="6" :lg="4">
-            <div class="metric-card">
-              <div class="metric-value">{{ latestData.换手率.toFixed(2) }}%</div>
-              <div class="metric-label">换手率</div>
-            </div>
-          </el-col>
-        </el-row>
-      </el-card>
-    </div>
+          <div class="chart-header">
+            <h3>大盘资金流热力图</h3>
+            <div class="chart-controls">
+              <!-- 时间范围选择：默认20天，可选30/40天 -->
+              <el-select v-model="daysRange" placeholder="时间范围" style="width: 120px; margin-right: 10px;">
+                <el-option label="20天" :value="20"></el-option>
+                <el-option label="30天" :value="30"></el-option>
+                <el-option label="40天" :value="40"></el-option>
+                <el-option label="60天" :value="60"></el-option>
+                <el-option label="90天" :value="90"></el-option>
+                <el-option label="120天" :value="120"></el-option>
+                <el-option label="180天" :value="180"></el-option>
+              </el-select>
+              <el-select v-model="valueFilter" placeholder="数值过滤" style="width: 120px; margin-right: 10px;">
+                <el-option label="全部" value="all"></el-option>
+                <el-option label="正值" value="positive"></el-option>
+                <el-option label="负值" value="negative"></el-option>
+              </el-select>
 
-    <!-- 趋势图表 -->
-    <div class="charts-section" v-if="indexData.length > 0">
-      <el-row :gutter="20">
-        <el-col :span="24">
-          <el-card shadow="hover">
+            </div>
+          </div>
+        </template>
+        <div class="chart-container">
+          <MarketFundFlowHeatmap 
+            :data="fundFlowData"
+            :selectedMetric="selectedFundFlowMetric"
+            :searchKeyword="searchKeyword"
+            :valueFilter="valueFilter"
+            @chart-click="handleFundFlowClick"
+          />
+        </div>
+      </el-card>
+      <el-card class="mt-16" shadow="never">
+        <template #header>
+          <div class="chart-header">
+            <span>收盘价与涨跌幅趋势</span>
+          </div>
+        </template>
+        <TrendChart 
+          :data="processedFundFlowData" 
+          date-field="date"
+          :yFields="trendFields"
+          :defaultSelectedFields="['shanghai_close_price','shanghai_change_rate']"
+          height="420px"
+          title="收盘价与涨跌幅趋势"
+        />
+        <!-- 涨跌比热力图 -->
+        <div class="rise-fall-section" v-if="riseFallData.length > 0">
+          <el-card class="mt-16" shadow="hover">
             <template #header>
               <div class="chart-header">
-                <h3>上证指数趋势分析</h3>
+                <h3>新高新低比热力图</h3>
                 <div class="chart-controls">
-                  <el-select v-model="selectedMetrics" multiple placeholder="选择指标" style="width: 300px;">
-                    <el-option label="收盘点位" value="收盘点位"></el-option>
-                    <el-option label="开盘点位" value="开盘点位"></el-option>
-                    <el-option label="最高点位" value="最高点位"></el-option>
-                    <el-option label="最低点位" value="最低点位"></el-option>
-                    <el-option label="涨跌幅" value="涨跌幅"></el-option>
-                    <el-option label="成交量" value="成交量"></el-option>
-                    <el-option label="成交额" value="成交额"></el-option>
+                  <!-- 指数代码选择，与页面时间范围共用 -->
+                  <el-select v-model="indexCode" placeholder="指数代码" style="width: 160px;">
+                    <el-option label="全部A股" value="all" />
+                    <el-option label="上证50" value="sz50" />
+                    <el-option label="沪深300" value="hs300" />
+                    <el-option label="中证500" value="zz500" />
                   </el-select>
                 </div>
               </div>
             </template>
             <div class="chart-container">
-              <TrendChart 
-                :data="chartData" 
-                date-field="date"
-                :yFields="selectedMetricsConfig"
-                :defaultSelectedFields="selectedMetrics"
-                height="500px"
-                title="上证指数趋势"
-              />
+              <HeatmapChart :option="riseFallHeatmapOption" :height="480" @chart-click="handleRiseFallClick" />
             </div>
           </el-card>
-        </el-col>
-      </el-row>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { getShIndexHistory, formatIndexData, type IndexHistData } from '../../services/marketApi'
-import TrendChart from '../../components/TrendChart.vue'
-import { Refresh } from '@element-plus/icons-vue'
+import { ref, onMounted, watch } from 'vue'
+import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { computed } from 'vue'
+ import MarketFundFlowHeatmap from '@/components/MarketFundFlowHeatmap.vue'
+ import { fetchMarketFundFlowData, FUND_FLOW_METRICS, type FundFlowMetricType, type MarketFundFlowDataItem } from '@/services/marketFundFlowApi'
+ import TrendChart from '@/components/TrendChart.vue'
+ import HeatmapChart from '@/components/HeatmapChart.vue'
+ import { fetchRiseFallRatioData, type RiseFallRatioItem } from '@/services/marketRiseFallRatioApi'
+ import type { EChartsOption } from 'echarts'
 
-// 数据状态
+ // 仅保留加载状态与资金流相关状态
 const loading = ref(false)
-const indexData = ref<IndexHistData[]>([])
-const latestData = computed(() => indexData.value.length > 0 ? indexData.value[indexData.value.length-1] : null)
+const fundFlowMetrics = FUND_FLOW_METRICS
+const fundFlowData = ref<MarketFundFlowDataItem[]>([])
+const selectedFundFlowMetric = ref<FundFlowMetricType>('main_net_inflow_amount')
+const searchKeyword = ref('')
+const valueFilter = ref<'all' | 'positive' | 'negative'>('all')
+// 时间范围（天数），默认20天
+const daysRange = ref<number>(20)
 
-// 图表配置
-const selectedMetrics = ref(['收盘点位', '成交量'])
-const selectedMetricsConfig = computed(() => {
-  return selectedMetrics.value.map(metric => {
-    switch (metric) {
-      case '收盘点位':
-        return { key: '收盘点位', label: '收盘点位', color: '#409EFF' }
-      case '开盘点位':
-        return { key: '开盘点位', label: '开盘点位', color: '#67C23A' }
-      case '最高点位':
-        return { key: '最高点位', label: '最高点位', color: '#E6A23C' }  
-      case '最低点位':
-        return { key: '最低点位', label: '最低点位', color: '#F56C6C' }
-      case '涨跌幅':
-        return { key: '涨跌幅', label: '涨跌幅', color: '#909399' }
-      case '成交量':
-        return { key: '成交量', label: '成交量', color: '#9370DB' }
-      case '成交额':
-        return { key: '成交额', label: '成交额', color: '#FF6347' } 
-      default:
-        return { key: metric, label: metric, color: '#409EFF' }
-    }
-  })
-})
-
-// 格式化后的图表数据
-const chartData = computed(() => {
-  return formatIndexData(indexData.value)
-})
-
-// 格式化成交量
-function formatVolume(volume: number): string {
-  if (volume >= 100000000) {
-    return (volume / 100000000).toFixed(2) + '亿'
-  } else if (volume >= 10000) {
-    return (volume / 10000).toFixed(2) + '万'
-  } else {
-    return volume.toString()
-  }
-}
-
-// 格式化成交额
-function formatAmount(amount: number): string {
-  if (amount >= 100000000000) {
-    return (amount / 1000000000000).toFixed(2) + '万亿'
-  } else if (amount >= 100000000) {
-    return (amount / 100000000).toFixed(2) + '亿'
-  } else if (amount >= 10000) {
-    return (amount / 10000).toFixed(2) + '万'
-  } else {
-    return amount.toString()
-  }
-}
-
-// 获取上证指数历史数据
-async function fetchIndexData() {
-  loading.value = true
+// 获取大盘资金流数据
+async function fetchFundFlowData() {
   try {
-    // 获取最近6个月的数据
-    const endDate = new Date().toISOString().split('T')[0] // 今天
-    const startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 6个月前
-    
-    const response = await getShIndexHistory(startDate, endDate)
-    if (response.code === 200 && response.data) {
-      indexData.value = response.data
-    } else {
-      ElMessage.error('获取上证指数数据失败: ' + response.message)
-    }
+    loading.value = true
+    const endDate = new Date().toISOString().split('T')[0]
+    const startDate = new Date(Date.now() - daysRange.value * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // pageSize 按天数范围设置，确保分页足够覆盖
+    const res = await fetchMarketFundFlowData(startDate, endDate, 1, daysRange.value, '-date')
+    fundFlowData.value = res.list ?? []
   } catch (error) {
-    console.error('获取上证指数数据出错:', error)
-    ElMessage.error('获取上证指数数据出错')
+    console.error('获取大盘资金流数据出错:', error)
+    ElMessage.error('获取大盘资金流数据出错')
   } finally {
     loading.value = false
   }
 }
 
-// 刷新数据
-function refreshData() {
-  fetchIndexData()
+function handleFundFlowClick(payload: unknown) {
+  console.log('fund flow chart click:', payload)
 }
 
-// 组件挂载时获取数据
-onMounted(() => {
-  fetchIndexData()
+// 涨跌比相关状态
+const indexCode = ref<'all' | 'sz50' | 'hs300' | 'zz500'>('all')
+const riseFallData = ref<RiseFallRatioItem[]>([])
+
+/**
+ * 获取涨跌比数据
+ * @description 复用页面的时间范围（daysRange），根据选择的指数代码拉取指定日期范围的涨跌比数据
+ * @returns Promise<void>
+ */
+async function fetchRiseFallData() {
+  try {
+    loading.value = true
+    const endDate = new Date().toISOString().split('T')[0]
+    const startDate = new Date(Date.now() - daysRange.value * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const list = await fetchRiseFallRatioData({ indexCode: indexCode.value, startDate, endDate })
+    // 排序：按日期升序，确保热力图x轴顺序正确
+    riseFallData.value = [...list].sort((a, b) => a.date.localeCompare(b.date))
+  } catch (error) {
+    console.error('获取涨跌比数据出错:', error)
+    ElMessage.error('获取涨跌比数据出错')
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 涨跌比热力图配置
+ * @description x轴为日期，y轴为三个周期的涨跌比（20/60/120），颜色按值大小渐变
+ */
+const riseFallHeatmapOption = computed<EChartsOption>(() => {
+  const dates = riseFallData.value.map(item => item.date)
+  const metrics = [
+    { key: 'rise_fall_ratio_20', label: '20日涨跌比' },
+    { key: 'rise_fall_ratio_60', label: '60日涨跌比' },
+    { key: 'rise_fall_ratio_120', label: '120日涨跌比' }
+  ] as const
+
+  // 组装热力图数据 [xIndex, yIndex, value]
+  const values: number[] = []
+  const heatmapData: [number, number, number][] = []
+  riseFallData.value.forEach((item, xIdx) => {
+    metrics.forEach((m, yIdx) => {
+      const v = (item as any)[m.key] as number
+      if (typeof v === 'number') {
+        values.push(v)
+        heatmapData.push([xIdx, yIdx, v])
+      }
+    })
+  })
+
+  const min = values.length ? Math.min(...values) : 0
+  const max = values.length ? Math.max(...values) : 1
+
+  return {
+    tooltip: {
+      position: 'top',
+      formatter: (params: any) => {
+        const date = dates[params.value[0]]
+        const metric = metrics[params.value[1]].label
+        const val = params.value[2]
+        return `${date}<br/>${metric}: ${val.toFixed(4)}`
+      }
+    },
+    grid: { left: 80, right: 30, top: 40, bottom: 40 },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLabel: { rotate: 45 }
+    },
+    yAxis: {
+      type: 'category',
+      data: metrics.map(m => m.label)
+    },
+    visualMap: {
+      min,
+      max,
+      calculable: true,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 0,
+      inRange: {
+        color: ['#50a3ba', '#eac763', '#d94e5d']
+      }
+    },
+    series: [
+      {
+        name: '涨跌比热力图',
+        type: 'heatmap',
+        data: heatmapData,
+        progressive: 0,
+        label: { show: false }
+      }
+    ]
+  }
 })
+
+function handleRiseFallClick(payload: unknown) {
+  console.log('rise-fall chart click:', payload)
+}
+
+onMounted(() => {
+  // 初始化拉取资金流与涨跌比数据
+  fetchFundFlowData()
+  fetchRiseFallData()
+})
+
+// 切换时间范围或指数时自动刷新相关数据
+watch(daysRange, () => {
+  fetchFundFlowData()
+  fetchRiseFallData()
+})
+watch(indexCode, () => {
+  fetchRiseFallData()
+})
+// 趋势图字段配置
+const trendFields = [
+  { key: 'shanghai_close_price', label: '上证收盘价', color: '#409EFF', yAxisIndex: 0 },
+  { key: 'shanghai_change_rate', label: '上证涨跌幅(%)', color: '#67C23A', yAxisIndex: 1 }
+]
+// 复用资金流处理后的数据
+const processedFundFlowData = computed<MarketFundFlowDataItem[]>(() => fundFlowData?.value ?? [])
 </script>
 
 <style scoped>
@@ -221,74 +248,9 @@ onMounted(() => {
   padding: 20px;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.market-title {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
-
-.market-subtitle {
-  margin: 5px 0 0;
-  color: #909399;
-}
-
-.latest-data-section {
-  margin-bottom: 20px;
-}
-
-.metrics-grid {
-  margin-top: 10px;
-}
-
-.metric-card {
-  padding: 15px;
-  text-align: center;
-  border-radius: 4px;
-  background-color: #f5f7fa;
-  height: 100%;
-  min-height: 100px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.metric-value {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.metric-label {
-  font-size: 14px;
-  color: #909399;
-}
-
-.metric-change {
-  font-size: 14px;
-  margin-top: 5px;
-}
-
-.price.up, .metric-change.up {
-  color: #f56c6c;
-}
-
-.price.down, .metric-change.down {
-  color: #67c23a;
-}
-
-.charts-section {
-  margin-bottom: 20px;
-}
+/* 删除与上证指数历史API相关的样式块（最新数据与趋势图表） */
+.latest-data-section { display: none; }
+.charts-section { display: none; }
 
 .chart-header {
   display: flex;
@@ -299,5 +261,9 @@ onMounted(() => {
 .chart-container {
   height: 500px;
   margin-top: 20px;
+}
+
+.rise-fall-section {
+  margin-top: 16px;
 }
 </style>
