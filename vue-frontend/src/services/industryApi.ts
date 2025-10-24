@@ -141,6 +141,61 @@ export interface IndustrySectorRealtimeResponse {
 // API基础URL
 const API_BASE_URL = '/django/api/stock'
 
+// 行业板块日频数据项接口
+export interface IndustrySectorDailyItem {
+  sector_code: string
+  sector_name: string
+  date: string
+  open_price: number
+  close_price: number
+  high_price: number
+  low_price: number
+  change_percent: number
+  change_amount: number
+  total_volume: number
+  total_amount: number
+  total_market_cap?: number | null
+  amplitude: number
+  turnover_rate: number
+  rising_stocks: number
+  falling_stocks: number
+  flat_stocks: number
+  created_at: string
+}
+
+// 行业板块日频数据响应的data结构
+export interface IndustrySectorDailyData {
+  sector_code: string
+  sector_name: string
+  daily_data: IndustrySectorDailyItem[]
+  query_time: string
+}
+
+// 行业板块日频数据完整响应
+export interface IndustrySectorDailyResponse {
+  code: number
+  message: string
+  timestamp: string
+  data: IndustrySectorDailyData
+}
+
+/**
+ * 获取行业板块日频数据（用于K线）
+ * @param code 行业板块代码，如"BK0001"
+ * @param params 可选时间范围参数：start_date/end_date（YYYYMMDD）
+ * @returns Promise<IndustrySectorDailyData> 行业板块日频数据
+ */
+export async function getIndustrySectorDaily(
+  code: string,
+  params?: { start_date?: string; end_date?: string }
+): Promise<IndustrySectorDailyData> {
+  const response = await axios.get<IndustrySectorDailyData>(
+    `${API_BASE_URL}/industry-sector/daily/${code}/`,
+    { params }
+  )
+  return response.data
+}
+
 /**
  * 获取行业板块列表（不包含成分股）
  * @param limit 返回行业板块数量限制，默认返回全部

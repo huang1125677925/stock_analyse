@@ -618,14 +618,24 @@
         "sector_name": "农业",
         "daily_data": [
             {
-                "date": "2024-01-01",
-                "open": 1230.45,
-                "high": 1240.56,
-                "low": 1225.67,
-                "close": 1234.56,
-                "change_percent": 1.23,
-                "volume": 12345678,
-                "amount": 123456789.01
+                "sector_code": "BK0478",
+                "sector_name": "有色金属",
+                "date": "2025-10-23",
+                "open_price": 23013.99,
+                "close_price": 23346.68,
+                "high_price": 23356.74,
+                "low_price": 22815.58,
+                "change_percent": 1.09,
+                "change_amount": 251.59,
+                "total_volume": 38204075,
+                "total_amount": 46366082081.0,
+                "total_market_cap": null,
+                "amplitude": 2.34,
+                "turnover_rate": 2.63,
+                "rising_stocks": 0,
+                "falling_stocks": 0,
+                "flat_stocks": 0,
+                "created_at": "2025-10-23T08:01:23.195827+00:00"
             },
             // 更多日频数据...
         ],

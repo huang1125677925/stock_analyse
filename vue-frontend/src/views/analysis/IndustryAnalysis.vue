@@ -41,6 +41,18 @@
       </div>
     </el-card>
 
+    <!-- 行业K线图展示区域 -->
+    <el-card 
+      class="kline-panel" 
+      shadow="hover" 
+      v-if="selectedIndustry && selectedIndustry !== 'all' && selectedIndustryCode"
+    >
+      <IndustryKline 
+        :industry-code="selectedIndustryCode"
+        :title="`${selectedIndustryName} - 行业K线图`"
+      />
+    </el-card>
+
     <!-- 趋势图表展示区域 -->
     <IndustryTrendCharts
       v-if="selectedIndustry && selectedQuarter"
@@ -103,6 +115,7 @@ import {
 } from '../../services/industryAnalysisApi'
 import IndustryFundFlowHeatmap from '../../components/IndustryFundFlowHeatmap.vue'
 import IndustryTrendCharts from '../../components/IndustryTrendCharts.vue'
+import IndustryKline from '../../components/IndustryKline.vue'
 
 // 响应式数据
 const loading = ref(false)
@@ -133,6 +146,12 @@ const selectedIndustryName = computed(() => {
 const selectedQuarterName = computed(() => {
   const quarter = quarterOptions.value.find(item => item.value === selectedQuarter.value)
   return quarter?.label || '未选择'
+})
+
+// 选中行业代码（用于请求日频K线数据）
+const selectedIndustryCode = computed(() => {
+  const industry = industryList.value.find(item => item.name === selectedIndustry.value)
+  return industry?.code || ''
 })
 
 // 方法
@@ -196,6 +215,11 @@ onMounted(() => {
 
 .filter-panel {
   margin-bottom: 24px;
+}
+
+/* 新增：K线图卡片样式 */
+.kline-panel {
+  margin-top: 24px;
 }
 
 .filter-row {
