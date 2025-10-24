@@ -266,10 +266,11 @@ interface ApiResponse<T> {
 export interface StockListParams extends PageParams {
   keyword?: string; // 搜索关键词，可以是股票代码或名称
   industry?: string; // 行业筛选
+  stock_names?: string; // 仅看我的：以逗号分隔的股票名称列表
 }
 
 export const getStockList = async (params: StockListParams = {}): Promise<StockListResponse> => {
-  const { page, page_size, keyword, industry } = params
+  const { page, page_size, keyword, industry, stock_names } = params
   const queryParams = new URLSearchParams()
   
   if (page !== undefined) {
@@ -286,6 +287,10 @@ export const getStockList = async (params: StockListParams = {}): Promise<StockL
 
   if (industry) {
     queryParams.append('industry', industry)
+  }
+
+  if (stock_names) {
+    queryParams.append('stock_names', stock_names)
   }
   
   const queryString = queryParams.toString()

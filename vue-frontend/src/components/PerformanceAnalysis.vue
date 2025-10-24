@@ -21,7 +21,7 @@
     <div class="chart-container">
       <!-- 业绩指标热力图 -->
       <PerformanceHeatmap 
-        :data="industryHeatmapData"
+        :data="filteredIndustryHeatmapData"
         :selected-metric="selectedMetric"
         :sort-ascending="sortAscending"
         @chart-ready="handleChartReady"
@@ -34,12 +34,13 @@
 <script setup lang="ts">
 /**
  * 行业业绩指标分析组件
- * 功能：显示行业业绩指标热力图，支持多种业绩指标和报告类型
- * 参数：无
+ * 功能：显示行业业绩指标热力图，支持多种业绩指标和报告类型，并支持行业白名单过滤（用于“仅看我的”）
+ * 参数：
+ * - industryWhitelist?: string[] 行业白名单，传入后仅显示该列表中的行业
  * 返回值：无
  * 事件：chart-ready, chart-click
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryHeatmapData, HeatmapMetricType } from '@/services/industry-heatmap'
@@ -47,6 +48,14 @@ import type { IndustryHeatmapData } from '@/services/industry-heatmap'
 import MetricSelector from '@/components/MetricSelector.vue'
 import ReportTypeSelector from '@/components/ReportTypeSelector.vue'
 import PerformanceHeatmap from '@/components/PerformanceHeatmap.vue'
+
+interface Props {
+  industryWhitelist?: string[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  industryWhitelist: () => []
+})
 
 // 响应式变量
 const router = useRouter()
@@ -57,6 +66,29 @@ const loading = ref(false)
 
 // 数据存储
 const industryHeatmapData = ref<IndustryHeatmapData | null>(null)
+
+// 根据白名单过滤后的数据
+const filteredIndustryHeatmapData = computed<IndustryHeatmapData | null>(() => {
+  const data = industryHeatmapData.value
+  if (!data) return null
+  if (!props.industryWhitelist || props.industryWhitelist.length === 0) return data
+  const set = new Set(props.industryWhitelist.map(s => s.trim().toLowerCase()))
+  const filteredSw = data.swCodeNames.filter(sw => set.has(sw.indexName.trim().toLowerCase()))
+  const filteredCongestions: Record<string, any[]> = {}
+  filteredSw.forEach(sw => {
+    const key = sw.indexCode
+    const altKey = sw.indexName as any
+    const series = data.congestions[key] || data.congestions[altKey]
+    if (series) {
+      filteredCongestions[key] = series
+    }
+  })
+  return {
+    dates: data.dates,
+    swCodeNames: filteredSw,
+    congestions: filteredCongestions
+  }
+})
 
 // 获取行业业绩数据
 const fetchPerformanceData = async () => {

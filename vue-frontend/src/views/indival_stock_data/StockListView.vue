@@ -39,6 +39,9 @@
             <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
             <el-button :icon="RefreshLeft" @click="resetSearch">重置</el-button>
           </el-form-item>
+          <el-form-item label="仅看我的">
+            <el-checkbox v-model="onlyMine" @change="handleOnlyMineChange">仅看我的（持有/关注）</el-checkbox>
+          </el-form-item>
         </el-form>
       </div>
 
@@ -94,7 +97,7 @@
             </template>
           </el-table-column>
           
-          <el-table-column label="操作" min-width="180" fixed="right" align="center" header-align="center">
+          <el-table-column label="操作" min-width="260" fixed="right" align="center" header-align="center">
             <template #default="scope">
               <el-button 
                 type="primary" 
@@ -102,6 +105,20 @@
                 @click="viewHistory(scope.row.code)"
               >
                 股票详情
+              </el-button>
+              <el-button 
+                type="success" 
+                size="small"
+                @click="addWatched(scope.row.code)"
+              >
+                添加关注
+              </el-button>
+              <el-button 
+                type="warning" 
+                size="small"
+                @click="addHeld(scope.row.code)"
+              >
+                添加持有
               </el-button>
             </template>
           </el-table-column>
@@ -153,6 +170,8 @@ import { ElMessage } from 'element-plus'
 import { getStockList } from '@/services/individualStockApi'
 import type { StockInfo } from '@/services/individualStockApi'
 import { getIndustrySectors, type IndustrySector } from '@/services/industryAnalysisApi'
+import { createPersonalHolding, type RelationType, getPersonalHoldings, type PersonalHoldingsListResponse } from '@/services/personalHoldingsApi'
+import { isAuthenticated } from '@/services/auth'
 
 // 路由
 const router = useRouter()
@@ -169,6 +188,11 @@ const searchKeyword = ref('')
 const industry = ref('')
 const industryList = ref<IndustrySector[]>([])
 
+// 仅看我的（持有/关注）
+const onlyMine = ref(false)
+const holdingsCodeSet = ref<Set<string>>(new Set()) // 保留：用于本地操作（如按钮状态）
+const holdingsNameList = ref<string[]>([]) // 后端过滤使用的股票名称列表
+
 // 排序
 const sortField = ref('')
 const sortOrder = ref('asc')
@@ -179,13 +203,67 @@ const pageSize = ref(10)
 const totalStocks = ref(0)
 
 /**
- * 计算过滤后的股票列表
+ * 计算过滤后的股票列表（后端过滤）
  */
-const filteredStocks = computed(() => {
-  // 由于现在使用后端筛选，直接返回stocks数组
-  return stocks.value
+const filteredStocks = computed(() => stocks.value)
+
+// 根据过滤结果更新总数（用于分页展示）
+watch(filteredStocks, (list) => {
+  if (onlyMine.value) {
+    totalStocks.value = list.length
+  }
 })
 
+// 切换“仅看我的”
+const handleOnlyMineChange = async () => {
+  if (onlyMine.value) {
+    if (!isAuthenticated()) {
+      ElMessage.error('请先登录后再启用“仅看我的”')
+      onlyMine.value = false
+      router.push('/login')
+      return
+    }
+    try {
+      const res: PersonalHoldingsListResponse = await getPersonalHoldings()
+      const list = res.data?.list || []
+      // 同时保留代码集合，核心使用名称集合进行后端过滤
+      const codes = list
+        .filter(item => ['WATCHED', 'HELD'].includes(item.relation_type))
+        .map(item => item.stock_code?.trim())
+        .filter(Boolean) as string[]
+      holdingsCodeSet.value = new Set(codes)
+
+      const names = list
+        .filter(item => ['WATCHED', 'HELD'].includes(item.relation_type))
+        .map(item => item.stock_name?.trim())
+        .filter(Boolean) as string[]
+      holdingsNameList.value = names
+
+      currentPage.value = 1
+      if (names.length === 0) {
+        ElMessage.warning('您的持有/关注列表为空，暂无可展示数据')
+        stocks.value = []
+        totalStocks.value = 0
+      } else {
+        ElMessage.success(`已启用，仅展示与您相关的股票（${names.length} 条记录）`)
+        // 触发后端过滤
+        fetchStockList()
+      }
+    } catch (error) {
+      console.error('获取个人持有/关注列表失败:', error)
+      ElMessage.error('获取个人列表失败，请稍后重试')
+      onlyMine.value = false
+      holdingsCodeSet.value = new Set()
+      holdingsNameList.value = []
+    }
+  } else {
+    // 关闭时清空集合并刷新为全量
+    holdingsCodeSet.value = new Set()
+    holdingsNameList.value = []
+    currentPage.value = 1
+    fetchStockList()
+  }
+}
 
 // 方法：获取股票列表
 const fetchStockList = async () => {
@@ -194,8 +272,9 @@ const fetchStockList = async () => {
     const response = await getStockList({
       page: currentPage.value,
       page_size: pageSize.value,
-      keyword: searchKeyword.value, // 添加搜索关键词参数
-      industry: industry.value || undefined
+      keyword: searchKeyword.value,
+      industry: industry.value || undefined,
+      stock_names: onlyMine.value && holdingsNameList.value.length > 0 ? holdingsNameList.value.join(',') : undefined
     })
     stocks.value = response.data
     
@@ -269,6 +348,36 @@ const viewRealtime = (code: string) => {
 // 方法：查看历史行情
 const viewHistory = (code: string) => {
   router.push(`/stock-history/${code}`)
+}
+
+// 新增：添加关注
+const addWatched = async (code: string) => {
+  if (!isAuthenticated()) {
+    ElMessage.error('请先登录后再进行操作')
+    router.push('/login')
+    return
+  }
+  try {
+    const res = await createPersonalHolding({ stock_code: code, relation_type: 'WATCHED' })
+    ElMessage.success(res.message || '已添加关注')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '添加关注失败')
+  }
+}
+
+// 新增：添加持有
+const addHeld = async (code: string) => {
+  if (!isAuthenticated()) {
+    ElMessage.error('请先登录后再进行操作')
+    router.push('/login')
+    return
+  }
+  try {
+    const res = await createPersonalHolding({ stock_code: code, relation_type: 'HELD' })
+    ElMessage.success(res.message || '已添加持有')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '添加持有失败')
+  }
 }
 
 // 方法：格式化市值

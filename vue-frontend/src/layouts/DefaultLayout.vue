@@ -261,6 +261,12 @@ const menuItems = computed(() => {
         },
       ],
     },
+    // 在此处新增个人中心入口
+    {
+      path: '/personal/holdings',
+      title: '个人中心',
+      icon: 'User',
+    },
     // {
     //       path: '/forum/posts',
     //       title: '论坛讨论区',

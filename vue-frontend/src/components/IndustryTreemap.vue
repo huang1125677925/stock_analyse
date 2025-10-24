@@ -104,15 +104,25 @@
  * 2. 支持多种指标维度切换
  * 3. 提供数据刷新和实时更新
  * 4. 显示统计信息和图例说明
+ * 5. 支持行业白名单过滤（用于“仅看我的”）
  * 
- * 参数：无
+ * 参数：
+ * - industryWhitelist?: string[] 行业白名单，传入后仅显示该列表中的行业
  * 返回值：无
  * 事件：无
  */
-import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue'
+import { ref, onMounted, computed, nextTick, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { fetchIndustryStatistics, type IndustryStatistics } from '@/services/industryApi'
+
+interface Props {
+  industryWhitelist?: string[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  industryWhitelist: () => []
+})
 
 // 路由实例
 const router = useRouter()
@@ -147,16 +157,35 @@ const currentMetricLabel = computed(() => {
   return metric?.label || ''
 })
 
-const totalIndustries = computed(() => industryData.value?.length || 0)
+// 行业白名单过滤后的数据
+const visibleIndustryData = computed<IndustryStatistics[]>(() => {
+  if (!props.industryWhitelist || props.industryWhitelist.length === 0) return industryData.value
+  const set = new Set(props.industryWhitelist.map(s => s.trim().toLowerCase()))
+  return industryData.value.filter(item => set.has(item.industry.trim().toLowerCase()))
+})
+
+// 监听白名单变化，及时刷新树图
+watch(() => props.industryWhitelist, () => {
+  updateTreemap()
+}, { deep: true })
+
+// 监听可见数据变化，确保图表及时更新
+watch(visibleIndustryData, () => {
+  updateTreemap()
+})
+
+const totalIndustries = computed(() => visibleIndustryData.value?.length || 0)
 
 const maxValue = computed(() => {
-  if (!industryData.value || industryData.value.length === 0) return 0
-  return Math.max(...industryData.value.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
+  const data = visibleIndustryData.value
+  if (!data || data.length === 0) return 0
+  return Math.max(...data.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
 })
 
 const minValue = computed(() => {
-  if (!industryData.value || industryData.value.length === 0) return 0
-  return Math.min(...industryData.value.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
+  const data = visibleIndustryData.value
+  if (!data || data.length === 0) return 0
+  return Math.min(...data.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
 })
 
 // 方法定义
@@ -227,8 +256,16 @@ function updateTreemap() {
     return
   }
   
-  if (!industryData.value || industryData.value.length === 0) {
-    console.error('industryData为空或未定义')
+  const sourceData = visibleIndustryData.value
+  if (!sourceData || sourceData.length === 0) {
+    console.error('可见数据为空或未定义')
+    // 清空图表，显示暂无数据
+    if (chartInstance) {
+      chartInstance.setOption({
+        title: { text: '暂无数据', left: 'center', top: 'center' }
+      })
+      chartInstance.resize()
+    }
     return
   }
   
@@ -243,402 +280,248 @@ function updateTreemap() {
   console.log('当前选择的指标:', metric)
   
   // 将后端数据稳健地转换为数值，避免 NaN/字符串导致空图
-  const baseData = industryData.value.map(item => {
+  const baseData = sourceData.map(item => {
     const raw = item[selectedMetric.value as keyof IndustryStatistics] as unknown
     const num = typeof raw === 'number' ? raw : Number(raw)
     const originalValue = Number.isNaN(num) ? 0 : num
     const stockCount = typeof item.stock_count === 'number' && item.stock_count > 0 ? item.stock_count : 1
-    return { industry: item.industry, originalValue, stockCount }
+    
+    // 根据指标类型选择值（示例：百分比指标不做额外处理）
+    const value = originalValue
+    
+    return {
+      name: item.industry,
+      value,
+      stockCount,
+      metricKey: selectedMetric.value
+    }
   })
   
-  console.log('baseData处理结果:', baseData.slice(0, 3)) // 只打印前3条避免日志过长
-
-  let treemapData = baseData.map(d => ({
-    name: d.industry,
-    value: Math.abs(d.originalValue),
-    originalValue: d.originalValue,
-    itemStyle: { color: getColorByValue(d.originalValue, metric?.isPercent || false) }
-  }))
-
-  console.log('初始treemapData:', treemapData.slice(0, 3))
-
-  // 若所有值为 0（或等价于 0），则回退使用股票数量作为面积，保证图形可见
-  const totalArea = treemapData.reduce((sum, it) => sum + it.value, 0)
-  console.log('总面积:', totalArea)
-  
-  if (totalArea <= 0) {
-    console.log('所有值为0，使用股票数量作为回退')
-    treemapData = baseData.map(d => ({
-      name: d.industry,
-      value: d.stockCount,
-      originalValue: d.originalValue,
-      itemStyle: { color: getColorByValue(d.originalValue, metric?.isPercent || false) }
-    }))
-  }
-
-  // 过滤无效数据
-  treemapData = treemapData.filter(item => item.value > 0)
-  console.log('过滤后的treemapData长度:', treemapData.length)
-  console.log('最终treemapData:', treemapData.slice(0, 3))
-
-  if (treemapData.length === 0) {
-    console.error('treemapData为空，无法渲染图表')
-    return
-  }
-
-  // 配置图表选项
-  const option = {
-    title: {
-      text: `行业${currentMetricLabel.value}分布`,
-      left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'bold'
+  // 构建矩形树图数据结构
+  const treemapSeriesData = baseData.map(item => ({
+    name: item.name,
+    value: Math.abs(item.value),
+    children: [
+      {
+        name: `${item.name}`,
+        value: Math.abs(item.value),
+        originalValue: item.value,
+        label: {
+          show: true,
+          formatter: (params: any) => `${params.name}\n${formatValue(params.data.originalValue)}`
+        },
+        itemStyle: {
+          color: item.value > 0 ? '#73C0DE' : item.value < 0 ? '#EE6666' : '#999'
+        }
       }
+    ]
+  }))
+  
+  // 设置图表配置
+  const option: echarts.EChartsOption = {
+    title: {
+      text: `行业矩形树图（${metric?.label || ''}）`,
+      left: 'center'
     },
     tooltip: {
-      trigger: 'item',
       formatter: (params: any) => {
-        const data = params.data
-        const sum = treemapData.reduce((s, it) => s + it.value, 0)
-        return `
-          <div style="padding: 8px;">
-            <div style="font-weight: bold; margin-bottom: 4px;">${data.name}</div>
-            <div>${currentMetricLabel.value}: ${formatValue(data.originalValue)}</div>
-            <div>占比: ${sum > 0 ? ((data.value / sum) * 100).toFixed(2) : '0.00'}%</div>
-            <div style="color: #999; font-size: 12px; margin-top: 4px;">点击查看该行业股票列表</div>
-          </div>
-        `
+        const nameStr = typeof params?.name === 'string' ? params.name : ''
+        const baseName = nameStr.replace(/\s*\(.+\)\s*$/, '')
+        // 优先使用节点携带的原始值
+        const originalVal = (params?.data && 'originalValue' in params.data) ? Number(params.data.originalValue) : undefined
+        const dataItem = sourceData.find(i => i.industry === baseName)
+        const valueToShow = originalVal !== undefined ? originalVal : dataItem ? (dataItem[selectedMetric.value as keyof IndustryStatistics] as number) : 0
+        return `${baseName}<br/>${metric?.label || ''}: ${formatValue(Number(valueToShow))}`
       }
     },
     series: [{
       type: 'treemap',
-      data: treemapData,
-      roam: false,
-      nodeClick: true, // 启用节点点击
+      data: treemapSeriesData,
+      roam: true,
+      nodeClick: false,
       breadcrumb: { show: false },
       label: {
         show: true,
-        // 标签显示原始指标值，避免在回退场景显示面积值造成误解
-        formatter: (params: any) => `${params.name}\n${formatValue(params.data.originalValue)}`,
-        fontSize: 12,
-        color: '#fff',
-        fontWeight: 'bold'
+        color: '#2c3e50',
+        textShadowColor: 'rgba(255,255,255,0.9)',
+        textShadowBlur: 2,
+        textShadowOffsetX: 0,
+        textShadowOffsetY: 0
       },
+      // 增强边界与间隙，使块之间更清晰
       itemStyle: {
-        borderColor: '#fff',
-        borderWidth: 2,
+        borderColor: '#ffffff',
+        borderWidth: 1,
         gapWidth: 2
       },
+      // 分层配置，父层与子层边界区分更明显
+      levels: [
+        {
+          itemStyle: {
+            borderColor: '#e5e7eb',
+            borderWidth: 1,
+            gapWidth: 3
+          },
+          upperLabel: {
+            show: false
+          }
+        },
+        {
+          itemStyle: {
+            borderColor: '#ffffff',
+            borderWidth: 1,
+            gapWidth: 2
+          }
+        }
+      ],
+      // 鼠标悬停强调，边界更明显
       emphasis: {
         itemStyle: {
-          borderColor: '#333',
-          borderWidth: 3
-        },
-        label: {
-          fontSize: 14
+          borderColor: '#409EFF',
+          borderWidth: 2
         }
       }
     }]
   }
-
-  console.log('设置ECharts选项:', option)
+  
   chartInstance.setOption(option)
-  
-  // 绑定点击事件
-  chartInstance.off('click') // 先移除之前的事件监听器
+  chartInstance.resize()
+  chartInstance.off('click')
   chartInstance.on('click', handleTreemapClick)
-  
-  console.log('ECharts选项设置完成')
 }
 
-/**
- * 根据数值获取颜色
- */
-function getColorByValue(value: number, isPercent: boolean): string {
-  if (isPercent) {
-    // 百分比类型，正值绿色，负值红色
-    if (value > 0) return '#52c41a' // 绿色
-    if (value < 0) return '#ff4d4f' // 红色
-    return '#d9d9d9' // 灰色
-  } else {
-    // 非百分比类型，使用渐变色
-    const colors = [
-      '#1890ff', '#13c2c2', '#52c41a', '#faad14', 
-      '#f759ab', '#722ed1', '#fa541c', '#eb2f96'
-    ]
-    const index = Math.abs(value.toString().charCodeAt(0)) % colors.length
-    return colors[index]
+// 添加窗口resize处理，确保tab切换后图表自适应
+function handleResize() {
+  if (chartInstance) {
+    chartInstance.resize()
   }
 }
 
-/**
- * 格式化数值显示
- */
-function formatValue(value: number): string {
-  const metric = availableMetrics.find(m => m.key === selectedMetric.value)
-  
-  if (metric?.isPercent) {
-    return `${value.toFixed(2)}%`
-  }
-  
-  if (metric?.unit === '元') {
-    if (value >= 1e12) return `${(value / 1e12).toFixed(2)}万亿`
-    if (value >= 1e8) return `${(value / 1e8).toFixed(2)}亿`
-    if (value >= 1e4) return `${(value / 1e4).toFixed(2)}万`
-    return value.toFixed(2)
-  }
-  
-  if (value >= 1e8) return `${(value / 1e8).toFixed(2)}亿`
-  if (value >= 1e4) return `${(value / 1e4).toFixed(2)}万`
-  
-  return value.toFixed(2) + (metric?.unit || '')
-}
-
-/**
- * 格式化时间显示
- */
-function formatTime(date: Date): string {
-  return date.toLocaleString('zh-CN')
-}
-
-// 生命周期钩子
 onMounted(async () => {
   await loadIndustryData()
-  
-  // 监听窗口大小变化
-  window.addEventListener('resize', () => {
-    if (chartInstance) {
-      chartInstance.resize()
-    }
-  })
+  window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
-  // 清理图表实例
+  window.removeEventListener('resize', handleResize)
   if (chartInstance) {
     chartInstance.dispose()
     chartInstance = null
   }
-  
-  // 移除事件监听器
-  window.removeEventListener('resize', () => {
-    if (chartInstance) {
-      chartInstance.resize()
-    }
-  })
 })
+
+function formatValue(val: number): string {
+  const metric = availableMetrics.find(m => m.key === selectedMetric.value)
+  const value = typeof val === 'number' ? val : Number(val)
+  if (Number.isNaN(value)) return '--'
+
+  if (metric?.isPercent) {
+    return `${value.toFixed(2)}%`
+  }
+
+  if (metric?.unit === '元') {
+    const abs = Math.abs(value)
+    if (abs >= 1e12) return `${(value / 1e12).toFixed(2)}万亿`
+    if (abs >= 1e8) return `${(value / 1e8).toFixed(2)}亿`
+    if (abs >= 1e4) return `${(value / 1e4).toFixed(2)}万`
+    return value.toFixed(2)
+  }
+
+  if (metric?.unit === '手') {
+    const abs = Math.abs(value)
+    if (abs >= 1e8) return `${(value / 1e8).toFixed(2)}亿手`
+    if (abs >= 1e4) return `${(value / 1e4).toFixed(2)}万手`
+    return `${value.toFixed(2)}手`
+  }
+
+  if (metric?.unit) {
+    return `${value.toFixed(2)}${metric.unit}`
+  }
+
+  return value.toFixed(2)
+}
+
+function formatTime(date: Date): string {
+  try {
+    return new Date(date).toLocaleString('zh-CN')
+  } catch {
+    return ''
+  }
+}
 </script>
 
 <style scoped lang="scss">
 .industry-treemap {
-  .control-panel {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: white;
-    padding: 16px 24px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 24px;
-  }
-
-  .metric-selector {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .metric-selector label {
-    font-weight: 500;
-    color: #333;
-  }
-
-  .metric-select {
-    padding: 8px 12px;
-    border: 1px solid #d9d9d9;
-    border-radius: 6px;
-    font-size: 14px;
-    min-width: 200px;
-    background: white;
-  }
-
-  .metric-select:focus {
-    border-color: #1890ff;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-  }
-
-  .refresh-controls {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .refresh-btn {
-    padding: 8px 16px;
-    background: #1890ff;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.3s;
-  }
-
-  .refresh-btn:hover:not(:disabled) {
-    background: #40a9ff;
-  }
-
-  .refresh-btn:disabled {
-    background: #d9d9d9;
-    cursor: not-allowed;
-  }
-
-  .update-time {
-    font-size: 12px;
-    color: #999;
-  }
-
-  .loading-container, .error-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 400px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #1890ff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 16px;
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .error-message {
-    text-align: center;
-  }
-
-  .error-message h3 {
-    color: #ff4d4f;
-    margin-bottom: 8px;
-  }
-
-  .retry-btn {
-    padding: 8px 16px;
-    background: #ff4d4f;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-top: 16px;
-  }
-
   .treemap-container {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    align-items: start;
   }
 
   .treemap-chart {
     width: 100%;
-    height: 600px;
+    height: 560px; // 确保图表容器有高度，否则不显示
+    min-height: 420px;
+    border: 1px solid #ebeef5;
+    border-radius: 8px;
+    background-color: #fff;
   }
 
   .chart-info {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    padding: 24px;
-    border-top: 1px solid #f0f0f0;
-  }
+    padding: 12px;
+    border: 1px solid #ebeef5;
+    border-radius: 8px;
+    background-color: #fff;
 
-  .legend h4, .statistics h4 {
-    margin: 0 0 16px 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #333;
-  }
+    .legend {
+      margin-bottom: 12px;
 
-  .legend-items {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+      .legend-items {
+        display: flex;
+        gap: 12px;
 
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
 
-  .color-box {
-    width: 16px;
-    height: 16px;
-    border-radius: 2px;
-  }
+          .color-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
 
-  .color-box.positive {
-    background-color: #52c41a;
-  }
-
-  .color-box.negative {
-    background-color: #ff4d4f;
-  }
-
-  .color-box.neutral {
-    background-color: #d9d9d9;
-  }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-
-  .stat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-  }
-
-  .stat-label {
-    color: #666;
-    font-size: 14px;
-  }
-
-  .stat-value {
-    font-weight: 600;
-    color: #333;
-    font-size: 14px;
-  }
-
-  @media (max-width: 768px) {
-    .control-panel {
-      flex-direction: column;
-      gap: 16px;
-      align-items: stretch;
+            &.positive { background-color: #73C0DE; }
+            &.negative { background-color: #EE6666; }
+            &.neutral { background-color: #999; }
+          }
+        }
+      }
     }
-    
-    .chart-info {
+
+    .statistics {
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px 12px;
+
+        .stat-item {
+          display: flex;
+          justify-content: space-between;
+
+          .stat-label { color: #606266; }
+          .stat-value { color: #303133; }
+        }
+      }
+    }
+  }
+
+  @media (max-width: 1200px) {
+    .treemap-container {
       grid-template-columns: 1fr;
     }
-    
     .treemap-chart {
-      height: 400px;
+      height: 480px;
     }
   }
 }

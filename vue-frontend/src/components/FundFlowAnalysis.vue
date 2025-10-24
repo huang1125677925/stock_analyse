@@ -45,7 +45,7 @@
     <div class="chart-container">
       <!-- 资金流热力图 -->
       <FundFlowHeatmap 
-        :data="industryFundFlowData"
+        :data="filteredIndustryFundFlowData"
         :selected-metric="selectedFundFlowMetric"
         :sort-ascending="sortAscending"
         :value-filter="valueFilter"
@@ -59,12 +59,13 @@
 <script setup lang="ts">
 /**
  * 行业资金流分析组件
- * 功能：显示行业资金流热力图，支持多种资金流指标和日期范围选择
- * 参数：无
+ * 功能：显示行业资金流热力图，支持多种资金流指标和日期范围选择，并支持行业白名单过滤（用于“仅看我的”）
+ * 参数：
+ * - industryWhitelist?: string[] 行业白名单，传入后仅显示该列表中的行业
  * 返回值：无
  * 事件：chart-ready, chart-click
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -74,6 +75,14 @@ import FundFlowHeatmap from './FundFlowHeatmap.vue'
 import { FundFlowMetricType } from '@/services/industry-fund-flow'
 import { fetchIndustryFundFlowData } from '@/services/industry-fund-flow'
 import type { IndustryFundFlowData } from '@/services/industry-fund-flow'
+
+interface Props {
+  industryWhitelist?: string[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  industryWhitelist: () => []
+})
 
 // 响应式变量
 const router = useRouter()
@@ -86,6 +95,29 @@ const loading = ref(false)
 
 // 数据存储
 const industryFundFlowData = ref<IndustryFundFlowData | null>(null)
+
+// 根据白名单过滤后的数据
+const filteredIndustryFundFlowData = computed<IndustryFundFlowData | null>(() => {
+  const data = industryFundFlowData.value
+  if (!data) return null
+  if (!props.industryWhitelist || props.industryWhitelist.length === 0) return data
+  const set = new Set(props.industryWhitelist.map(s => s.trim().toLowerCase()))
+  const filteredSw = data.swCodeNames.filter(sw => set.has(sw.indexName.trim().toLowerCase()))
+  const filteredCongestions: Record<string, any[]> = {}
+  filteredSw.forEach(sw => {
+    const key = sw.indexCode
+    const altKey = sw.indexName as any
+    const series = data.congestions[key] || data.congestions[altKey]
+    if (series) {
+      filteredCongestions[key] = series
+    }
+  })
+  return {
+    dates: data.dates,
+    swCodeNames: filteredSw,
+    congestions: filteredCongestions
+  }
+})
 
 // 获取行业资金流数据
 const fetchFundFlowData = async () => {

@@ -170,6 +170,12 @@ const router = createRouter({
       ]
     },
     {
+      path: '/personal/holdings',
+      name: 'personal-center-holdings',
+      component: () => import('@/views/personal-center/HoldingsView.vue'),
+      meta: { title: '个人中心-持有/关注', requiresAuth: true }
+    },
+    {
       path: '/strategy',
       name: 'strategy',
       meta: { title: '策略分析' },
