@@ -25,6 +25,17 @@
           <IndustryTreemap :industry-whitelist="industryWhitelist" />
         </el-tab-pane>
         
+        <el-tab-pane label="行业宽度热力图" name="breadth">
+          <IndustryBreadthAnalysis :industry-whitelist="industryWhitelist" />
+        </el-tab-pane>
+        
+        <el-tab-pane label="行业规模宽度" name="scaleBreadth">
+          <IndustryScaleBreadthPanel :industry-whitelist="industryWhitelist" panel-type="breadth" />
+        </el-tab-pane>
+        <el-tab-pane label="行业产出营收" name="outputScale">
+          <IndustryScaleBreadthPanel :industry-whitelist="industryWhitelist" panel-type="output" />
+        </el-tab-pane>
+        
         <el-tab-pane label="指数RPS强度排名" name="indexrps">
           <IndexRpsView />
         </el-tab-pane>
@@ -55,6 +66,8 @@ import IndustryTreemap from '@/components/IndustryTreemap.vue'
 import IndexRpsView from '@/views/strategy/IndexRpsView.vue'
 import { getPersonalHoldings, type PersonalHoldingsListResponse } from '@/services/personalHoldingsApi'
 import { isAuthenticated } from '@/services/auth'
+import IndustryBreadthAnalysis from '@/components/IndustryBreadthAnalysis.vue'
+import IndustryScaleBreadthPanel from '@/components/IndustryScaleBreadthPanel.vue'
 
 // 当前激活的tab
 const activeTab = ref('turnover')
