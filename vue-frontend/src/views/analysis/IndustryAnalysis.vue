@@ -81,6 +81,20 @@
       />
     </el-card>
 
+    <el-card 
+      class="fund-flow-panel" 
+      shadow="hover" 
+      v-if="selectedIndustry && selectedIndustry !== 'all' && selectedIndustryCode"
+    >
+      <IndustryFundFlowCorrelationScatter
+        :sector-code="selectedIndustryCode"
+        :industry-name="selectedIndustryName"
+        :title="`${selectedIndustryName} - 资金流相关性散点图`"
+        height="500px"
+      />
+    </el-card>
+    
+
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-overlay">
       <el-loading
@@ -116,6 +130,7 @@ import {
 import IndustryFundFlowHeatmap from '../../components/IndustryFundFlowHeatmap.vue'
 import IndustryTrendCharts from '../../components/IndustryTrendCharts.vue'
 import IndustryKline from '../../components/IndustryKline.vue'
+import IndustryFundFlowCorrelationScatter from '@/components/IndustryFundFlowCorrelationScatter.vue'
 
 // 响应式数据
 const loading = ref(false)
