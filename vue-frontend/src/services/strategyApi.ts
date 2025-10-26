@@ -102,3 +102,69 @@ export async function getHistoricalRps(
     throw error
   }
 }
+
+// 新增：个股K线形态识别API类型与方法
+export interface CandlestickPatternItem {
+  date: string
+  hammer: number
+  morning_star: number
+  piercing: number
+  kicking: number
+  inverted_hammer: number
+  engulfing: number
+  harami: number
+  hanging_man: number
+  evening_star: number
+  dark_cloud_cover: number
+  three_black_crows: number
+  identical_three_crows: number
+  doji: number
+  long_legged_doji: number
+  gravestone_doji: number
+}
+
+export interface CandlestickPatternData {
+  stock_code: string
+  stock_name: string
+  total: number
+  patterns: CandlestickPatternItem[]
+}
+
+export interface CandlestickPatternResponse {
+  code: number
+  message: string
+  timestamp: string
+  data: CandlestickPatternData
+}
+
+export interface CandlestickPatternParams {
+  start_date?: string // 格式：YYYY-MM-DD
+  end_date?: string   // 格式：YYYY-MM-DD
+}
+
+/**
+ * 获取指定股票的K线形态识别结果
+ * @param stockCode 股票代码
+ * @param params 查询参数（start_date, end_date）
+ * @returns Promise<CandlestickPatternData>
+ */
+export async function getCandlestickPatterns(
+  stockCode: string,
+  params: CandlestickPatternParams = {}
+): Promise<CandlestickPatternData> {
+  try {
+    const response = await axios.get<CandlestickPatternData>(
+      `/django/api/strategy/individual-analysis/candlestick/${stockCode}/`,
+      {
+        params: {
+          start_date: params.start_date,
+          end_date: params.end_date
+        }
+      }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取个股K线形态识别结果失败:', error)
+    throw error
+  }
+}

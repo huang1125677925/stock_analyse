@@ -55,7 +55,20 @@
           </el-form-item>
         </el-form>
       </div>
-
+      <div class="chart-container">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <span>K线形态识别热力图（最近一月）</span>
+            </div>
+          </template>
+          <CandlestickPatternHeatmap
+                  :stock-code="queryForm.code"
+                  :start-date="recentMonthRange[0]"
+                  :end-date="recentMonthRange[1]"
+                />
+        </el-card>
+      </div>
       <!-- 历史行情图表 -->
       <div class="chart-container">
         <StockChart 
@@ -64,6 +77,7 @@
           :loading="loading"
         />
       </div>
+      
 
       <!-- 业绩数据趋势图 -->
       <div class="chart-container">
@@ -84,6 +98,7 @@
               @refresh="handleSearch"
               @sort-change="handleSortChange"
             />
+            
           </el-tab-pane>
 
           <!-- 业绩数据标签页 -->
@@ -166,6 +181,7 @@ import PerformanceDataTable from './components/PerformanceDataTable.vue'
 // 导入图表组件
 import StockChart from './components/StockChart.vue'
 import PerformanceChart from './components/PerformanceChart.vue'
+import CandlestickPatternHeatmap from './components/CandlestickPatternHeatmap.vue'
 
 // 路由
 const route = useRoute()
@@ -213,6 +229,37 @@ const stockInfo = reactive<StockInfo>({
 const queryForm = reactive({
   code: route.params.code as string || '',
   dateRange: [] as string[]
+})
+
+// 最近一个月日期范围（相对于选择的结束日期或今天），格式：YYYYMMDD
+const recentMonthRange = computed<[string, string]>(() => {
+  const formatYmd = (d: Date): string => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}${m}${day}`
+  }
+  const toDateFromYmd = (s: string): Date => {
+    if (/^\d{8}$/.test(s)) {
+      const y = Number(s.slice(0, 4))
+      const m = Number(s.slice(4, 6)) - 1
+      const d = Number(s.slice(6, 8))
+      return new Date(y, m, d)
+    }
+    // 尝试按 YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s)
+    return new Date()
+  }
+  const minusDays = (ymd: string, days: number): string => {
+    const date = toDateFromYmd(ymd)
+    date.setDate(date.getDate() - days)
+    return formatYmd(date)
+  }
+
+  const end = queryForm.dateRange?.[1] ?? formatYmd(new Date())
+  const endYmd = /^\d{8}$/.test(end) ? end : formatYmd(toDateFromYmd(end))
+  const startYmd = minusDays(endYmd, 30)
+  return [startYmd, endYmd]
 })
 
 // 历史行情数据
@@ -558,5 +605,17 @@ onMounted(() => {
   .stock-chart {
     height: 350px;
   }
+}
+.chart-card {
+  border: 1px solid #ebeef5;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-header span {
+  font-size: 16px;
+  font-weight: 600;
 }
 </style>
