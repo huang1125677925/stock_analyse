@@ -164,7 +164,7 @@ const router = createRouter({
         {
           path: '/analysis/index-list',
           name: 'index-list',
-          component: () => import('@/views/analysis/IndexList.vue'),
+          component: () => import('@/views/markt_data/IndexList.vue'),
           meta: { title: '指数列表' }
         },
         {
