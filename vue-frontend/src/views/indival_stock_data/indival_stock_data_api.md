@@ -175,7 +175,7 @@
 
 ### 请求信息
 
-- **URL**: `/stocks/<str:stock_code>/history/`
+- **URL**: `/django/api/individual_stock/stocks/<str:stock_code>/history/`
 - **方法**: GET
 - **接口名称**: `stock_history`
 

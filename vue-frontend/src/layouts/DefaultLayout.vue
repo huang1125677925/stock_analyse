@@ -178,6 +178,11 @@ const menuItems = computed(() => {
       icon: 'DataAnalysis',
       children: [
         {
+          path: '/analysis/market-change',
+          title: '大盘涨跌',
+          icon: 'TrendCharts',
+        },
+        {
           path: '/analysis/market',
           title: '大盘分析',
           icon: 'TrendCharts',

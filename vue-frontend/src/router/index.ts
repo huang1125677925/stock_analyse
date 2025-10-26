@@ -132,6 +132,12 @@ const router = createRouter({
           meta: { title: '大盘分析' }
         },
         {
+          path: '/analysis/market-change',
+          name: 'MarketChangeHeatmap',
+          component: () => import('@/views/markt_data/MarketChangeHeatmap.vue'),
+          meta: { title: '大盘涨跌' }
+        },
+        {
           path: '/analysis/congestion',
           name: 'congestion-heatmap',
           component: () => import('@/views/analysis/CongestionHeatmap.vue'),
