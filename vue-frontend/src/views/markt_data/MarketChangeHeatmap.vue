@@ -23,6 +23,14 @@
       </div>
       <div ref="pieChartRef" class="chart chart-pie"></div>
     </el-card>
+    
+    <!-- 新增：ADR/ADL 趋势图组件 -->
+    <div class="breadth-intro">
+      <p><strong>涨跌家数比（ADR）</strong>：一段时间内上涨股票家数之和与下跌股票家数之和的比值，常用参数为 10 日。比值通常在特定区间（如 0.5–1.5）波动，超出则可能预示市场超买或超卖，趋势可能反转。</p>
+      <p><strong>腾落指标（ADL）</strong>：每日上涨家数与下跌家数的差值的累计。从基期（通常为一段行情起点）开始，每天用上涨家数减去下跌家数并持续累加。观察与大盘指数的同步或背离；背离常被视为趋势反转的先行信号。</p>
+    </div>
+    <AdrTrend :days="30" />
+    <AdlTrend :days="30" />
   </div>
 </template>
 
@@ -43,6 +51,8 @@ import { onMounted, onBeforeUnmount, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { getStockHistory } from '@/services/individualStockApi'
+import AdrTrend from '@/components/AdrTrend.vue'
+import AdlTrend from '@/components/AdlTrend.vue'
 
 // 定义组件名称，便于路由与组件名称一致
 defineOptions({ name: 'MarketChangeHeatmap' })
@@ -282,5 +292,11 @@ onBeforeUnmount(() => {
   .chart-pie {
     height: 360px;
   }
+}
+.breadth-intro {
+  margin: 12px 0 8px;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.6;
 }
 </style>
