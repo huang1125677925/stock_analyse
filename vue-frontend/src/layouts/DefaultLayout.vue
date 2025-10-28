@@ -197,6 +197,11 @@ const menuItems = computed(() => {
           title: 'CCTV新闻',
           icon: 'Document',
         },
+        {
+          path: '/analysis/news-wordcloud',
+          title: '新闻词云',
+          icon: 'DataLine',
+        },
       ],
     },
     {

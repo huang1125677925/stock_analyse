@@ -150,6 +150,12 @@ const router = createRouter({
           meta: { title: 'CCTV新闻列表' }
         },
         {
+          path: '/analysis/news-wordcloud',
+          name: 'news-wordcloud',
+          component: () => import('@/views/markt_data/NewsWordcloud.vue'),
+          meta: { title: '新闻词云' }
+        },
+        {
           path: '/analysis/news-detail/:id',
           name: 'news-detail',
           component: () => import('@/views/analysis/NewsDetail.vue'),
