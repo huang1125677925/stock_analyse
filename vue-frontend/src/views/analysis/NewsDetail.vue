@@ -23,8 +23,29 @@
           </div>
           
           <el-divider />
-          
-          <!-- 新闻内容 -->
+
+          <!-- AI分析结果（置顶） -->
+          <el-row :gutter="20" class="mt-20">
+            <el-col :span="24">
+              <el-card class="content-card" shadow="hover">
+                <template #header>
+                  <div class="ai-header">
+                    <span>AI分析结果</span>
+                    <el-tag type="success" size="small">AI智能分析</el-tag>
+                  </div>
+                </template>
+                <div class="ai-content" v-if="aiEntries.length">
+                  <div class="ai-line" v-for="item in aiEntries" :key="item.industry">
+                    <span class="industry">{{ item.industry }}</span>
+                    <el-tag :type="getImpactTagType(item.impact)" size="small">{{ item.impact }}</el-tag>
+                  </div>
+                </div>
+                <el-empty v-else description="暂无AI分析结果" />
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <!-- 新闻内容（下方） -->
           <el-row :gutter="20" class="mt-20">
             <el-col :span="24">
               <el-card class="content-card">
@@ -35,22 +56,6 @@
               </el-card>
             </el-col>
           </el-row>
-          
-          <!-- AI分析结果 -->
-          <el-row :gutter="20" class="mt-20">
-            <el-col :span="24">
-              <el-card class="content-card" shadow="hover">
-                <template #header>
-                  <div class="ai-header">
-                    <span>AI分析结果</span>
-                    <el-tag type="success" size="small">AI智能分析</el-tag>
-                  </div>
-                </template>
-                <div class="ai-content" v-if="newsDetail.ai_content" v-html="formatContent(newsDetail.ai_content)"></div>
-                <el-empty v-else description="暂无AI分析结果" />
-              </el-card>
-            </el-col>
-          </el-row>
         </template>
       </div>
     </el-card>
@@ -58,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getNewsDetail, type NewsItem } from '@/services/newsApi'
@@ -111,6 +116,33 @@ function formatContent(content: string): string {
     console.error('Markdown解析错误:', error)
     return `<p class="error">内容解析错误</p>`
   }
+}
+
+// 解析 AI 内容（JSON 字符串：key 为行业，value 为影响，如“利好/利空/中性”）
+interface AiEntry { industry: string; impact: string }
+const aiEntries = computed<AiEntry[]>(() => {
+  const raw = newsDetail.value?.ai_content
+  if (!raw) return []
+  try {
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!obj || typeof obj !== 'object') return []
+    return Object.entries(obj as Record<string, unknown>).map(([industry, impact]) => ({
+      industry,
+      impact: String(impact ?? '')
+    }))
+  } catch (e) {
+    console.error('AI内容解析失败:', e)
+    return []
+  }
+})
+
+// 根据影响值选择标签类型
+function getImpactTagType(impact: string): 'success' | 'info' | 'warning' | 'danger' {
+  const text = impact.trim()
+  if (text.includes('利好')) return 'success'
+  if (text.includes('利空')) return 'danger'
+  if (text.includes('中性')) return 'info'
+  return 'info'
 }
 
 // 返回列表页
@@ -178,6 +210,22 @@ onMounted(() => {
   background-color: #f8f9fa;
   padding: 15px;
   border-radius: 4px;
+}
+
+.ai-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.ai-line .industry {
+  font-weight: 500;
+  color: #303133;
 }
 
 .ai-header {

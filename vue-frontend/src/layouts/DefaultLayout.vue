@@ -199,7 +199,7 @@ const menuItems = computed(() => {
         },
         {
           path: '/analysis/news-wordcloud',
-          title: '新闻词云',
+          title: '新闻热力图',
           icon: 'DataLine',
         },
       ],
