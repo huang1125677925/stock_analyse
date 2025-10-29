@@ -20,7 +20,13 @@
           style="width: 100%"
         >
           <el-table-column prop="stock_code" label="股票代码" min-width="120" align="center" header-align="center" />
-          <el-table-column prop="stock_name" label="股票名称" min-width="140" align="center" header-align="center" />
+          <el-table-column prop="stock_name" label="股票名称" min-width="160" align="center" header-align="center">
+            <template #default="scope">
+              <el-button type="primary" link @click="viewHistory(scope.row.stock_code)">
+                {{ scope.row.stock_name }}
+              </el-button>
+            </template>
+          </el-table-column>
           <el-table-column prop="industry" label="行业" min-width="140" align="center" header-align="center" />
           <el-table-column prop="relation_type" label="类型" min-width="120" align="center" header-align="center">
             <template #default="scope">
@@ -30,7 +36,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="created_at" label="创建时间" min-width="180" align="center" header-align="center" />
-          <el-table-column label="操作" min-width="160" fixed="right" align="center" header-align="center">
+          <el-table-column label="操作" min-width="160" align="center" header-align="center">
             <template #default="scope">
               <el-popconfirm title="确认删除该记录？" @confirm="handleDelete(scope.row.id)">
                 <template #reference>
@@ -114,6 +120,11 @@ const handleDelete = async (id: number) => {
 onMounted(() => {
   fetchList()
 })
+
+// 方法：跳转到股票历史详情
+const viewHistory = (code: string) => {
+  router.push(`/stock-history/${code}`)
+}
 </script>
 
 <style scoped>

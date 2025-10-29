@@ -1,1 +1,0 @@
-import{J as s}from"./index-FX-vaUBG.js";async function o(){return await s.get("/django/api/personal/holdings/")}async function r(n){return await s.post("/django/api/personal/holdings/",n)}async function t(n){return await s.delete(`/django/api/personal/holdings/${n}/`)}export{r as c,t as d,o as g};

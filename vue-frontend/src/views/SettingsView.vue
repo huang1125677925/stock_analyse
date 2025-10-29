@@ -11,42 +11,51 @@
       </template>
       <div v-loading="loadingInviteCodes">
         <el-empty v-if="invitationCodes.length === 0" description="暂无邀请码" />
-        <el-table v-else :data="invitationCodes" style="width: 100%">
-          <el-table-column prop="code" label="邀请码" width="180" />
-          <el-table-column label="状态" width="120">
-            <template #default="scope">
-              <el-tag :type="scope.row.is_used ? 'info' : 'success'">
-                {{ scope.row.is_used ? '已使用' : '未使用' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="使用者" width="150">
-            <template #default="scope">
-              <span>{{ scope.row.used_by || '-' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" width="180" />
-          <el-table-column prop="expires_at" label="过期时间" width="180" />
-          <el-table-column label="操作">
-            <template #default="scope">
-              <el-button 
-                type="primary" 
-                link 
-                @click="copyInviteCode(scope.row.code)"
-                :disabled="scope.row.is_used"
-              >
-                复制
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <!-- 非空时同时展示统计与表格，需要使用 template v-else 包裹 -->
+        <template v-else>
+          <!-- 邀请码使用状态统计 -->
+          <div class="invite-stats">
+            <el-tag type="danger">已使用：{{ usedCount }}</el-tag>
+            <el-tag type="success" class="stats-gap">未使用：{{ unusedCount }}</el-tag>
+            <el-tag class="stats-gap">总数：{{ totalCount }}</el-tag>
+          </div>
+          <el-table :data="invitationCodes" style="width: 100%">
+           <el-table-column prop="code" label="邀请码" width="180" />
+           <el-table-column label="状态" width="120">
+             <template #default="scope">
+               <el-tag :type="scope.row.is_used ? 'info' : 'success'">
+                 {{ scope.row.is_used ? '已使用' : '未使用' }}
+               </el-tag>
+             </template>
+           </el-table-column>
+           <el-table-column label="使用者" width="150">
+             <template #default="scope">
+               <span>{{ scope.row.used_by || '-' }}</span>
+             </template>
+           </el-table-column>
+           <el-table-column prop="created_at" label="创建时间" width="180" />
+           <el-table-column prop="expires_at" label="过期时间" width="180" />
+           <el-table-column label="操作">
+             <template #default="scope">
+               <el-button 
+                 type="primary" 
+                 link 
+                 @click="copyInviteCode(scope.row.code)"
+                 :disabled="scope.row.is_used"
+               >
+                 复制
+               </el-button>
+             </template>
+           </el-table-column>
+          </el-table>
+        </template>
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getInvitationCodes, generateInvitationCode } from '../services/userApi'
 import type { InvitationCode } from '../services/userApi'
@@ -57,6 +66,11 @@ import type { InvitationCode } from '../services/userApi'
 const invitationCodes = ref<InvitationCode[]>([])
 const loadingInviteCodes = ref(false)
 const generatingCode = ref(false)
+
+// 统计数据
+const usedCount = computed(() => invitationCodes.value.filter((c) => c.is_used).length)
+const unusedCount = computed(() => invitationCodes.value.filter((c) => !c.is_used).length)
+const totalCount = computed(() => invitationCodes.value.length)
 
 // 获取邀请码列表
 const fetchInvitationCodes = async () => {
@@ -127,5 +141,13 @@ onMounted(() => {
 
 .el-empty {
   padding: 30px 0;
+}
+
+.invite-stats {
+  margin: 10px 0;
+}
+
+.stats-gap {
+  margin-left: 8px;
 }
 </style>
