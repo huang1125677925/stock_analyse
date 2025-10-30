@@ -177,9 +177,12 @@ const buildHeatmapOption = (metrics: FundFlowMetricType[], title: string, labelS
         if (props.valueFilter === 'positive' && value <= 0) shouldInclude = false
         else if (props.valueFilter === 'negative' && value >= 0) shouldInclude = false
         if (shouldInclude) {
-          heatmapData.push([xIndex, yIndex, value])
-          minValue = Math.min(minValue, value)
-          maxValue = Math.max(maxValue, value)
+          // 金额类指标统一转换为“亿”单位进行展示
+          const isAmountMetric = (metric as string).endsWith('_amount')
+          const displayValue = isAmountMetric ? value / 100000000 : value
+          heatmapData.push([xIndex, yIndex, displayValue])
+          minValue = Math.min(minValue, displayValue)
+          maxValue = Math.max(maxValue, displayValue)
         }
       }
     })
@@ -199,8 +202,13 @@ const buildHeatmapOption = (metrics: FundFlowMetricType[], title: string, labelS
         const item = data[xIndex]
         const metric = metrics[yIndex]
         const metricConfig = FUND_FLOW_METRICS[metric]
-        const formattedValue = metricConfig.formatter ? metricConfig.formatter(value) : Number(value).toFixed(2)
-        return `${item.date}<br/>${metricConfig.name}: ${formattedValue}${metricConfig.unit}`
+        const isAmountMetric = (metric as string).endsWith('_amount')
+        // 统一金额类指标为“亿”单位；比例类维持原有格式
+        const formattedValue = isAmountMetric
+          ? Number(value).toFixed(2)
+          : (metricConfig.formatter ? metricConfig.formatter(value) : Number(value).toFixed(2))
+        const unit = isAmountMetric ? '亿' : metricConfig.unit
+        return `${item.date}<br/>${metricConfig.name}: ${formattedValue}${unit}`
       }
     },
     grid: {
@@ -231,8 +239,9 @@ const buildHeatmapOption = (metrics: FundFlowMetricType[], title: string, labelS
         formatter: function (params: any) {
           const value = params.data[2]
           const metric = metrics[params.data[1]]
-          const metricConfig = FUND_FLOW_METRICS[metric]
-          return metricConfig.formatter ? metricConfig.formatter(value) : Number(value).toFixed(1)
+          const isAmountMetric = (metric as string).endsWith('_amount')
+          // 金额统一显示为“亿”，比例使用原格式
+          return isAmountMetric ? Number(value).toFixed(1) + '亿' : Number(value).toFixed(1)
         }
       },
       emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }

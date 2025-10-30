@@ -128,7 +128,7 @@ const router = createRouter({
         {
           path: '/analysis/market',
           name: 'market-analysis',
-          component: () => import('@/views/analysis/MarketAnalysis.vue'),
+          component: () => import('@/views/markt_data/MarketAnalysis.vue'),
           meta: { title: '大盘分析' }
         },
         {

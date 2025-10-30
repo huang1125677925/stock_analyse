@@ -47,7 +47,7 @@
           <div class="pane-title">行业列表</div>
           <el-scrollbar class="industry-scroll">
             <div
-              v-for="(ind, yi) in industryList"
+              v-for="(ind, yi) in sortedIndustryList"
               :key="ind"
               class="industry-item"
               @click="openIndustryDialog(ind)"
@@ -232,6 +232,13 @@ function industryPositiveCount(industry: string): number {
   }
   return cnt
 }
+
+// 行业列表按利好天数降序排序（用于侧边行业列表展示）
+const sortedIndustryList = computed<string[]>(() => {
+  const list = [...industryList]
+  list.sort((a, b) => industryPositiveCount(b) - industryPositiveCount(a))
+  return list
+})
 
 function openIndustryDialog(industry: string) {
   const items: Array<{ date: string; reasons: string[] }> = []
