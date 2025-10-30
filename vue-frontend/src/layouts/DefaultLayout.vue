@@ -78,13 +78,13 @@
     </el-main>
 
     <!-- 移动端抽屉菜单 -->
-    <el-drawer v-model="mobileMenuVisible" direction="rtl" size="80%" :with-header="false">
+    <el-drawer v-model="mobileMenuVisible" direction="rtl" size="100%" :with-header="false">
       <div class="mobile-drawer">
         <div class="mobile-drawer-header">
           <h3>导航</h3>
           <el-button type="text" @click="mobileMenuVisible = false"><el-icon><Fold /></el-icon></el-button>
         </div>
-        <el-menu :default-active="$route.path" router class="mobile-menu">
+        <el-menu :default-active="$route.path" router class="mobile-menu" @select="onMobileMenuSelect">
           <template v-for="item in menuItems" :key="item.path">
             <el-sub-menu v-if="item.children && item.children.length" :index="item.path">
               <template #title>
@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { isAuthenticated, currentUser, logout, initAuth } from '../services/auth'
@@ -341,6 +341,22 @@ const breadcrumbs = computed(() => {
     title: item.meta?.title || '未知页面',
   }))
 })
+
+// 移动端：选择菜单或路由变化时自动关闭抽屉
+function onMobileMenuSelect(index: string, indexPath: string[]) {
+  if (isMobile.value) {
+    mobileMenuVisible.value = false
+  }
+}
+
+watch(
+  () => route.path,
+  () => {
+    if (isMobile.value && mobileMenuVisible.value) {
+      mobileMenuVisible.value = false
+    }
+  }
+)
 </script>
 
 <style scoped>

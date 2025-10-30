@@ -31,7 +31,7 @@ const router = createRouter({
     {
       path: '/industries',
       name: 'industries',
-      component: () => import('../views/analysis/IndustryAnalysis.vue'),
+      component: () => import('../views/industry-stock-data/IndustryAnalysis.vue'),
       meta: { title: '行业分析' }
     },
     {
@@ -140,7 +140,7 @@ const router = createRouter({
         {
           path: '/analysis/congestion',
           name: 'congestion-heatmap',
-          component: () => import('@/views/analysis/CongestionHeatmap.vue'),
+          component: () => import('@/views/industry-stock-data/CongestionHeatmap.vue'),
           meta: { title: '行业热力图' }
         },
         {
