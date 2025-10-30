@@ -225,7 +225,9 @@ const buildHeatmapOption = (metrics: FundFlowMetricType[], title: string, labelS
       orient: 'vertical',
       right: '2%',
       top: '5%',
-      inRange: { color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'] },
+      // 根据数值从负到正映射为鲜绿到鲜红的连续渐变
+      // 说明：visualMap 会将 min 映射为数组首色（负值 -> 绿），max 映射为数组尾色（正值 -> 红）
+      inRange: { color: ['#00C853', '#FF1744'] },
       text: ['高', '低'],
       textStyle: { fontSize: 12 }
     },

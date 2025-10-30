@@ -47,7 +47,7 @@
           <div class="pane-title">行业列表</div>
           <el-scrollbar class="industry-scroll">
             <div
-              v-for="(ind, yi) in sortedIndustryList"
+              v-for="(ind, yi) in sortedIndustryList.slice().reverse()"
               :key="ind"
               class="industry-item"
               @click="openIndustryDialog(ind)"
@@ -233,10 +233,15 @@ function industryPositiveCount(industry: string): number {
   return cnt
 }
 
-// 行业列表按利好天数降序排序（用于侧边行业列表展示）
+// 行业列表按利好天数降序排序（用于侧边行业列表展示，并列按名称）
 const sortedIndustryList = computed<string[]>(() => {
   const list = [...industryList]
-  list.sort((a, b) => industryPositiveCount(b) - industryPositiveCount(a))
+  list.sort((a, b) => {
+    const diff = industryPositiveCount(a) - industryPositiveCount(b)
+    if (diff !== 0) return diff
+    // 并列时按行业名称排序，使用中文本地化比较，保证稳定性
+    return a.localeCompare(b, 'zh-CN')
+  })
   return list
 })
 
@@ -270,8 +275,9 @@ function openCell(industry: string, date: string) {
 // 热力图数据点：[xIndex, yIndex, value]
 const heatmapPoints = computed(() => {
   const pts: Array<[number, number, number]> = []
-  for (let yi = 0; yi < industryList.length; yi++) {
-    const ind = industryList[yi]
+  const inds = sortedIndustryList.value
+  for (let yi = 0; yi < inds.length; yi++) {
+    const ind = inds[yi]
     for (let xi = 0; xi < dateList.value.length; xi++) {
       const d = dateList.value[xi]
       const reasons = heatMap.value[d]?.[ind] || []
@@ -291,7 +297,7 @@ const chartOption = computed<EChartsOption>(() => ({
       const xi = Number(v[0])
       const yi = Number(v[1])
       const date = dateList.value[xi]
-      const industry = industryList[yi]
+      const industry = sortedIndustryList.value[yi]
       const reasons = heatMap.value[date]?.[industry] || []
       return reasons.length > 0
         ? `${industry} · ${date}：利好${reasons.length}条`
@@ -307,7 +313,7 @@ const chartOption = computed<EChartsOption>(() => ({
   },
   yAxis: {
     type: 'category',
-    data: industryList as unknown as string[],
+    data: sortedIndustryList.value as unknown as string[],
     axisLabel: { color: '#606266' },
     axisLine: { lineStyle: { color: '#ebeef5' } }
   },
@@ -342,7 +348,7 @@ function handleChartClick(params: any) {
   const xi = Number(v[0])
   const yi = Number(v[1])
   const date = dateList.value[xi]
-  const industry = industryList[yi]
+  const industry = sortedIndustryList.value[yi]
   openCell(industry, date)
 }
 
