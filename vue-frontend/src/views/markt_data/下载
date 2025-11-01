@@ -1,0 +1,1524 @@
+openapi: 3.0.3
+info:
+  title: 股票数据服务 OpenAPI 文档
+  version: 1.0.0
+  description: 统一响应格式的 Django REST API 文档，包含 scheduled_tasks 下的 Tushare 直通代理接口
+paths:
+  /django/api/forum/posts/:
+    get:
+      operationId: forum_posts_retrieve
+      description: 获取帖子列表
+      tags:
+      - forum
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/forum/posts/{post_id}/:
+    get:
+      operationId: forum_posts_retrieve_2
+      description: 获取帖子详情
+      parameters:
+      - in: path
+        name: post_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - forum
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/forum/posts/{post_id}/comment/:
+    post:
+      operationId: forum_posts_comment_create
+      description: 添加评论
+      parameters:
+      - in: path
+        name: post_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - forum
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/forum/posts/{post_id}/delete/:
+    post:
+      operationId: forum_posts_delete_create
+      description: 删除帖子
+      parameters:
+      - in: path
+        name: post_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - forum
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: forum_posts_delete_destroy
+      description: 删除帖子
+      parameters:
+      - in: path
+        name: post_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - forum
+      security:
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /django/api/forum/posts/create/:
+    get:
+      operationId: forum_posts_create_retrieve
+      description: 创建新帖子
+      tags:
+      - forum
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: forum_posts_create_create
+      description: 创建新帖子
+      tags:
+      - forum
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/balance-sheets/:
+    get:
+      operationId: individual_stock_balance_sheets_retrieve
+      description: |-
+        获取资产负债表数据
+
+        路径参数:
+        - stock_code: 股票代码（可选）
+
+        查询参数:
+        - date: 报告期，格式YYYYMMDD（可选）
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/cash-flow-statements/:
+    get:
+      operationId: individual_stock_cash_flow_statements_retrieve
+      description: |-
+        获取现金流量表数据
+
+        路径参数:
+        - stock_code: 股票代码（可选）
+
+        查询参数:
+        - date: 报告期，格式YYYYMMDD（可选）
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/income-statements/:
+    get:
+      operationId: individual_stock_income_statements_retrieve
+      description: |-
+        获取利润表数据
+
+        路径参数:
+        - stock_code: 股票代码（可选）
+
+        查询参数:
+        - date: 报告期，格式YYYYMMDD（可选）
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/performance-reports/:
+    get:
+      operationId: individual_stock_performance_reports_retrieve
+      description: |-
+        获取业绩快报数据
+
+        查询参数:
+        - date: 报告期，格式YYYYMMDD，如20200331（必需）
+        - stock_code: 股票代码（可选，用于查询特定股票）
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stock-tags/:
+    get:
+      operationId: individual_stock_stock_tags_retrieve
+      description: |-
+        功能：获取股票标记，支持单个标记查询和批量查询
+        参数：
+        - request(HttpRequest): 请求对象
+        - tag_id(int, 可选): 标记ID，如果提供则获取单个标记
+        返回值：
+        - JsonResponse: 调用success_response返回数据；失败时调用error_response返回错误信息
+        事件：
+        - 当标记不存在时，记录日志并返回错误响应
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: individual_stock_stock_tags_create
+      description: |-
+        功能：创建股票标记
+        参数：
+        - request(HttpRequest): 请求对象，包含标记数据
+        返回值：
+        - JsonResponse: 调用success_response返回创建的标记数据；失败时调用error_response返回错误信息
+        事件：
+        - 当数据验证失败时，记录日志并返回错误响应
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: individual_stock_stock_tags_update
+      description: |-
+        功能：更新股票标记
+        参数：
+        - request(HttpRequest): 请求对象，包含更新的标记数据
+        - tag_id(int): 标记ID
+        返回值：
+        - JsonResponse: 调用success_response返回更新后的标记数据；失败时调用error_response返回错误信息
+        事件：
+        - 当标记不存在时，记录日志并返回错误响应
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: individual_stock_stock_tags_destroy
+      description: |-
+        功能：删除股票标记
+        参数：
+        - request(HttpRequest): 请求对象
+        - tag_id(int): 标记ID
+        返回值：
+        - JsonResponse: 调用success_response返回删除成功信息；失败时调用error_response返回错误信息
+        事件：
+        - 当标记不存在时，记录日志并返回错误响应
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /django/api/individual_stock/stock-tags/{tag_id}/:
+    get:
+      operationId: individual_stock_stock_tags_retrieve_2
+      description: |-
+        功能：获取股票标记，支持单个标记查询和批量查询
+        参数：
+        - request(HttpRequest): 请求对象
+        - tag_id(int, 可选): 标记ID，如果提供则获取单个标记
+        返回值：
+        - JsonResponse: 调用success_response返回数据；失败时调用error_response返回错误信息
+        事件：
+        - 当标记不存在时，记录日志并返回错误响应
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: individual_stock_stock_tags_create_2
+      description: |-
+        功能：创建股票标记
+        参数：
+        - request(HttpRequest): 请求对象，包含标记数据
+        返回值：
+        - JsonResponse: 调用success_response返回创建的标记数据；失败时调用error_response返回错误信息
+        事件：
+        - 当数据验证失败时，记录日志并返回错误响应
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: individual_stock_stock_tags_update_2
+      description: |-
+        功能：更新股票标记
+        参数：
+        - request(HttpRequest): 请求对象，包含更新的标记数据
+        - tag_id(int): 标记ID
+        返回值：
+        - JsonResponse: 调用success_response返回更新后的标记数据；失败时调用error_response返回错误信息
+        事件：
+        - 当标记不存在时，记录日志并返回错误响应
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: individual_stock_stock_tags_destroy_2
+      description: |-
+        功能：删除股票标记
+        参数：
+        - request(HttpRequest): 请求对象
+        - tag_id(int): 标记ID
+        返回值：
+        - JsonResponse: 调用success_response返回删除成功信息；失败时调用error_response返回错误信息
+        事件：
+        - 当标记不存在时，记录日志并返回错误响应
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /django/api/individual_stock/stock-tags/choices/:
+    get:
+      operationId: individual_stock_stock_tags_choices_retrieve
+      description: |-
+        功能：获取所有标记因子的选择项
+        参数：
+        - request(HttpRequest): 请求对象
+        返回值：
+        - JsonResponse: 调用success_response返回选择项数据；失败时调用error_response返回错误信息
+        事件：
+        - 当获取选择项失败时，记录日志并返回错误响应
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/:
+    get:
+      operationId: individual_stock_stocks_retrieve
+      description: |-
+        功能：获取股票列表，支持关键词搜索、行业筛选与分页，提高查询性能。
+        参数：
+        - request(HttpRequest): 请求对象，查询参数包括：
+          - page(int, 可选): 页码，默认1
+          - page_size(int, 可选): 每页数量，默认20
+          - keyword(str, 可选): 关键词，按股票名称或代码模糊匹配
+          - industry(str, 可选): 行业名称，按行业精确匹配
+          - stock_names(list[str] 或 逗号分隔字符串, 可选): 股票名列表，按名称精确筛选，支持JSON数组或逗号分隔
+        返回值：
+        - JsonResponse: 调用success_response返回数据；失败时调用error_response返回错误信息。
+        事件：
+        - 当页码格式错误或超出范围时，记录日志并返回错误响应。
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/balance-sheets/:
+    get:
+      operationId: individual_stock_stocks_balance_sheets_retrieve
+      description: |-
+        获取资产负债表数据
+
+        路径参数:
+        - stock_code: 股票代码（可选）
+
+        查询参数:
+        - date: 报告期，格式YYYYMMDD（可选）
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/cash-flow-statements/:
+    get:
+      operationId: individual_stock_stocks_cash_flow_statements_retrieve
+      description: |-
+        获取现金流量表数据
+
+        路径参数:
+        - stock_code: 股票代码（可选）
+
+        查询参数:
+        - date: 报告期，格式YYYYMMDD（可选）
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/history/:
+    get:
+      operationId: individual_stock_stocks_history_retrieve
+      description: 获取股票历史行情数据
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/income-statements/:
+    get:
+      operationId: individual_stock_stocks_income_statements_retrieve
+      description: |-
+        获取利润表数据
+
+        路径参数:
+        - stock_code: 股票代码（可选）
+
+        查询参数:
+        - date: 报告期，格式YYYYMMDD（可选）
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/info/:
+    get:
+      operationId: individual_stock_stocks_info_retrieve
+      description: 获取股票详细信息
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/performance-reports/:
+    get:
+      operationId: individual_stock_stocks_performance_reports_retrieve
+      description: |-
+        获取指定股票的业绩快报数据
+
+        路径参数:
+        - stock_code: 股票代码
+
+        查询参数:
+        - page: 页码，默认1
+        - page_size: 每页数量，默认20
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/realtime/:
+    get:
+      operationId: individual_stock_stocks_realtime_retrieve_2
+      description: 获取股票实时行情
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/{stock_code}/tags/:
+    get:
+      operationId: individual_stock_stocks_tags_retrieve
+      description: |-
+        功能：获取指定股票的所有标记
+        参数：
+        - request(HttpRequest): 请求对象，查询参数包括：
+          - start_date(str, 可选): 开始日期，格式：YYYY-MM-DD
+          - end_date(str, 可选): 结束日期，格式：YYYY-MM-DD
+        - stock_code(str): 股票代码
+        返回值：
+        - JsonResponse: 调用success_response返回标记数据；失败时调用error_response返回错误信息
+        事件：
+        - 当股票代码无效时，记录日志并返回错误响应
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/stocks/realtime/:
+    get:
+      operationId: individual_stock_stocks_realtime_retrieve
+      description: 获取股票实时行情
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/individual_stock/strategy-results/:
+    get:
+      operationId: individual_stock_strategy_results_retrieve
+      description: |-
+        获取策略结果
+        - 如果提供result_id，返回单个策略结果
+        - 如果不提供result_id，返回策略结果列表（支持分页和筛选）
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: individual_stock_strategy_results_create
+      description: 创建新的策略结果
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: individual_stock_strategy_results_update
+      description: 更新策略结果
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: individual_stock_strategy_results_partial_update
+      description: 部分更新策略结果
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: individual_stock_strategy_results_destroy
+      description: 删除策略结果
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /django/api/individual_stock/strategy-results/{result_id}/:
+    get:
+      operationId: individual_stock_strategy_results_retrieve_2
+      description: |-
+        获取策略结果
+        - 如果提供result_id，返回单个策略结果
+        - 如果不提供result_id，返回策略结果列表（支持分页和筛选）
+      parameters:
+      - in: path
+        name: result_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: individual_stock_strategy_results_create_2
+      description: 创建新的策略结果
+      parameters:
+      - in: path
+        name: result_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: individual_stock_strategy_results_update_2
+      description: 更新策略结果
+      parameters:
+      - in: path
+        name: result_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: individual_stock_strategy_results_partial_update_2
+      description: 部分更新策略结果
+      parameters:
+      - in: path
+        name: result_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: individual_stock_strategy_results_destroy_2
+      description: 删除策略结果
+      parameters:
+      - in: path
+        name: result_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /django/api/market/fund-flow/:
+    get:
+      operationId: market_fund_flow_retrieve
+      description: |-
+        查询大盘资金流数据
+
+        参数:
+            start_date (str, optional): 开始日期，格式：YYYY-MM-DD
+            end_date (str, optional): 结束日期，格式：YYYY-MM-DD
+            page (int, optional): 页码，默认为1
+            page_size (int, optional): 每页数量，默认为20，最大100
+            order_by (str, optional): 排序字段，可选值：date, -date（默认）
+
+        返回:
+            包含资金流数据列表和分页信息的响应
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/market/index-basic-data/:
+    get:
+      operationId: market_index_basic_data_retrieve
+      description: |-
+        查询指数基础数据列表
+
+        参数:
+            page (int, optional): 页码，默认为1
+            page_size (int, optional): 每页数量，默认为20，最大100
+            search (str, optional): 搜索关键词，支持按代码或名称搜索
+            code (str, optional): 精确匹配指数代码
+
+        返回:
+            包含指数列表和分页信息的响应
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: market_index_basic_data_create
+      description: |-
+        创建新的指数记录
+
+        参数:
+            code (str): 指数代码，必填
+            name (str): 指数名称，必填
+
+        返回:
+            创建成功的指数信息
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: market_index_basic_data_update
+      description: |-
+        更新指数信息
+
+        参数:
+            id (int): 指数ID，必填
+            code (str, optional): 新的指数代码
+            name (str, optional): 新的指数名称
+
+        返回:
+            更新后的指数信息
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: market_index_basic_data_destroy
+      description: |-
+        删除指数记录
+
+        参数:
+            id (int): 指数ID，必填
+
+        返回:
+            删除结果
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /django/api/market/index-high-low-statistics/:
+    get:
+      operationId: market_index_high_low_statistics_retrieve
+      description: |-
+        查询指数涨跌统计数据（仅从数据库查询）
+
+        参数:
+            index_code (str, optional): 指数代码，可选值：'all', 'sz50', 'hs300', 'zz500'
+            start_date (str, optional): 开始日期，格式：YYYY-MM-DD
+            end_date (str, optional): 结束日期，格式：YYYY-MM-DD
+            limit (int, optional): 返回记录数量限制，默认30
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/market/index-info/:
+    get:
+      operationId: market_index_info_retrieve
+      description: |-
+        指数信息查询接口（仅从数据库读取）
+
+        功能：提供指数基础信息的查询（code/name），支持按代码精确匹配或关键词搜索。
+        参数：
+            - code: 指数代码（精确匹配）
+            - search: 关键词，模糊匹配代码或名称
+            - limit: 返回数量上限，默认100，最大1000
+        返回：
+            - list: 指数记录列表（id, code, name）
+            - count: 返回记录数量
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/market/rise-fall-ratio/:
+    get:
+      operationId: market_rise_fall_ratio_retrieve
+      description: |-
+        查询涨跌比数据
+
+        参数:
+            index_code (str, optional): 指数代码，不指定则查询所有
+            start_date (str, optional): 开始日期，格式YYYY-MM-DD
+            end_date (str, optional): 结束日期，格式YYYY-MM-DD
+            limit (int, optional): 返回记录数限制，默认30条
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/market/sse-daily-overview/:
+    get:
+      operationId: market_sse_daily_overview_retrieve
+      description: |-
+        获取上证每日概况数据
+
+        参数:
+            date (str, optional): 日期，格式为YYYYMMDD，默认为最近一个交易日
+      tags:
+      - market
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/personal/holdings/:
+    get:
+      operationId: personal_holdings_retrieve
+      description: |-
+        持有/关注股票API视图
+        功能：提供当前登录用户的持有或关注股票的查询与新增
+        参数：
+        - GET: 无（从请求令牌识别用户）
+        - POST: {
+            stock_code(str): 股票代码，必填
+            relation_type(str): 关系类型，可选，默认 WATCHED，可选值：HELD/WATCHED
+          }
+        返回值：
+        - 成功：{ list: [...], pagination: {...} } 或新增后的记录信息
+        事件：
+        - 参数格式错误、股票不存在、重复添加时返回错误
+      tags:
+      - personal
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: personal_holdings_create
+      description: |-
+        持有/关注股票API视图
+        功能：提供当前登录用户的持有或关注股票的查询与新增
+        参数：
+        - GET: 无（从请求令牌识别用户）
+        - POST: {
+            stock_code(str): 股票代码，必填
+            relation_type(str): 关系类型，可选，默认 WATCHED，可选值：HELD/WATCHED
+          }
+        返回值：
+        - 成功：{ list: [...], pagination: {...} } 或新增后的记录信息
+        事件：
+        - 参数格式错误、股票不存在、重复添加时返回错误
+      tags:
+      - personal
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/personal/holdings/{holding_id}/:
+    delete:
+      operationId: personal_holdings_destroy
+      description: |-
+        持有/关注股票详情API视图
+        功能：删除当前用户的指定持有/关注记录
+        参数：
+        - DELETE: 路径参数 holding_id(int)
+        返回值：
+        - 成功：删除成功消息
+        事件：
+        - 当记录不存在或不属于当前用户时返回错误
+      parameters:
+      - in: path
+        name: holding_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - personal
+      security:
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /django/api/tasks/index-basic/:
+    get:
+      operationId: tasks_index_basic_retrieve
+      description: Tushare index_basic 的代理接口，统一返回格式。
+      summary: 指数基本信息直通代理
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: 指数类别
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 返回字段列表，逗号分隔
+      - in: query
+        name: market
+        schema:
+          type: string
+        description: 市场：MSCI/CSI/SSE/SZSE/CICC/SW/OTH
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: 指数简称
+      - in: query
+        name: publisher
+        schema:
+          type: string
+        description: 发布方
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 指数代码
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexBasic'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/tasks/index-daily/:
+    get:
+      operationId: tasks_index_daily_retrieve
+      description: Tushare index_daily 的代理接口，统一返回格式。
+      summary: 指数日线行情直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 指数代码（必填）
+        required: true
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexDaily'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/tasks/index-weight/:
+    get:
+      operationId: tasks_index_weight_retrieve
+      description: Tushare index_weight 的代理接口，统一返回格式。
+      summary: 指数成分和权重直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: index_code
+        schema:
+          type: string
+        description: 指数代码（必填）
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexWeight'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/user/info/:
+    get:
+      operationId: user_info_retrieve
+      description: 获取当前用户信息
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/user/invitation/:
+    get:
+      operationId: user_invitation_retrieve
+      description: 获取用户的邀请码列表
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: user_invitation_create
+      description: 生成邀请码
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/user/invitation/validate/:
+    post:
+      operationId: user_invitation_validate_create
+      description: 验证邀请码是否有效
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/user/login/:
+    post:
+      operationId: user_login_create
+      description: 处理用户登录请求
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/user/logout/:
+    post:
+      operationId: user_logout_create
+      description: 处理用户登出请求
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/user/register/:
+    post:
+      operationId: user_register_create
+      description: 处理用户注册请求
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /django/api/user/reset-password/:
+    post:
+      operationId: user_reset_password_create
+      description: 处理密码重置请求
+      tags:
+      - user
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        error:
+          type: string
+      required:
+      - code
+      - message
+      - timestamp
+    IndexBasicData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexBasicRecord'
+      required:
+      - count
+      - interface
+      - records
+    IndexBasicRecord:
+      type: object
+      properties:
+        ts_code:
+          type: string
+        name:
+          type: string
+        fullname:
+          type: string
+        market:
+          type: string
+        publisher:
+          type: string
+        index_type:
+          type: string
+        category:
+          type: string
+        base_date:
+          type: string
+        base_point:
+          type: number
+          format: double
+        list_date:
+          type: string
+        weight_rule:
+          type: string
+        desc:
+          type: string
+        exp_date:
+          type: string
+    IndexDailyData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexDailyRecord'
+      required:
+      - count
+      - interface
+      - records
+    IndexDailyRecord:
+      type: object
+      properties:
+        ts_code:
+          type: string
+        trade_date:
+          type: string
+        close:
+          type: number
+          format: double
+        open:
+          type: number
+          format: double
+        high:
+          type: number
+          format: double
+        low:
+          type: number
+          format: double
+        pre_close:
+          type: number
+          format: double
+        change:
+          type: number
+          format: double
+        pct_chg:
+          type: number
+          format: double
+        vol:
+          type: number
+          format: double
+        amount:
+          type: number
+          format: double
+    IndexWeightData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexWeightRecord'
+      required:
+      - count
+      - interface
+      - records
+    IndexWeightRecord:
+      type: object
+      properties:
+        index_code:
+          type: string
+        con_code:
+          type: string
+        trade_date:
+          type: string
+        weight:
+          type: number
+          format: double
+    SuccessResponseIndexBasic:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/IndexBasicData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseIndexDaily:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/IndexDailyData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseIndexWeight:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/IndexWeightData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

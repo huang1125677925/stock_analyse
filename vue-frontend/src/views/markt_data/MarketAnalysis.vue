@@ -37,19 +37,34 @@
         </div>
       </el-card>
       <el-card class="mt-16" shadow="never">
-        <template #header>
-          <div class="chart-header">
-            <span>收盘价与涨跌幅趋势</span>
-          </div>
-        </template>
-        <TrendChart 
-          :data="processedFundFlowData" 
-          date-field="date"
-          :yFields="trendFields"
-          :defaultSelectedFields="['shanghai_close_price','shanghai_change_rate']"
-          height="420px"
-          title="收盘价与涨跌幅趋势"
-        />
+        <!-- 上证指数成交量趋势 -->
+        <el-card class="mt-16" shadow="hover">
+          <template #header>
+            <div class="chart-header">
+              <h3>指数趋势（成交量/额/收盘价）</h3>
+              <div class="chart-controls">
+                <el-select v-model="selectedMarket" placeholder="选择市场" style="width: 160px; margin-right: 10px;">
+                  <el-option label="MSCI指数" value="MSCI" />
+                  <el-option label="中证指数" value="CSI" />
+                  <el-option label="上交所指数" value="SSE" />
+                  <el-option label="深交所指数" value="SZSE" />
+                  <el-option label="中金指数" value="CICC" />
+                  <el-option label="申万指数" value="SW" />
+                  <el-option label="其他指数" value="OTH" />
+                </el-select>
+                <el-select v-model="selectedIndexTsCode" placeholder="选择指数" style="width: 220px;" filterable>
+                  <el-option
+                    v-for="item in indexList"
+                    :key="item.ts_code"
+                    :label="`${item.name ?? item.ts_code} (${item.ts_code})`"
+                    :value="item.ts_code"
+                  />
+                </el-select>
+              </div>
+            </div>
+          </template>
+          <IndexVolumeTrend :ts-code="selectedIndexTsCode" height="420px" />
+        </el-card>
         <!-- 涨跌比热力图 -->
         <div class="rise-fall-section" v-if="riseFallData.length > 0">
           <el-card class="mt-16" shadow="hover">
@@ -84,9 +99,10 @@ import { ElMessage } from 'element-plus'
 import { computed } from 'vue'
  import MarketFundFlowHeatmap from '@/components/MarketFundFlowHeatmap.vue'
  import { fetchMarketFundFlowData, FUND_FLOW_METRICS, type FundFlowMetricType, type MarketFundFlowDataItem } from '@/services/marketFundFlowApi'
- import TrendChart from '@/components/TrendChart.vue'
  import HeatmapChart from '@/components/HeatmapChart.vue'
+ import IndexVolumeTrend from '@/components/IndexVolumeTrend.vue'
  import { fetchRiseFallRatioData, type RiseFallRatioItem } from '@/services/marketRiseFallRatioApi'
+ import { fetchIndexBasicList, type IndexBasicItem } from '@/services/indexBasicApi'
  import type { EChartsOption } from 'echarts'
 
  // 仅保留加载状态与资金流相关状态
@@ -123,6 +139,25 @@ function handleFundFlowClick(payload: unknown) {
 // 涨跌比相关状态
 const indexCode = ref<'all' | 'sz50' | 'hs300' | 'zz500'>('all')
 const riseFallData = ref<RiseFallRatioItem[]>([])
+
+// 指数列表与选择（用于指数趋势下拉）
+const indexList = ref<IndexBasicItem[]>([])
+const selectedIndexTsCode = ref<string>('000001.SH')
+const selectedMarket = ref<'MSCI' | 'CSI' | 'SSE' | 'SZSE' | 'CICC' | 'SW' | 'OTH'>('SSE')
+
+async function loadIndexList() {
+  try {
+    const list = await fetchIndexBasicList({ market: selectedMarket.value })
+    indexList.value = list
+    // 如果当前选中的指数不在新列表中，则切到第一个
+    if (!list.find(i => i.ts_code === selectedIndexTsCode.value)) {
+      selectedIndexTsCode.value = list.length ? list[0].ts_code : ''
+    }
+  } catch (err) {
+    console.error('获取指数列表失败:', err)
+    ElMessage.error('获取指数列表失败')
+  }
+}
 
 /**
  * 获取涨跌比数据
@@ -224,6 +259,8 @@ onMounted(() => {
   // 初始化拉取资金流与涨跌比数据
   fetchFundFlowData()
   fetchRiseFallData()
+  // 初始化指数列表
+  loadIndexList()
 })
 
 // 切换时间范围或指数时自动刷新相关数据
@@ -234,13 +271,11 @@ watch(daysRange, () => {
 watch(indexCode, () => {
   fetchRiseFallData()
 })
-// 趋势图字段配置
-const trendFields = [
-  { key: 'shanghai_close_price', label: '上证收盘价', color: '#409EFF', yAxisIndex: 0 },
-  { key: 'shanghai_change_rate', label: '上证涨跌幅(%)', color: '#67C23A', yAxisIndex: 1 }
-]
-// 复用资金流处理后的数据
-const processedFundFlowData = computed<MarketFundFlowDataItem[]>(() => fundFlowData?.value ?? [])
+// 切换市场时刷新指数列表
+watch(selectedMarket, () => {
+  loadIndexList()
+})
+// 已移除“收盘价与涨跌幅趋势”图，相关字段与数据处理不再需要
 </script>
 
 <style scoped>

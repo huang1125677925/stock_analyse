@@ -1,28 +1,34 @@
 <template>
   <div class="market-change-heatmap">
-    <el-card shadow="hover">
-      <div class="header">
-        <h2>大盘涨跌（日历热力图）</h2>
-        <span class="subtitle">数据来源：上证指数（sh000001）</span>
-      </div>
-      <div ref="chartRef" class="chart"></div>
-    </el-card>
-    <!-- 连续色条热力图 -->
-    <el-card shadow="hover">
-      <div class="header">
-        <h2>连续色条热力图</h2>
-        <span class="subtitle">连续视觉映射（visualMap: continuous）</span>
-      </div>
-      <div ref="continuousChartRef" class="chart chart-continuous"></div>
-    </el-card>
-    <!-- 区间分布饼图 -->
-    <el-card shadow="hover">
-      <div class="header">
-        <h2>区间分布（饼图）</h2>
-        <span class="subtitle">区间：&lt; -1%、-1% ~ 0%、0% ~ 1%、≥ 1%</span>
-      </div>
-      <div ref="pieChartRef" class="chart chart-pie"></div>
-    </el-card>
+    <!-- 顶部两栏：左侧日历热力图（3/4），右侧区间分布饼图（1/4） -->
+    <el-row :gutter="12" class="top-split">
+      <el-col :span="18">
+        <el-card shadow="hover">
+          <div class="header">
+            <h2>大盘涨跌（日历热力图）</h2>
+            <span class="subtitle">数据来源：上证指数（sh000001）</span>
+            <div class="header-actions">
+              <el-radio-group v-model="heatmapMode" size="small">
+                <el-radio-button label="piecewise">分段色阶</el-radio-button>
+                <el-radio-button label="continuous">连续色条</el-radio-button>
+              </el-radio-group>
+            </div>
+          </div>
+          <div ref="chartRef" class="chart"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover">
+          <div class="header">
+            <h2>区间分布（饼图）</h2>
+            <span class="subtitle">区间：&lt; -1%、-1% ~ 0%、0% ~ 1%、≥ 1%</span>
+          </div>
+          <div ref="pieChartRef" class="chart chart-pie"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+    <!-- 连续色条热力图已并入左侧卡片，通过按钮切换 -->
+    <!-- 饼图已上移至右侧列 -->
     
     <!-- 新增：ADR/ADL 趋势图组件 -->
     <div class="breadth-intro">
@@ -47,7 +53,7 @@
  * 事件（Emits）：无
  */
 
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { getStockHistory } from '@/services/individualStockApi'
@@ -58,11 +64,10 @@ import AdlTrend from '@/components/AdlTrend.vue'
 defineOptions({ name: 'MarketChangeHeatmap' })
 
 const chartRef = ref<HTMLDivElement | null>(null)
-const continuousChartRef = ref<HTMLDivElement | null>(null)
 const pieChartRef = ref<HTMLDivElement | null>(null)
+const heatmapMode = ref<'piecewise' | 'continuous'>('piecewise')
 
 let chartPiecewise: echarts.ECharts | null = null
-let chartContinuous: echarts.ECharts | null = null
 let chartPie: echarts.ECharts | null = null
 
 // 工具方法：格式化日期为 YYYYMMDD
@@ -130,6 +135,7 @@ const initChart = async () => {
       calendar: {
         range: [startDateStr, endDateStr],
         cellSize: 18,
+        left: 'center', // 居中显示
         splitLine: {
           show: true,
           lineStyle: { color: '#ddd', width: 1 }
@@ -177,6 +183,7 @@ const initChart = async () => {
       calendar: {
         range: [startDateStr, endDateStr],
         cellSize: 18,
+        left: 'center', // 居中显示
         splitLine: {
           show: true,
           lineStyle: { color: '#ddd', width: 1 }
@@ -224,19 +231,20 @@ const initChart = async () => {
       ]
     }
 
-    // 设置图表
-    chartPiecewise.setOption(optionPiecewise)
-
-    if (continuousChartRef.value) {
-      chartContinuous = echarts.init(continuousChartRef.value)
-      chartContinuous.setOption(optionContinuous)
-    }
+    // 初始化并按模式设置图表
+    chartPiecewise.setOption(heatmapMode.value === 'piecewise' ? optionPiecewise : optionContinuous)
     if (pieChartRef.value) {
       chartPie = echarts.init(pieChartRef.value)
       chartPie.setOption(optionPie)
     }
 
     window.addEventListener('resize', handleResize)
+
+    // 监听模式切换，更新图表
+    watch(heatmapMode, (m) => {
+      if (!chartPiecewise) return
+      chartPiecewise.setOption(m === 'piecewise' ? optionPiecewise : optionContinuous, true)
+    })
   } catch (err: unknown) {
     console.error(err)
     ElMessage.error('获取大盘历史数据失败，请稍后重试')
@@ -245,7 +253,6 @@ const initChart = async () => {
 
 const handleResize = () => {
   chartPiecewise?.resize()
-  chartContinuous?.resize()
   chartPie?.resize()
 }
 
@@ -256,21 +263,27 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   chartPiecewise?.dispose()
-  chartContinuous?.dispose()
   chartPie?.dispose()
   chartPiecewise = null
-  chartContinuous = null
   chartPie = null
 })
 </script>
 
 <style scoped lang="scss">
 .market-change-heatmap {
+  .top-split {
+    margin-bottom: 10px;
+  }
   .header {
     display: flex;
     align-items: baseline;
     gap: 12px;
     margin-bottom: 12px;
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+    }
 
     h2 {
       margin: 0;
@@ -290,7 +303,7 @@ onBeforeUnmount(() => {
     height: 340px;
   }
   .chart-pie {
-    height: 360px;
+    height: 340px; // 与左侧热力图保持一致高度
   }
 }
 .breadth-intro {
