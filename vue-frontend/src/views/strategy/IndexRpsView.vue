@@ -7,12 +7,11 @@
       <el-card shadow="hover">
         <template #header>
           <div class="table-header">
-            <h3>指数RPS强度排名 ({{ formatDate(queryTime) }})</h3>
             <div class="table-controls">
               <el-input
                 v-model="searchKeyword"
                 placeholder="搜索指数名称"
-                prefix-icon="Search"
+                :prefix-icon="Search"
                 clearable
                 style="width: 200px"
               />
@@ -21,7 +20,7 @@
         </template>
         
         <el-table
-          :data="filteredRpsData"
+          :data="paginatedRpsData"
           stripe
           border
           style="width: 100%"
@@ -33,12 +32,12 @@
         >
           <!-- 固定列 -->
           <el-table-column type="index" label="#" width="50" fixed="left" align="center" />
-          <el-table-column prop="指数代码" label="指数代码" width="100" sortable="custom" fixed="left" align="center">
+          <el-table-column prop="ts_code" label="ts_code" width="150" sortable="custom" fixed="left" align="center">
             <template #default="scope">
-              <el-tag size="small" effect="plain">{{ scope.row.指数代码 }}</el-tag>
+              <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="指数简称" label="指数简称" width="120" sortable="custom" fixed="left">
+          <el-table-column prop="name" label="name" width="150" sortable="custom" fixed="left">
             <template #header>
               <div class="custom-header">
                 <span>指数简称</span>
@@ -49,72 +48,171 @@
             </template>
             <template #default="scope">
               <el-button type="text" @click="showIndexDetail(scope.row)">
-                {{ scope.row.指数简称 }}
+                {{ scope.row.name }}
               </el-button>
             </template>
           </el-table-column>
           
-          <!-- 动态周期列 -->
-          <template v-for="period in displayPeriods" :key="period">
-            <!-- 涨跌幅列 -->
-            <el-table-column :label="`${period}日涨跌幅`" width="120" sortable="custom" :prop="`${period}日涨跌幅`" align="center">
-              <template #header>
-                <div class="custom-header">
-                  <span>{{ period }}日涨跌幅</span>
-                  <el-tooltip :content="`${period}日内的价格变化百分比`" placement="top">
-                    <el-icon><InfoFilled /></el-icon>
-                  </el-tooltip>
+          <!-- 5日涨跌幅 -->
+          <el-table-column label="5日涨跌幅" width="120" sortable="custom" prop="return_5" align="center">
+            <template #header>
+              <div class="custom-header">
+                <span>5日涨跌幅</span>
+                <el-tooltip content="5日内的价格变化百分比" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="change-percent-cell">
+                <span :class="{ 'up': scope.row.return_5 > 0, 'down': scope.row.return_5 < 0 }">
+                  {{ scope.row.return_5 > 0 ? '+' : '' }}{{ scope.row.return_5.toFixed(2) }}%
+                </span>
+                <div class="trend-indicator">
+                  <el-icon v-if="scope.row.return_5 > 0"><CaretTop /></el-icon>
+                  <el-icon v-else-if="scope.row.return_5 < 0"><CaretBottom /></el-icon>
+                  <el-icon v-else><Minus /></el-icon>
                 </div>
-              </template>
-              <template #default="scope">
-                <div class="change-percent-cell">
-                  <span :class="{ 'up': scope.row[`${period}日涨跌幅`] > 0, 'down': scope.row[`${period}日涨跌幅`] < 0 }">
-                    {{ scope.row[`${period}日涨跌幅`] > 0 ? '+' : '' }}{{ scope.row[`${period}日涨跌幅`].toFixed(2) }}%
-                  </span>
-                  <div class="trend-indicator">
-                    <el-icon v-if="scope.row[`${period}日涨跌幅`] > 0"><CaretTop /></el-icon>
-                    <el-icon v-else-if="scope.row[`${period}日涨跌幅`] < 0"><CaretBottom /></el-icon>
-                    <el-icon v-else><Minus /></el-icon>
-                  </div>
+              </div>
+            </template>
+          </el-table-column>
+          
+          <!-- RPS_5 -->
+          <el-table-column label="RPS_5" width="170" sortable="custom" prop="RPS_5" align="center">
+            <template #header>
+              <div class="custom-header">
+                <span>RPS_5</span>
+                <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="rps-cell">
+                <el-progress
+                  :percentage="scope.row.RPS_5"
+                  :color="getRpsColor(scope.row.RPS_5)"
+                  :format="(val: number) => val.toFixed(1)"
+                  :stroke-width="18"
+                  :text-inside="true"
+                  :show-text="true"
+                />
+                <div class="rps-rank" :class="getRpsRankClass(scope.row.RPS_5)">
+                  {{ getRpsRankText(scope.row.RPS_5) }}
                 </div>
-              </template>
-            </el-table-column>
-            
-            <!-- RPS值列 -->
-            <el-table-column :label="`RPS_${period}`" width="170" sortable="custom" :prop="`RPS_${period}`" align="center">
-              <template #header>
-                <div class="custom-header">
-                  <span>RPS_{{ period }}</span>
-                  <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
-                    <el-icon><InfoFilled /></el-icon>
-                  </el-tooltip>
+              </div>
+            </template>
+          </el-table-column>
+
+          <!-- 20日涨跌幅 -->
+          <el-table-column label="20日涨跌幅" width="120" sortable="custom" prop="return_20" align="center">
+            <template #header>
+              <div class="custom-header">
+                <span>20日涨跌幅</span>
+                <el-tooltip content="20日内的价格变化百分比" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="change-percent-cell">
+                <span :class="{ 'up': scope.row.return_20 > 0, 'down': scope.row.return_20 < 0 }">
+                  {{ scope.row.return_20 > 0 ? '+' : '' }}{{ scope.row.return_20.toFixed(2) }}%
+                </span>
+                <div class="trend-indicator">
+                  <el-icon v-if="scope.row.return_20 > 0"><CaretTop /></el-icon>
+                  <el-icon v-else-if="scope.row.return_20 < 0"><CaretBottom /></el-icon>
+                  <el-icon v-else><Minus /></el-icon>
                 </div>
-              </template>
-              <template #default="scope">
-                <div class="rps-cell">
-                  <el-progress
-                    :percentage="scope.row[`RPS_${period}`]"
-                    :color="getRpsColor(scope.row[`RPS_${period}`])"
-                    :format="(val: number) => val.toFixed(1)"
-                    :stroke-width="18"
-                    :text-inside="true"
-                    :show-text="true"
-                  />
-                  <div class="rps-rank" :class="getRpsRankClass(scope.row[`RPS_${period}`])">
-                    {{ getRpsRankText(scope.row[`RPS_${period}`]) }}
-                  </div>
+              </div>
+            </template>
+          </el-table-column>
+          
+          <!-- RPS_20 -->
+          <el-table-column label="RPS_20" width="170" sortable="custom" prop="RPS_20" align="center">
+            <template #header>
+              <div class="custom-header">
+                <span>RPS_20</span>
+                <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="rps-cell">
+                <el-progress
+                  :percentage="scope.row.RPS_20"
+                  :color="getRpsColor(scope.row.RPS_20)"
+                  :format="(val: number) => val.toFixed(1)"
+                  :stroke-width="18"
+                  :text-inside="true"
+                  :show-text="true"
+                />
+                <div class="rps-rank" :class="getRpsRankClass(scope.row.RPS_20)">
+                  {{ getRpsRankText(scope.row.RPS_20) }}
                 </div>
-              </template>
-            </el-table-column>
-          </template>
+              </div>
+            </template>
+          </el-table-column>
+
+          <!-- 60日涨跌幅 -->
+          <el-table-column label="60日涨跌幅" width="120" sortable="custom" prop="return_60" align="center">
+            <template #header>
+              <div class="custom-header">
+                <span>60日涨跌幅</span>
+                <el-tooltip content="60日内的价格变化百分比" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="change-percent-cell">
+                <span :class="{ 'up': scope.row.return_60 > 0, 'down': scope.row.return_60 < 0 }">
+                  {{ scope.row.return_60 > 0 ? '+' : '' }}{{ scope.row.return_60.toFixed(2) }}%
+                </span>
+                <div class="trend-indicator">
+                  <el-icon v-if="scope.row.return_60 > 0"><CaretTop /></el-icon>
+                  <el-icon v-else-if="scope.row.return_60 < 0"><CaretBottom /></el-icon>
+                  <el-icon v-else><Minus /></el-icon>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          
+          <!-- RPS_60 -->
+          <el-table-column label="RPS_60" width="170" sortable="custom" prop="RPS_60" align="center">
+            <template #header>
+              <div class="custom-header">
+                <span>RPS_60</span>
+                <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="rps-cell">
+                <el-progress
+                  :percentage="scope.row.RPS_60"
+                  :color="getRpsColor(scope.row.RPS_60)"
+                  :format="(val: number) => val.toFixed(1)"
+                  :stroke-width="18"
+                  :text-inside="true"
+                  :show-text="true"
+                />
+                <div class="rps-rank" :class="getRpsRankClass(scope.row.RPS_60)">
+                  {{ getRpsRankText(scope.row.RPS_60) }}
+                </div>
+              </div>
+            </template>
+          </el-table-column>
         </el-table>
         
         <!-- 表格底部分页 -->
         <div class="table-footer">
           <el-pagination
-            v-if="rpsData.length > 10"
+            v-if="filteredRpsData.length > 10"
             layout="total, sizes, prev, pager, next"
-            :total="rpsData.length"
+            :total="filteredRpsData.length"
             :page-sizes="[10, 20, 50, 100]"
             v-model:page-size="pageSize"
             v-model:current-page="currentPage"
@@ -131,9 +229,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, InfoFilled, CaretTop, CaretBottom, Minus } from '@element-plus/icons-vue'
+import { Refresh, InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getIndexRps } from '@/services/strategyApi'
 import type { IndexRpsItem } from '@/services/strategyApi'
 
@@ -147,34 +245,31 @@ const queryTime = ref('')
 // 搜索关键词
 const searchKeyword = ref('')
 
-// 固定显示的周期（5日、20日和60日）
-const displayPeriods = ref<string[]>(['5', '20', '60'])
-
 // 分页相关
 const currentPage = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(2000)
 
 // 过滤后的RPS数据
 const filteredRpsData = computed(() => {
   let result = rpsData.value
   if (searchKeyword.value) {
     result = result.filter(item => {
-      return item.指数简称.includes(searchKeyword.value)
+      return item.name.includes(searchKeyword.value)
     })
   }
-  
-  // 分页处理
+  return result
+})
+
+// 分页后的数据
+const paginatedRpsData = computed(() => {
   const startIndex = (currentPage.value - 1) * pageSize.value
   const endIndex = startIndex + pageSize.value
-  return result.slice(startIndex, endIndex)
+  return filteredRpsData.value.slice(startIndex, endIndex)
 })
 
 // 获取默认排序属性
 const getDefaultSortProp = () => {
-  if (displayPeriods.value.length > 0) {
-    return `RPS_${displayPeriods.value[0]}`
-  }
-  return ''
+  return 'RPS_5' // 默认按RPS_5排序
 }
 
 // 获取RPS颜色
@@ -203,15 +298,18 @@ const getRpsRankClass = (value: number) => {
   return 'rank-weak'
 }
 
+// 获取指定周期的RPS值
+const getRpsValue = (row: IndexRpsItem, period: number): number => {
+  return row[`RPS_${period}` as keyof IndexRpsItem] as number || 0
+}
+
 // 表格行样式
 const tableRowClassName = ({ row }: { row: IndexRpsItem }) => {
-  // 根据第一个周期的RPS值设置行样式
-  if (displayPeriods.value.length > 0) {
-    const rpsValue = row[`RPS_${displayPeriods.value[0]}`]
-    if (rpsValue >= 90) return 'row-excellent'
-    if (rpsValue >= 80) return 'row-strong'
-    if (rpsValue >= 70) return 'row-good'
-  }
+  // 根据RPS_5值设置行样式
+  const rpsValue = row.RPS_5
+  if (rpsValue >= 90) return 'row-excellent'
+  if (rpsValue >= 80) return 'row-strong'
+  if (rpsValue >= 70) return 'row-good'
   return ''
 }
 
@@ -220,8 +318,8 @@ const handleSortChange = (sort: { prop: string, order: string }) => {
   // 根据排序重新排列数据
   if (sort.prop && sort.order) {
     rpsData.value.sort((a, b) => {
-      const propA = a[sort.prop as keyof IndexRpsItem] as number
-      const propB = b[sort.prop as keyof IndexRpsItem] as number
+      const propA = Number(a[sort.prop as keyof IndexRpsItem] ?? 0)
+      const propB = Number(b[sort.prop as keyof IndexRpsItem] ?? 0)
       
       if (sort.order === 'ascending') {
         return propA - propB
@@ -246,22 +344,8 @@ const handleCurrentChange = (page: number) => {
 // 显示指数详情
 const showIndexDetail = (row: IndexRpsItem) => {
   ElMessage({
-    message: `${row.指数简称} (${row.指数代码})`,
+    message: `${row.name} (${row.ts_code})`,
     type: 'info'
-  })
-}
-
-// 格式化日期
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
   })
 }
 
@@ -271,7 +355,7 @@ const refreshData = async () => {
   
   loading.value = true
   try {
-    const periodsStr = displayPeriods.value.join(',')
+    const periodsStr = '5,20,60' // 固定周期参数
     const response = await getIndexRps(periodsStr)
     
     // 由于在axiosConfig.ts中已经处理了非200状态码的情况
@@ -290,6 +374,11 @@ const refreshData = async () => {
 // 组件挂载时加载数据
 onMounted(() => {
   refreshData()
+})
+
+// 监听搜索关键词变化，重置页码
+watch(searchKeyword, () => {
+  currentPage.value = 1
 })
 </script>
 

@@ -1,11 +1,15 @@
 // 股票策略API服务
 import axios from './axiosConfig'
 
-// 指数RPS强度排名接口类型定义
 export interface IndexRpsItem {
-  指数代码: string
-  指数简称: string
-  [key: string]: any // 动态属性，包含不同周期的涨跌幅和RPS值
+  ts_code: string
+  name: string
+  return_5: number
+  RPS_5: number  
+  return_20: number
+  RPS_20: number  
+  return_60: number
+  RPS_60: number  
 }
 // 独立出来的IndexRps数据结构
 export interface IndexRpsData {
