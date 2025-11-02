@@ -1047,6 +1047,47 @@ paths:
       responses:
         '204':
           description: No response body
+  /django/api/tasks/git-info/:
+    get:
+      operationId: tasks_git_info_retrieve
+      description: 返回指定仓库的提交信息（最近提交在前）
+      summary: Git 仓库提交信息
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+        description: 限制返回的提交数量
+      - in: query
+        name: repo_path
+        schema:
+          type: string
+        description: 仓库本地路径
+      tags:
+      - Tools
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseGitInfo'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/tasks/index-basic/:
     get:
       operationId: tasks_index_basic_retrieve
@@ -1345,6 +1386,28 @@ components:
       - code
       - message
       - timestamp
+    GitCommitRecord:
+      type: object
+      properties:
+        authored_datetime:
+          type: string
+        message:
+          type: string
+    GitInfoData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/GitCommitRecord'
+      required:
+      - count
+      - interface
+      - records
     IndexBasicData:
       type: object
       properties:
@@ -1466,6 +1529,22 @@ components:
         weight:
           type: number
           format: double
+    SuccessResponseGitInfo:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/GitInfoData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseIndexBasic:
       type: object
       properties:

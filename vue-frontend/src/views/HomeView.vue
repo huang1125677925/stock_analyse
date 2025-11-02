@@ -36,8 +36,50 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { featureUpdates } from '@/services/homeView'
+import { ElMessage } from 'element-plus'
+import { getGitInfo, type GitCommitRecord } from '@/services/toolsApi'
 const router = useRouter()
+
+// 展示用的数据结构
+interface FeatureUpdate { date: string; content: string }
+
+// 功能迭代列表（从后端接口获取）
+const featureUpdates = ref<FeatureUpdate[]>([])
+
+// 加载两仓库的提交记录并合并
+const loadFeatureUpdates = async () => {
+  try {
+    const FRONTEND_REPO = '/root/stock_analyse'
+    const BACKEND_REPO = '/root/django/stock_data_service'
+    const LIMIT = 1000
+
+    const [fe, be] = await Promise.all([
+      getGitInfo(FRONTEND_REPO, LIMIT),
+      getGitInfo(BACKEND_REPO, LIMIT)
+    ])
+
+    const mapRecords = (records: GitCommitRecord[], prefix: string) =>
+      records.map(r => ({ 
+        date: new Date(r.authored_datetime).toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        }), 
+        content: `${prefix}${r.message}` 
+      }))
+
+    featureUpdates.value = [...mapRecords(fe.records, '【前端】：'), ...mapRecords(be.records, '【后端】：')]
+  } catch (error) {
+    console.error('加载功能迭代失败:', error)
+    ElMessage.error('加载功能迭代失败，请稍后重试')
+  }
+}
+
+onMounted(() => {
+  loadFeatureUpdates()
+})
 
 /**
  * 按日期排序的功能迭代列表（从最新到最旧）
