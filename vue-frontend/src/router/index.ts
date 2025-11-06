@@ -132,6 +132,12 @@ const router = createRouter({
           meta: { title: '大盘分析' }
         },
         {
+          path: '/analysis/index-analysis',
+          name: 'index-analysis',
+          component: () => import('@/views/markt_data/IndexAnalysis.vue'),
+          meta: { title: '指数分析' }
+        },
+        {
           path: '/analysis/market-change',
           name: 'MarketChangeHeatmap',
           component: () => import('@/views/markt_data/MarketChangeHeatmap.vue'),
@@ -142,6 +148,54 @@ const router = createRouter({
           name: 'congestion-heatmap',
           component: () => import('@/views/industry-stock-data/CongestionHeatmap.vue'),
           meta: { title: '行业热力图' }
+        },
+        {
+          path: '/analysis/congestion/turnover',
+          name: 'congestion-turnover',
+          component: () => import('@/views/industry-stock-data/CongestionTurnoverView.vue'),
+          meta: { title: '成交金额占比分位数' }
+        },
+        {
+          path: '/analysis/congestion/performance',
+          name: 'congestion-performance',
+          component: () => import('@/views/industry-stock-data/CongestionPerformanceView.vue'),
+          meta: { title: '行业业绩指标' }
+        },
+        {
+          path: '/analysis/congestion/fundflow',
+          name: 'congestion-fundflow',
+          component: () => import('@/views/industry-stock-data/CongestionFundFlowView.vue'),
+          meta: { title: '行业资金流' }
+        },
+        {
+          path: '/analysis/congestion/treemap',
+          name: 'congestion-treemap',
+          component: () => import('@/views/industry-stock-data/CongestionTreemapView.vue'),
+          meta: { title: '行业矩形树图' }
+        },
+        {
+          path: '/analysis/congestion/breadth',
+          name: 'congestion-breadth',
+          component: () => import('@/views/industry-stock-data/CongestionBreadthView.vue'),
+          meta: { title: '行业宽度热力图' }
+        },
+        {
+          path: '/analysis/congestion/scale-breadth',
+          name: 'congestion-scale-breadth',
+          component: () => import('@/views/industry-stock-data/CongestionScaleBreadthView.vue'),
+          meta: { title: '行业规模宽度' }
+        },
+        {
+          path: '/analysis/congestion/output-scale',
+          name: 'congestion-output-scale',
+          component: () => import('@/views/industry-stock-data/CongestionOutputScaleView.vue'),
+          meta: { title: '行业产出营收' }
+        },
+        {
+          path: '/analysis/congestion/index-rps',
+          name: 'congestion-index-rps',
+          component: () => import('@/views/industry-stock-data/CongestionIndexRpsView.vue'),
+          meta: { title: '指数RPS强度排名' }
         },
         {
           path: '/analysis/news-list',

@@ -18,7 +18,56 @@
       <div class="topbar-right" v-if="!isMobile">
         <el-menu :default-active="$route.path" class="top-menu" mode="horizontal" router>
           <template v-for="item in menuItems" :key="item.path">
-            <el-sub-menu v-if="item.children && item.children.length" :index="item.path">
+            <!-- 行业分析：使用大导航弹窗（mega menu） -->
+            <template v-if="item.path === '/analysis'">
+              <el-popover placement="bottom-start" trigger="hover" :hide-after="0" popper-class="mega-menu-popper">
+                <template #reference>
+                  <div class="mega-menu-trigger">
+                    <el-icon>
+                      <component :is="item.icon" />
+                    </el-icon>
+                    <span class="mega-menu-title">{{ item.title }}</span>
+                  </div>
+                </template>
+                <div class="mega-menu">
+                  <div v-for="section in analysisMegaMenuSections" :key="section.title" class="mega-section">
+                    <div class="mega-section-title">{{ section.title }}</div>
+                    <ul class="mega-links">
+                      <li v-for="link in section.items" :key="link.title">
+                        <el-link :underline="false" :disabled="!link.path" @click="goPath(link.path)">{{ link.title }}</el-link>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </el-popover>
+            </template>
+
+            <!-- 股市基本面：使用大导航弹窗（mega menu） -->
+            <template v-else-if="item.path === '/market-fundamentals'">
+              <el-popover placement="bottom-start" trigger="hover" :hide-after="0" :width="isMobile ? 360 : 600" popper-class="mega-menu-popper">
+                <template #reference>
+                  <div class="mega-menu-trigger">
+                    <el-icon>
+                      <component :is="item.icon" />
+                    </el-icon>
+                    <span class="mega-menu-title">{{ item.title }}</span>
+                  </div>
+                </template>
+                <div class="mega-menu mega-menu-horizontal">
+                  <div v-for="section in fundamentalsMegaMenuSections" :key="section.title" class="mega-section">
+                    <div class="mega-section-title">{{ section.title }}</div>
+                    <ul class="mega-links">
+                      <li v-for="link in section.items" :key="link.title">
+                        <el-link :underline="false" :disabled="!link.path" @click="goPath(link.path)">{{ link.title }}</el-link>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </el-popover>
+            </template>
+
+            <!-- 其他菜单维持原有渲染逻辑 -->
+            <el-sub-menu v-else-if="item.children && item.children.length" :index="item.path">
               <template #title>
                 <el-icon>
                   <component :is="item.icon" />
@@ -333,6 +382,87 @@ const menuItems = computed(() => {
   return baseMenuItems
 })
 
+// 行业分析大导航结构（悬停展开的 mega menu）
+const analysisMegaMenuSections = [
+  // {
+  //   title: '景气度指标',
+  //   items: [
+  //     { title: '净利润增长率' },
+  //     { title: '营业收入增长率' },
+  //     { title: '营业总收入增长率' },
+  //     { title: 'ROE增长率' },
+  //     { title: '利润总额增长率' },
+  //   ],
+  // },
+  {
+    title: '拥挤度指标',
+    items: [
+      // { title: '行业整体分析', path: '/analysis/congestion' },
+      { title: '单一行业分析', path: '/industries' },
+      { title: '成交金额占比分位数', path: '/analysis/congestion/turnover' },
+      { title: '行业业绩指标', path: '/analysis/congestion/performance' },
+      { title: '行业资金流', path: '/analysis/congestion/fundflow' },
+      { title: '行业矩形树图', path: '/analysis/congestion/treemap' },
+      { title: '行业宽度热力图', path: '/analysis/congestion/breadth' },
+      { title: '行业规模宽度', path: '/analysis/congestion/scale-breadth' },
+      { title: '行业产出营收', path: '/analysis/congestion/output-scale' },
+      { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
+      // { title: '大盘挤拥度' },
+      // { title: '融资买入/成交额' },
+      // { title: '行业挤拥度-申万1级' },
+      // { title: '行业挤拥度-申万2级' },
+      // { title: '小市值因子挤拥度与因子估值' },
+    ],
+  },
+  // {
+  //   title: '机构调研',
+  //   items: [
+  //     { title: '近期调研列表' },
+  //     { title: '近30天调研次数排名' },
+  //     { title: '近30天机构调研排名' },
+  //   ],
+  // },
+  // {
+  //   title: '其他',
+  //   items: [
+  //     { title: '业绩预告统计' },
+  //     { title: '估值' },
+  //     { title: '回购' },
+  //     { title: '近期A股回购数据' },
+  //   ],
+  // },
+]
+
+// 股市基本面大导航结构（悬停展开的 mega menu）
+const fundamentalsMegaMenuSections = [
+  {
+    title: '大盘分析',
+    items: [
+      { title: '大盘涨跌', path: '/analysis/market-change' },
+      { title: '大盘分析', path: '/analysis/market' },
+    ],
+  },
+  {
+    title: '指数分析',
+    items: [
+      { title: '指数分析', path: '/analysis/index-analysis' },
+      { title: '指数列表', path: '/analysis/index-list' },
+    ],
+  },
+  {
+    title: '新闻与舆情',
+    items: [
+      { title: 'CCTV新闻', path: '/analysis/news-list' },
+      { title: '新闻热力图', path: '/analysis/news-wordcloud' },
+    ],
+  },
+]
+
+function goPath(path?: string) {
+  if (!path) return
+  router.push(path)
+}
+
 // 面包屑导航（桌面端显示）
 const breadcrumbs = computed(() => {
   const matched = route.matched.filter((item) => item.meta && item.meta.title)
@@ -408,6 +538,66 @@ watch(
 .top-menu {
   border-bottom: none;
   margin-right: 12px;
+  white-space: nowrap;
+}
+
+/* mega menu 触发器样式，保持与顶栏菜单一致 */
+.mega-menu-trigger {
+  height: 60px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--el-text-color-primary);
+  white-space: nowrap;
+}
+.mega-menu-title {
+  font-size: 14px;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+}
+
+/* mega menu 弹窗样式 */
+.mega-menu-popper {
+  padding: 12px 16px;
+  width: fit-content;
+  max-width: 95vw;
+}
+.mega-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.mega-menu-horizontal {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.mega-section {
+  min-width: 220px;
+}
+.mega-section-title {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+.mega-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.mega-menu .el-link {
+  color: #606266;
+  font-size: 14px;
+}
+.mega-menu .el-link:hover {
+  color: #409EFF;
 }
 
 .header-right {
