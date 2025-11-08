@@ -151,6 +151,30 @@ paths:
       responses:
         '200':
           description: No response body
+  /django/api/individual_stock/dc-concepts/:
+    get:
+      operationId: individual_stock_dc_concepts_retrieve
+      description: 从个股数据的 dc_concept 字段提取概念，去重并排序后返回。无需任何参数，统一响应结构。
+      summary: 东财概念列表
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseConceptList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/individual_stock/income-statements/:
     get:
       operationId: individual_stock_income_statements_retrieve
@@ -408,6 +432,7 @@ paths:
           - page_size(int, 可选): 每页数量，默认20
           - keyword(str, 可选): 关键词，按股票名称或代码模糊匹配
           - industry(str, 可选): 行业名称，按行业精确匹配
+          - dc_concept(str, 可选): 东财概念，按概念模糊匹配
           - stock_names(list[str] 或 逗号分隔字符串, 可选): 股票名列表，按名称精确筛选，支持JSON数组或逗号分隔
         返回值：
         - JsonResponse: 调用success_response返回数据；失败时调用error_response返回错误信息。
@@ -1369,6 +1394,17 @@ components:
   schemas:
     ErrorResponse:
       type: object
+      description: |-
+        错误响应序列化器
+        功能：描述错误时的统一返回结构。
+        参数：无
+        返回值：
+        - code (int): 错误码
+        - message (str): 错误信息
+        - timestamp (str): 时间戳
+        - data (any|null): 为空或附加数据
+        - error (str, 可选): 具体错误描述
+        事件：无
       properties:
         code:
           type: integer
@@ -1529,6 +1565,34 @@ components:
         weight:
           type: number
           format: double
+    SuccessResponseConceptList:
+      type: object
+      description: |-
+        东财概念列表统一响应序列化器
+        功能：描述接口返回的统一结构，其中 data 为概念字符串数组。
+        参数：无
+        返回值：
+        - code (int): 状态码
+        - message (str): 信息
+        - timestamp (str): 时间戳（ISO 格式）
+        - data (list[str]): 概念名称列表
+        事件：无
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          type: array
+          items:
+            type: string
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseGitInfo:
       type: object
       properties:

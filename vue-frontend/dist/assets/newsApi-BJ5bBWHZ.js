@@ -1,1 +1,0 @@
-import{x as s}from"./index-DMQzgR5H.js";const o="/django/api/news";async function c(e=10,r=0,a){try{return(await s.get(`${o}/`,{params:{limit:e,offset:r,keyword:a}})).data}catch(t){throw console.error("获取新闻列表失败:",t),t}}async function i(e){try{return(await s.get(`${o}/${e}`)).data}catch(r){throw console.error("获取新闻详情失败:",r),r}}export{i as a,c as g};

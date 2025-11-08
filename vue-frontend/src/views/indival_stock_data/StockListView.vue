@@ -32,6 +32,23 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item label="东财概念">
+            <el-select
+              v-model="dcConcept"
+              placeholder="请选择东财概念"
+              style="width: 240px"
+              clearable
+              filterable
+              @change="handleDcConceptChange"
+            >
+              <el-option
+                v-for="concept in dcConceptList"
+                :key="concept"
+                :label="concept"
+                :value="concept"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item label="股票代码/名称">
             <el-input v-model="searchKeyword" placeholder="请输入股票代码或名称" clearable @clear="handleSearch" />
           </el-form-item>
@@ -148,26 +165,29 @@
  * 功能：
  * 1. 展示所有股票的基本信息
  * 2. 支持按股票代码、名称进行后端搜索
- * 3. 支持排序和分页
- * 4. 提供跳转到实时行情和历史行情的入口
- * 5. 支持从路由参数接收行业筛选条件
+ * 3. 支持东财概念筛选（下拉选择，后端模糊匹配）
+ * 4. 支持排序和分页
+ * 5. 提供跳转到实时行情和历史行情的入口
+ * 6. 支持从路由参数接收行业筛选条件
  * 
  * 参数：
  * - searchKeyword: 搜索关键词，用于后端搜索
  * - currentPage: 当前页码
  * - pageSize: 每页显示数量
  * - industry: 行业筛选条件，可从路由参数获取
+ * - dcConcept: 东财概念筛选条件（字符串）
  * 
  * 事件：
  * - handleSearch: 触发后端搜索
  * - resetSearch: 重置搜索条件并刷新数据
  * - fetchStockList: 从后端获取股票列表数据
+ * - handleDcConceptChange: 概念筛选变化后刷新数据
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, RefreshLeft, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getStockList } from '@/services/individualStockApi'
+import { getStockList, getDcConceptList } from '@/services/individualStockApi'
 import type { StockInfo } from '@/services/individualStockApi'
 import { getIndustrySectors, type IndustrySector } from '@/services/industryAnalysisApi'
 import { createPersonalHolding, type RelationType, getPersonalHoldings, type PersonalHoldingsListResponse } from '@/services/personalHoldingsApi'
@@ -187,6 +207,9 @@ const searchKeyword = ref('')
 // 行业筛选
 const industry = ref('')
 const industryList = ref<IndustrySector[]>([])
+// 东财概念筛选
+const dcConcept = ref('')
+const dcConceptList = ref<string[]>([])
 
 // 仅看我的（持有/关注）
 const onlyMine = ref(false)
@@ -274,7 +297,8 @@ const fetchStockList = async () => {
       page_size: pageSize.value,
       keyword: searchKeyword.value,
       industry: industry.value || undefined,
-      stock_names: onlyMine.value && holdingsNameList.value.length > 0 ? holdingsNameList.value.join(',') : undefined
+      stock_names: onlyMine.value && holdingsNameList.value.length > 0 ? holdingsNameList.value.join(',') : undefined,
+      dc_concept: dcConcept.value || undefined
     })
     stocks.value = response.data
     
@@ -301,8 +325,31 @@ const fetchIndustryList = async () => {
   }
 }
 
+/**
+ * 方法：获取东财概念列表
+ * 功能：调用后端统一响应接口，填充下拉选项
+ * 参数：无
+ * 返回值：无（更新 dcConceptList）
+ * 事件：无
+ */
+const fetchDcConceptList = async () => {
+  try {
+    const res = await getDcConceptList()
+    dcConceptList.value = res.data || []
+  } catch (error) {
+    console.error('获取东财概念列表失败:', error)
+    ElMessage.error('获取东财概念列表失败')
+  }
+}
+
 // 方法：行业筛选变化
 const handleIndustryChange = () => {
+  currentPage.value = 1 // 重置到第一页
+  fetchStockList() // 重新获取数据
+}
+
+// 方法：东财概念筛选变化
+const handleDcConceptChange = () => {
   currentPage.value = 1 // 重置到第一页
   fetchStockList() // 重新获取数据
 }
@@ -317,6 +364,7 @@ const handleSearch = () => {
 const resetSearch = () => {
   searchKeyword.value = ''
   industry.value = ''
+  dcConcept.value = ''
   currentPage.value = 1
   fetchStockList() // 重置后调用后端搜索
 }
@@ -410,15 +458,29 @@ const formatVolume = (value: number | null | undefined): string => {
 
 // 生命周期：组件挂载时获取数据
 onMounted(() => {
+  fetchIndustryList()
+  fetchDcConceptList()
   // 检查路由参数中是否有行业筛选条件
   const industryFromQuery = route.query.industry as string
   if (industryFromQuery) {
     industry.value = industryFromQuery
     ElMessage.success(`已自动筛选行业：${industryFromQuery}`)
   }
+  // 检查路由参数中是否有东财概念筛选条件
+  /**
+   * 初始化路由参数中的东财概念
+   * 功能：从 query 读取 dc_concept 并设置到筛选条件
+   * 参数：无
+   * 返回值：无
+   * 事件：更新 dcConcept 后将触发列表刷新（下方调用）
+   */
+  const conceptFromQuery = route.query.dc_concept as string
+  if (conceptFromQuery) {
+    dcConcept.value = conceptFromQuery
+    ElMessage.success(`已自动筛选概念：${conceptFromQuery}`)
+  }
   
   fetchStockList()
-  fetchIndustryList()
 })
 
 // 监听路由参数变化
@@ -428,6 +490,16 @@ watch(() => route.query.industry, (newIndustry) => {
     currentPage.value = 1 // 重置到第一页
     fetchStockList() // 重新获取数据
     ElMessage.success(`已切换到行业：${newIndustry}`)
+  }
+}, { immediate: false })
+
+// 监听路由参数中的东财概念变化
+watch(() => route.query.dc_concept, (newConcept) => {
+  if (newConcept && typeof newConcept === 'string') {
+    dcConcept.value = newConcept
+    currentPage.value = 1
+    fetchStockList()
+    ElMessage.success(`已切换到概念：${newConcept}`)
   }
 }, { immediate: false })
 </script>

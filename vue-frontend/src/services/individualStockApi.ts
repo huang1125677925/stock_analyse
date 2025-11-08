@@ -267,10 +267,11 @@ export interface StockListParams extends PageParams {
   keyword?: string; // 搜索关键词，可以是股票代码或名称
   industry?: string; // 行业筛选
   stock_names?: string; // 仅看我的：以逗号分隔的股票名称列表
+  dc_concept?: string; // 东财概念筛选（模糊匹配）
 }
 
 export const getStockList = async (params: StockListParams = {}): Promise<StockListResponse> => {
-  const { page, page_size, keyword, industry, stock_names } = params
+  const { page, page_size, keyword, industry, stock_names, dc_concept } = params
   const queryParams = new URLSearchParams()
   
   if (page !== undefined) {
@@ -293,11 +294,42 @@ export const getStockList = async (params: StockListParams = {}): Promise<StockL
     queryParams.append('stock_names', stock_names)
   }
   
+  if (dc_concept) {
+    queryParams.append('dc_concept', dc_concept)
+  }
+  
   const queryString = queryParams.toString()
   const url = queryString ? `${API_BASE_URL}/?${queryString}` : `${API_BASE_URL}/`
   
   const response = await axios.get<StockListResponse>(url)
   return response.data
+}
+
+/**
+ * 东财概念列表响应结构
+ * 功能：描述接口返回的统一结构，其中 data 为概念字符串数组。
+ * 参数：无
+ * 返回值：
+ * - code (int): 状态码
+ * - message (str): 信息
+ * - timestamp (str): 时间戳（ISO 格式）
+ * - data (string[]): 概念名称列表
+ * 事件：无
+ */
+export interface ConceptListResponse {
+  code: number
+  message: string
+  timestamp: string
+  data: string[]
+}
+
+/**
+ * 获取东财概念列表
+ * @returns Promise<ConceptListResponse> 概念列表统一响应
+ */
+export const getDcConceptList = async (): Promise<ConceptListResponse> => {
+  const response = await axios.get<ConceptListResponse, ConceptListResponse>('/django/api/individual_stock/dc-concepts/')
+  return response
 }
 
 /**

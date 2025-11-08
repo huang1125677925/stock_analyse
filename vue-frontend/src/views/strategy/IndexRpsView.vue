@@ -65,12 +65,12 @@
             </template>
             <template #default="scope">
               <div class="change-percent-cell">
-                <span :class="{ 'up': scope.row.return_5 > 0, 'down': scope.row.return_5 < 0 }">
-                  {{ scope.row.return_5 > 0 ? '+' : '' }}{{ scope.row.return_5.toFixed(2) }}%
+                <span :class="{ 'up': Number(scope.row.return_5) > 0, 'down': Number(scope.row.return_5) < 0 }">
+                  {{ formatPercent(scope.row.return_5) }}
                 </span>
                 <div class="trend-indicator">
-                  <el-icon v-if="scope.row.return_5 > 0"><CaretTop /></el-icon>
-                  <el-icon v-else-if="scope.row.return_5 < 0"><CaretBottom /></el-icon>
+                  <el-icon v-if="Number(scope.row.return_5) > 0"><CaretTop /></el-icon>
+                  <el-icon v-else-if="Number(scope.row.return_5) < 0"><CaretBottom /></el-icon>
                   <el-icon v-else><Minus /></el-icon>
                 </div>
               </div>
@@ -116,12 +116,12 @@
             </template>
             <template #default="scope">
               <div class="change-percent-cell">
-                <span :class="{ 'up': scope.row.return_20 > 0, 'down': scope.row.return_20 < 0 }">
-                  {{ scope.row.return_20 > 0 ? '+' : '' }}{{ scope.row.return_20.toFixed(2) }}%
+                <span :class="{ 'up': Number(scope.row.return_20) > 0, 'down': Number(scope.row.return_20) < 0 }">
+                  {{ formatPercent(scope.row.return_20) }}
                 </span>
                 <div class="trend-indicator">
-                  <el-icon v-if="scope.row.return_20 > 0"><CaretTop /></el-icon>
-                  <el-icon v-else-if="scope.row.return_20 < 0"><CaretBottom /></el-icon>
+                  <el-icon v-if="Number(scope.row.return_20) > 0"><CaretTop /></el-icon>
+                  <el-icon v-else-if="Number(scope.row.return_20) < 0"><CaretBottom /></el-icon>
                   <el-icon v-else><Minus /></el-icon>
                 </div>
               </div>
@@ -141,7 +141,7 @@
             <template #default="scope">
               <div class="rps-cell">
                 <el-progress
-                  :percentage="scope.row.RPS_20"
+                  :percentage="Number(scope.row.RPS_20)"
                   :color="getRpsColor(scope.row.RPS_20)"
                   :format="(val: number) => val.toFixed(1)"
                   :stroke-width="18"
@@ -167,12 +167,12 @@
             </template>
             <template #default="scope">
               <div class="change-percent-cell">
-                <span :class="{ 'up': scope.row.return_60 > 0, 'down': scope.row.return_60 < 0 }">
-                  {{ scope.row.return_60 > 0 ? '+' : '' }}{{ scope.row.return_60.toFixed(2) }}%
+                <span :class="{ 'up': Number(scope.row.return_60) > 0, 'down': Number(scope.row.return_60) < 0 }">
+                  {{ formatPercent(scope.row.return_60) }}
                 </span>
                 <div class="trend-indicator">
-                  <el-icon v-if="scope.row.return_60 > 0"><CaretTop /></el-icon>
-                  <el-icon v-else-if="scope.row.return_60 < 0"><CaretBottom /></el-icon>
+                  <el-icon v-if="Number(scope.row.return_60) > 0"><CaretTop /></el-icon>
+                  <el-icon v-else-if="Number(scope.row.return_60) < 0"><CaretBottom /></el-icon>
                   <el-icon v-else><Minus /></el-icon>
                 </div>
               </div>
@@ -192,7 +192,7 @@
             <template #default="scope">
               <div class="rps-cell">
                 <el-progress
-                  :percentage="scope.row.RPS_60"
+                  :percentage="Number(scope.row.RPS_60)"
                   :color="getRpsColor(scope.row.RPS_60)"
                   :format="(val: number) => val.toFixed(1)"
                   :stroke-width="18"
@@ -230,6 +230,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh, InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getIndexRps } from '@/services/strategyApi'
@@ -237,6 +238,9 @@ import type { IndexRpsItem } from '@/services/strategyApi'
 
 // 数据加载状态
 const loading = ref(false)
+
+// 路由
+const router = useRouter()
 
 // RPS数据
 const rpsData = ref<IndexRpsItem[]>([])
@@ -248,6 +252,20 @@ const searchKeyword = ref('')
 // 分页相关
 const currentPage = ref(1)
 const pageSize = ref(2000)
+
+/**
+ * 百分比格式化工具
+ * 功能：兼容数字与字符串输入，安全格式化为百分比文本
+ * 参数：value(unknown) 原始值，可能为 number 或 string
+ * 返回值：string 格式化后的文本，如 '+1.23%'
+ * 事件：无
+ */
+const formatPercent = (value: unknown): string => {
+  const num = typeof value === 'number' ? value : parseFloat(String(value))
+  if (!Number.isFinite(num)) return '-'
+  const sign = num > 0 ? '+' : ''
+  return `${sign}${num.toFixed(2)}%`
+}
 
 // 过滤后的RPS数据
 const filteredRpsData = computed(() => {
@@ -341,12 +359,15 @@ const handleCurrentChange = (page: number) => {
   currentPage.value = page
 }
 
-// 显示指数详情
+/**
+ * 显示指数详情（跳转到股票列表页面）
+ * 功能：点击指数简称时跳转到股票列表页面，并将概念名作为查询参数传递，便于在股票列表中按概念筛选
+ * 参数：row(IndexRpsItem) 当前行的指数数据
+ * 返回值：无
+ * 事件：路由跳转到 '/stock-list'，并携带 query: { dc_concept }
+ */
 const showIndexDetail = (row: IndexRpsItem) => {
-  ElMessage({
-    message: `${row.name} (${row.ts_code})`,
-    type: 'info'
-  })
+  router.push({ path: '/stock-list', query: { dc_concept: row.name } })
 }
 
 // 刷新数据
