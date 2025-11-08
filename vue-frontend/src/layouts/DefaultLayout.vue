@@ -20,7 +20,7 @@
           <template v-for="item in menuItems" :key="item.path">
             <!-- 行业分析：使用大导航弹窗（mega menu） -->
             <template v-if="item.path === '/analysis'">
-              <el-popover placement="bottom-start" trigger="hover" :hide-after="0" popper-class="mega-menu-popper">
+              <el-popover placement="bottom-start" trigger="hover" :hide-after="0" popper-class="mega-menu-popper mega-menu-popper-green">
                 <template #reference>
                   <div class="mega-menu-trigger">
                     <el-icon>
@@ -44,7 +44,7 @@
 
             <!-- 股市基本面：使用大导航弹窗（mega menu） -->
             <template v-else-if="item.path === '/market-fundamentals'">
-              <el-popover placement="bottom-start" trigger="hover" :hide-after="0" :width="isMobile ? 360 : 600" popper-class="mega-menu-popper">
+              <el-popover placement="bottom-start" trigger="hover" :hide-after="0" :width="isMobile ? 360 : 600" popper-class="mega-menu-popper mega-menu-popper-green">
                 <template #reference>
                   <div class="mega-menu-trigger">
                     <el-icon>
@@ -560,9 +560,15 @@ watch(
 
 /* mega menu 弹窗样式 */
 .mega-menu-popper {
-  padding: 12px 16px;
+  padding: 20px 24px;
   width: fit-content;
   max-width: 95vw;
+}
+.mega-menu-popper-green {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%) !important;
+}
+.mega-menu-popper-green .mega-section-title {
+  color: #2e7d6e;
 }
 .mega-menu {
   display: grid;
@@ -571,30 +577,32 @@ watch(
 }
 .mega-menu-horizontal {
   display: flex;
-  gap: 10px;
+  gap: 48px;
   align-items: flex-start;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
 }
-.mega-section {
-  min-width: 220px;
+.mega-menu-horizontal .mega-section {
+  min-width: 180px;
+  flex-shrink: 0;
 }
 .mega-section-title {
   font-weight: 600;
   color: #303133;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  font-size: 15px;
 }
 .mega-links {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 .mega-menu .el-link {
   color: #606266;
   font-size: 14px;
+  padding: 4px 0;
+  display: inline-block;
 }
 .mega-menu .el-link:hover {
   color: #409EFF;
