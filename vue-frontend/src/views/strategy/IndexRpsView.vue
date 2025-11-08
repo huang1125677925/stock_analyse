@@ -15,6 +15,15 @@
                 clearable
                 style="width: 200px"
               />
+              <el-select
+                v-model="idxType"
+                placeholder="选择板块类型"
+                style="width: 160px; margin-left: 12px"
+              >
+                <el-option label="行业板块" value="行业板块" />
+                <el-option label="概念板块" value="概念板块" />
+                <el-option label="地域板块" value="地域板块" />
+              </el-select>
             </div>
           </div>
         </template>
@@ -236,6 +245,23 @@ import { Refresh, InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@elem
 import { getIndexRps } from '@/services/strategyApi'
 import type { IndexRpsItem } from '@/services/strategyApi'
 
+/**
+ * 组件：指数RPS强度排名视图（IndexRpsView）
+ * 功能：展示不同板块类型下的指数RPS强度排名，支持搜索、排序、分页与详情跳转
+ * 参数：
+ *  - 无外部props；内部状态包括：
+ *    - idxType: 板块类型（'概念板块' | '行业板块' | '地域板块'），默认 '行业板块'
+ *    - searchKeyword: 搜索关键词
+ *    - currentPage/pageSize: 分页参数
+ * 返回值：无（组件渲染UI）；内部从接口获取 IndexRpsData:
+ *  - data: IndexRpsItem[] 指数数据
+ *  - query_time: 查询时间
+ * 事件：
+ *  - 点击指数简称触发路由跳转到股票列表并携带概念名
+ *  - 表格排序、分页变化重排/翻页
+ *  - 修改板块类型触发数据刷新
+ */
+
 // 数据加载状态
 const loading = ref(false)
 
@@ -248,6 +274,9 @@ const queryTime = ref('')
 
 // 搜索关键词
 const searchKeyword = ref('')
+
+// 板块类型（默认：行业板块）
+const idxType = ref<'概念板块' | '行业板块' | '地域板块'>('行业板块')
 
 // 分页相关
 const currentPage = ref(1)
@@ -377,7 +406,7 @@ const refreshData = async () => {
   loading.value = true
   try {
     const periodsStr = '5,20,60' // 固定周期参数
-    const response = await getIndexRps(periodsStr)
+    const response = await getIndexRps(periodsStr, false, idxType.value)
     
     // 由于在axiosConfig.ts中已经处理了非200状态码的情况
     // 这里直接使用返回的数据，不需要再次检查code
@@ -400,6 +429,12 @@ onMounted(() => {
 // 监听搜索关键词变化，重置页码
 watch(searchKeyword, () => {
   currentPage.value = 1
+})
+
+// 监听板块类型变化，刷新数据并重置分页
+watch(idxType, () => {
+  currentPage.value = 1
+  refreshData()
 })
 </script>
 

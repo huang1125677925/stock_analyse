@@ -59,14 +59,19 @@ export interface HistoricalRpsResponse {
  * @param save 是否保存到数据库
  * @returns Promise<IndexRpsResponse>
  */
-export async function getIndexRps(periods: string = "5,20,60", save: boolean = false): Promise<IndexRpsData> {
+export async function getIndexRps(
+  periods: string = "5,20,60",
+  save: boolean = false,
+  idx_type: '概念板块' | '行业板块' | '地域板块' = '行业板块'
+): Promise<IndexRpsData> {
   try {
     const response = await axios.get<IndexRpsData>(
       `/django/api/strategy/index-rps/`,
       {
         params: {
           periods,
-          save
+          save,
+          idx_type
         }
       }
     )
