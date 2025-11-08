@@ -24,6 +24,8 @@
                 <el-option label="概念板块" value="概念板块" />
                 <el-option label="地域板块" value="地域板块" />
               </el-select>
+              <!-- 仅看我的开关 -->
+              <el-checkbox v-model="onlyMine" @change="handleOnlyMineChange" style="margin-left: 12px">仅看我的</el-checkbox>
             </div>
           </div>
         </template>
@@ -41,12 +43,12 @@
         >
           <!-- 固定列 -->
           <el-table-column type="index" label="#" width="50" fixed="left" align="center" />
-          <el-table-column prop="ts_code" label="ts_code" width="150" sortable="custom" fixed="left" align="center">
+          <el-table-column prop="ts_code" label="ts_code" min-width="100" sortable="custom" fixed="left" align="center">
             <template #default="scope">
               <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="name" label="name" width="150" sortable="custom" fixed="left">
+          <el-table-column prop="name" label="name" min-width="120" sortable="custom" fixed="left">
             <template #header>
               <div class="custom-header">
                 <span>指数简称</span>
@@ -63,7 +65,7 @@
           </el-table-column>
           
           <!-- 5日涨跌幅 -->
-          <el-table-column label="5日涨跌幅" width="120" sortable="custom" prop="return_5" align="center">
+          <el-table-column label="5日涨跌幅" min-width="90" sortable="custom" prop="return_5" align="center">
             <template #header>
               <div class="custom-header">
                 <span>5日涨跌幅</span>
@@ -87,7 +89,7 @@
           </el-table-column>
           
           <!-- RPS_5 -->
-          <el-table-column label="RPS_5" width="170" sortable="custom" prop="RPS_5" align="center">
+          <el-table-column label="RPS_5" min-width="110" sortable="custom" prop="RPS_5" align="center">
             <template #header>
               <div class="custom-header">
                 <span>RPS_5</span>
@@ -114,7 +116,7 @@
           </el-table-column>
 
           <!-- 20日涨跌幅 -->
-          <el-table-column label="20日涨跌幅" width="120" sortable="custom" prop="return_20" align="center">
+          <el-table-column label="20日涨跌幅" min-width="90" sortable="custom" prop="return_20" align="center">
             <template #header>
               <div class="custom-header">
                 <span>20日涨跌幅</span>
@@ -138,7 +140,7 @@
           </el-table-column>
           
           <!-- RPS_20 -->
-          <el-table-column label="RPS_20" width="170" sortable="custom" prop="RPS_20" align="center">
+          <el-table-column label="RPS_20" min-width="110" sortable="custom" prop="RPS_20" align="center">
             <template #header>
               <div class="custom-header">
                 <span>RPS_20</span>
@@ -165,7 +167,7 @@
           </el-table-column>
 
           <!-- 60日涨跌幅 -->
-          <el-table-column label="60日涨跌幅" width="120" sortable="custom" prop="return_60" align="center">
+          <el-table-column label="60日涨跌幅" min-width="90" sortable="custom" prop="return_60" align="center">
             <template #header>
               <div class="custom-header">
                 <span>60日涨跌幅</span>
@@ -189,7 +191,7 @@
           </el-table-column>
           
           <!-- RPS_60 -->
-          <el-table-column label="RPS_60" width="170" sortable="custom" prop="RPS_60" align="center">
+          <el-table-column label="RPS_60" min-width="110" sortable="custom" prop="RPS_60" align="center">
             <template #header>
               <div class="custom-header">
                 <span>RPS_60</span>
@@ -214,7 +216,29 @@
               </div>
             </template>
           </el-table-column>
-        </el-table>
+          
+          <!-- 操作列：领涨数据详情 -->
+          <el-table-column label="操作" min-width="110" align="center">
+            <template #default="scope">
+              <el-button
+                type="primary"
+                size="small"
+                @click="openLeadRiseDetail(scope.row)"
+              >
+                领涨数据详情
+              </el-button>
+            </template>
+          </el-table-column>
+          
+          </el-table>
+        
+        <!-- 领涨数据详情对话框组件实例 -->
+        <LeadRiseDetailDialog
+          v-model="detailDialogVisible"
+          :ts-code="currentTsCode"
+          :idx-type="idxType"
+          :name="currentIndexName"
+        />
         
         <!-- 表格底部分页 -->
         <div class="table-footer">
@@ -238,12 +262,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+ import { ref, computed, onMounted, watch, defineComponent, h } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
 import { Refresh, InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getIndexRps } from '@/services/strategyApi'
 import type { IndexRpsItem } from '@/services/strategyApi'
+import { isAuthenticated } from '@/services/auth'
+import { getPersonalHoldings, type PersonalHoldingsListResponse } from '@/services/personalHoldingsApi'
+import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
 
 /**
  * 组件：指数RPS强度排名视图（IndexRpsView）
@@ -260,6 +287,7 @@ import type { IndexRpsItem } from '@/services/strategyApi'
  *  - 点击指数简称触发路由跳转到股票列表并携带概念名
  *  - 表格排序、分页变化重排/翻页
  *  - 修改板块类型触发数据刷新
+ *  - 切换“仅看我的”时，若板块类型为行业板块，则根据个人持有/关注的行业白名单进行筛选
  */
 
 // 数据加载状态
@@ -277,6 +305,25 @@ const searchKeyword = ref('')
 
 // 板块类型（默认：行业板块）
 const idxType = ref<'概念板块' | '行业板块' | '地域板块'>('行业板块')
+
+/**
+ * “仅看我的”筛选
+ * 功能：当开启时，若当前板块类型为“行业板块”，从个人持有/关注列表中提取行业名称，形成白名单进行过滤
+ * 参数：
+ *  - onlyMine(boolean): 是否启用仅看我的
+ *  - industryWhitelist(string[]): 行业名称白名单（来自个人持有/关注列表）
+ * 返回值：无（通过计算属性影响表格数据）
+ * 事件：
+ *  - 切换开关时校验登录；未登录则提示并跳转登录
+ *  - 成功启用后提示白名单数量；失败则回退状态
+ */
+const onlyMine = ref(false)
+const industryWhitelist = ref<string[]>([])
+
+// 是否启用白名单过滤（仅在行业板块且白名单非空时）
+const whitelistEnabled = computed(() => {
+  return onlyMine.value && idxType.value === '行业板块' && industryWhitelist.value.length > 0
+})
 
 // 分页相关
 const currentPage = ref(1)
@@ -299,6 +346,10 @@ const formatPercent = (value: unknown): string => {
 // 过滤后的RPS数据
 const filteredRpsData = computed(() => {
   let result = rpsData.value
+  // 行业白名单过滤（仅看我的）
+  if (whitelistEnabled.value) {
+    result = result.filter(item => industryWhitelist.value.includes(item.name))
+  }
   if (searchKeyword.value) {
     result = result.filter(item => {
       return item.name.includes(searchKeyword.value)
@@ -399,6 +450,112 @@ const showIndexDetail = (row: IndexRpsItem) => {
   router.push({ path: '/stock-list', query: { dc_concept: row.name } })
 }
 
+/**
+ * 组件：领涨数据详情对话框（LeadRiseDetailDialog）
+ * 功能：在对话框中展示指定概念板块（ts_code/name）近30天的 dc_index 领涨数据
+ * 参数：
+ *  - modelValue(Boolean): 对话框显示状态（v-model）
+ *  - tsCode(String): 概念代码（格式：xxxxx.DC，优先使用）
+ *  - idxType(String): 板块类型（用于标题展示）
+ *  - name(String): 概念名称，用于对话框标题与查询备用
+ * 返回值：无（组件内部渲染UI）
+ * 事件：
+ *  - update:modelValue(Boolean): 关闭或打开对话框时触发，用于双向绑定
+ */
+const LeadRiseDetailDialog = defineComponent({
+  name: 'LeadRiseDetailDialog',
+  props: {
+    modelValue: { type: Boolean, default: false },
+    tsCode: { type: String, required: true },
+    idxType: { type: String, required: true },
+    name: { type: String, default: '' }
+  },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    const visible = ref(props.modelValue)
+    const loading = ref(false)
+    const records = ref<DcIndexRecord[]>([])
+
+    const loadData = async () => {
+      if (!props.tsCode || !props.idxType) return
+      loading.value = true
+      try {
+        const data = await fetchDcIndexLastNDays({ tsCode: props.tsCode, name: props.name }, 30)
+        records.value = (data.records || []).sort((a, b) => a.trade_date.localeCompare(b.trade_date))
+      } catch (e) {
+        console.error('获取dc_daily数据失败:', e)
+        records.value = []
+      } finally {
+        loading.value = false
+      }
+    }
+
+    watch(() => props.modelValue, (val) => {
+      visible.value = val
+      if (val) {
+        loadData()
+      }
+    })
+
+    watch(() => props.tsCode, (newVal) => {
+      if (visible.value && newVal) {
+        loadData()
+      }
+    })
+
+    const close = () => emit('update:modelValue', false)
+
+    // 渲染函数：构建 ElDialog + ElTable 展示数据
+    return () => h(
+      ElDialog as any,
+      {
+        modelValue: visible.value,
+        'onUpdate:modelValue': (v: boolean) => emit('update:modelValue', v),
+        title: `领涨数据详情 - ${props.name || props.tsCode}`,
+        width: '1200px'
+      },
+      {
+        default: () => [
+          h('div', { style: 'margin-bottom: 12px; color: #909399;' }, `近30天概念板块（领涨）：${props.idxType}`),
+          h(
+            ElTable as any,
+            { data: records.value, stripe: true, border: true, height: 420 },
+            {
+              default: () => [
+                h(ElTableColumn as any, { prop: 'trade_date', label: '日期', width: 110, align: 'center' }),
+                h(ElTableColumn as any, { prop: 'name', label: '概念名称', minWidth: 150 }),
+                h(ElTableColumn as any, { prop: 'leading', label: '领涨股票', minWidth: 150 }),
+                h(ElTableColumn as any, { prop: 'leading_code', label: '领涨代码', width: 120, align: 'center' }),
+                h(ElTableColumn as any, { prop: 'leading_pct', label: '领涨涨幅%', width: 110, align: 'center' }),
+                h(ElTableColumn as any, { prop: 'pct_change', label: '板块涨幅%', width: 110, align: 'center' }),
+                h(ElTableColumn as any, { prop: 'total_mv', label: '总市值', width: 120, align: 'center' }),
+                h(ElTableColumn as any, { prop: 'turnover_rate', label: '换手率', width: 100, align: 'center' }),
+                h(ElTableColumn as any, { prop: 'up_num', label: '上涨家数', width: 100, align: 'center' }),
+                h(ElTableColumn as any, { prop: 'down_num', label: '下跌家数', width: 100, align: 'center' })
+              ]
+            }
+          )
+        ],
+        footer: () => [
+          h(ElButton as any, { onClick: close }, '关闭')
+        ]
+      }
+    )
+  }
+})
+
+// 详情对话框状态
+const detailDialogVisible = ref(false)
+const currentTsCode = ref('')
+const currentIndexName = ref('')
+
+// 打开对话框
+const openLeadRiseDetail = (row: IndexRpsItem) => {
+  currentTsCode.value = row.ts_code
+  currentIndexName.value = row.name
+  detailDialogVisible.value = true
+}
+
 // 刷新数据
 const refreshData = async () => {
   if (loading.value) return
@@ -432,10 +589,55 @@ watch(searchKeyword, () => {
 })
 
 // 监听板块类型变化，刷新数据并重置分页
-watch(idxType, () => {
+watch(idxType, (newType) => {
   currentPage.value = 1
   refreshData()
+  // 如果开启了仅看我的，但当前并非行业板块，提示说明
+  if (onlyMine.value && newType !== '行业板块') {
+    ElMessage.info('“仅看我的”当前仅支持行业板块，其他类型暂不筛选')
+  }
 })
+
+/**
+ * 切换“仅看我的”
+ * 功能：开启时校验登录并拉取个人持有/关注列表，提取行业名称白名单；关闭时清空白名单
+ * 参数：无
+ * 返回值：Promise<void>
+ * 事件：可能触发登录跳转与提示信息
+ */
+const handleOnlyMineChange = async () => {
+  if (onlyMine.value) {
+    if (!isAuthenticated()) {
+      ElMessage.error('请先登录后再启用“仅看我的”')
+      onlyMine.value = false
+      router.push('/login')
+      return
+    }
+    try {
+      const res: PersonalHoldingsListResponse = await getPersonalHoldings()
+      const industries = Array.from(new Set((res.data?.list || [])
+        .map(item => (item.industry || '').trim())
+        .filter(name => !!name)))
+      industryWhitelist.value = industries
+      if (idxType.value !== '行业板块') {
+        // 非行业板块类型时不生效，仅提示说明
+        ElMessage.info('“仅看我的”在当前板块类型下暂不生效（仅支持行业板块）')
+      }
+      if (industries.length === 0) {
+        ElMessage.warning('您的持有/关注列表为空，当前无可筛选的行业')
+      } else {
+        ElMessage.success(`已启用，仅展示 ${industries.length} 个相关行业`)
+      }
+    } catch (error) {
+      console.error('获取个人持有/关注列表失败:', error)
+      ElMessage.error('获取个人行业列表失败，请稍后重试')
+      onlyMine.value = false
+      industryWhitelist.value = []
+    }
+  } else {
+    industryWhitelist.value = []
+  }
+}
 </script>
 
 <style scoped>

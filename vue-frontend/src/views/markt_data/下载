@@ -1072,6 +1072,138 @@ paths:
       responses:
         '204':
           description: No response body
+  /django/api/tasks/dc-daily/:
+    get:
+      operationId: tasks_dc_daily_retrieve
+      description: Tushare dc_daily 的代理接口，统一返回格式。
+      summary: 东财板块日频行情直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: idx_type
+        schema:
+          type: string
+        description: 板块类型：概念板块/行业板块/地域板块
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 板块代码（格式：xxxxx.DC）
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseDcDaily'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/tasks/dc-index/:
+    get:
+      operationId: tasks_dc_index_retrieve
+      description: Tushare dc_index 的代理接口，统一返回格式。
+      summary: 东方财富概念板块直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: 板块名称（例如：人形机器人）
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 概念代码（支持多个，逗号分隔）
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseDcIndex'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/tasks/git-info/:
     get:
       operationId: tasks_git_info_retrieve
@@ -1392,6 +1524,110 @@ paths:
           description: No response body
 components:
   schemas:
+    DcDailyData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DcDailyRecord'
+      required:
+      - count
+      - interface
+      - records
+    DcDailyRecord:
+      type: object
+      description: |-
+        dc_daily 记录字段序列化器
+
+        字段说明参考 Tushare 文档：东财概念板块、行业指数板块、地域板块日频行情。
+      properties:
+        ts_code:
+          type: string
+        trade_date:
+          type: string
+        close:
+          type: number
+          format: double
+        open:
+          type: number
+          format: double
+        high:
+          type: number
+          format: double
+        low:
+          type: number
+          format: double
+        change:
+          type: number
+          format: double
+        pct_change:
+          type: number
+          format: double
+        vol:
+          type: number
+          format: double
+        amount:
+          type: number
+          format: double
+        swing:
+          type: number
+          format: double
+        turnover_rate:
+          type: number
+          format: double
+    DcIndexData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/DcIndexRecord'
+      required:
+      - count
+      - interface
+      - records
+    DcIndexRecord:
+      type: object
+      description: |-
+        dc_index 记录字段序列化器
+
+        字段说明参考 Tushare 文档：东方财富概念板块。
+      properties:
+        ts_code:
+          type: string
+        trade_date:
+          type: string
+        name:
+          type: string
+        leading:
+          type: string
+        leading_code:
+          type: string
+        pct_change:
+          type: number
+          format: double
+        leading_pct:
+          type: number
+          format: double
+        total_mv:
+          type: number
+          format: double
+        turnover_rate:
+          type: number
+          format: double
+        up_num:
+          type: integer
+        down_num:
+          type: integer
     ErrorResponse:
       type: object
       description: |-
@@ -1588,6 +1824,38 @@ components:
           type: array
           items:
             type: string
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseDcDaily:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/DcDailyData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseDcIndex:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/DcIndexData'
       required:
       - code
       - data
