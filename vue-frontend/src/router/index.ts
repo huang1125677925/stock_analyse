@@ -138,6 +138,12 @@ const router = createRouter({
           meta: { title: '指数分析' }
         },
         {
+          path: '/analysis/index-dailybasic',
+          name: 'index-dailybasic',
+          component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
+          meta: { title: '指数日基本面' }
+        },
+        {
           path: '/analysis/market-change',
           name: 'MarketChangeHeatmap',
           component: () => import('@/views/markt_data/MarketChangeHeatmap.vue'),
@@ -198,6 +204,18 @@ const router = createRouter({
           meta: { title: '指数RPS强度排名' }
         },
         {
+          path: '/analysis/sw-index-classify',
+          name: 'sw-index-classify',
+          component: () => import('@/views/industry-stock-data/IndexClassifyView.vue'),
+          meta: { title: '申万行业分类' }
+        },
+        {
+          path: '/analysis/sw-index-member-all',
+          name: 'sw-index-member-all',
+          component: () => import('@/views/industry-stock-data/IndexMemberAllView.vue'),
+          meta: { title: '申万行业成分构成' }
+        },
+        {
           path: '/analysis/news-list',
           name: 'news-list',
           component: () => import('@/views/analysis/NewsList.vue'),
@@ -208,6 +226,18 @@ const router = createRouter({
           name: 'news-wordcloud',
           component: () => import('@/views/markt_data/NewsWordcloud.vue'),
           meta: { title: '新闻词云' }
+        },
+        {
+          path: '/analysis/irm-qa-sh',
+          name: 'irm-qa-sh',
+          component: () => import('@/views/markt_data/IrmQaShView.vue'),
+          meta: { title: '上证E互动问答' }
+        },
+        {
+          path: '/analysis/irm-qa-sz',
+          name: 'irm-qa-sz',
+          component: () => import('@/views/markt_data/IrmQaSzView.vue'),
+          meta: { title: '深证互动易问答' }
         },
         {
           path: '/analysis/news-detail/:id',
@@ -354,6 +384,31 @@ const router = createRouter({
           name: 'stock-limit-step',
           component: () => import('@/views/indival_stock_data/LimitStepView.vue'),
           meta: { title: '连板天梯' }
+        }
+        ,
+        {
+          path: '/stock-cyq-perf',
+          name: 'stock-cyq-perf',
+          component: () => import('@/views/indival_stock_data/CyqPerfView.vue'),
+          meta: { title: '每日筹码及胜率' }
+        },
+        {
+          path: '/stock-hk-hold-detail',
+          name: 'stock-hk-hold-detail',
+          component: () => import('@/views/indival_stock_data/HkHoldDetailView.vue'),
+          meta: { title: '沪深港股通持股明细' }
+        },
+        {
+          path: '/stock-hsgt-top10',
+          name: 'stock-hsgt-top10',
+          component: () => import('@/views/indival_stock_data/HsgtTop10View.vue'),
+          meta: { title: '沪深股通十大成交股' }
+        },
+        {
+          path: '/stock-hsgt-list',
+          name: 'stock-hsgt-list',
+          component: () => import('@/views/indival_stock_data/StockHsgtListView.vue'),
+          meta: { title: '沪深港通股票列表' }
         }
       ]
     },

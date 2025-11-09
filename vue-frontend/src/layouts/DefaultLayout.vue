@@ -279,6 +279,11 @@ const menuItems = computed(() => {
           icon: 'List',
         },
         {
+          path: '/analysis/index-dailybasic',
+          title: '指数日基本面',
+          icon: 'List',
+        },
+        {
           path: '/analysis/news-list',
           title: 'CCTV新闻',
           icon: 'Document',
@@ -287,6 +292,16 @@ const menuItems = computed(() => {
           path: '/analysis/news-wordcloud',
           title: '新闻热力图',
           icon: 'DataLine',
+        },
+        {
+          path: '/analysis/irm-qa-sh',
+          title: '上证E互动问答',
+          icon: 'List',
+        },
+        {
+          path: '/analysis/irm-qa-sz',
+          title: '深证互动易问答',
+          icon: 'List',
         },
       ],
     },
@@ -360,6 +375,26 @@ const menuItems = computed(() => {
         {
           path: '/strategy-results',
           title: '策略选股',
+          icon: 'List',
+        },
+        {
+          path: '/stock-cyq-perf',
+          title: '每日筹码及胜率',
+          icon: 'List',
+        },
+        {
+          path: '/stock-hk-hold-detail',
+          title: '沪深港股通持股明细',
+          icon: 'List',
+        },
+        {
+          path: '/stock-hsgt-top10',
+          title: '沪深股通十大成交股',
+          icon: 'List',
+        },
+        {
+          path: '/stock-hsgt-list',
+          title: '沪深港通股票列表',
           icon: 'List',
         },
         
@@ -444,6 +479,13 @@ const analysisMegaMenuSections = [
       // { title: '小市值因子挤拥度与因子估值' },
     ],
   },
+  {
+    title: '申万行业数据',
+    items: [
+      { title: '申万行业分类', path: '/analysis/sw-index-classify' },
+      { title: '行业成分构成', path: '/analysis/sw-index-member-all' },
+    ],
+  },
   // {
   //   title: '机构调研',
   //   items: [
@@ -477,6 +519,7 @@ const fundamentalsMegaMenuSections = [
     items: [
       { title: '指数分析', path: '/analysis/index-analysis' },
       { title: '指数列表', path: '/analysis/index-list' },
+      { title: '指数日基本面', path: '/analysis/index-dailybasic' },
     ],
   },
   {
@@ -484,6 +527,13 @@ const fundamentalsMegaMenuSections = [
     items: [
       { title: 'CCTV新闻', path: '/analysis/news-list' },
       { title: '新闻热力图', path: '/analysis/news-wordcloud' },
+    ],
+  },
+  {
+    title: '互动问答',
+    items: [
+      { title: '上证E互动问答', path: '/analysis/irm-qa-sh' },
+      { title: '深证互动易问答', path: '/analysis/irm-qa-sz' },
     ],
   },
 ]
@@ -607,12 +657,12 @@ watch(
 }
 .mega-menu-horizontal {
   display: flex;
-  gap: 48px;
+  gap: 0px;
   align-items: flex-start;
   flex-wrap: nowrap;
 }
 .mega-menu-horizontal .mega-section {
-  min-width: 180px;
+  min-width: 120px;
   flex-shrink: 0;
 }
 .mega-section-title {
