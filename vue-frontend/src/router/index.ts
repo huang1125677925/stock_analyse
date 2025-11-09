@@ -318,6 +318,42 @@ const router = createRouter({
           name: 'strategy-results',
           component: () => import('@/views/indival_stock_data/StrategyResultListView.vue'),
           meta: { title: '策略结果管理' }
+        },
+        {
+          path: '/stock-ah-comparison',
+          name: 'stock-ah-comparison',
+          component: () => import('@/views/indival_stock_data/AhComparisonView.vue'),
+          meta: { title: 'AH溢价对比' }
+        },
+        {
+          path: '/stock-broker-recommend',
+          name: 'stock-broker-recommend',
+          component: () => import('@/views/indival_stock_data/BrokerRecommendView.vue'),
+          meta: { title: '券商推荐评级' }
+        },
+        {
+          path: '/stock-ccass-hold',
+          name: 'stock-ccass-hold',
+          component: () => import('@/views/indival_stock_data/CcassHoldView.vue'),
+          meta: { title: '中结持股汇总' }
+        },
+        {
+          path: '/stock-ccass-hold-detail',
+          name: 'stock-ccass-hold-detail',
+          component: () => import('@/views/indival_stock_data/CcassHoldDetailView.vue'),
+          meta: { title: '中结持股明细' }
+        },
+        {
+          path: '/stock-hm-detail',
+          name: 'stock-hm-detail',
+          component: () => import('@/views/indival_stock_data/HmDetailView.vue'),
+          meta: { title: '游资每日明细' }
+        },
+        {
+          path: '/stock-limit-step',
+          name: 'stock-limit-step',
+          component: () => import('@/views/indival_stock_data/LimitStepView.vue'),
+          meta: { title: '连板天梯' }
         }
       ]
     },

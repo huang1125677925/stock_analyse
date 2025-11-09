@@ -328,6 +328,36 @@ const menuItems = computed(() => {
           icon: 'List',
         },
         {
+          path: '/stock-ah-comparison',
+          title: 'AH溢价对比',
+          icon: 'List',
+        },
+        {
+          path: '/stock-broker-recommend',
+          title: '券商推荐评级',
+          icon: 'List',
+        },
+        {
+          path: '/stock-ccass-hold',
+          title: '中结持股汇总',
+          icon: 'List',
+        },
+        {
+          path: '/stock-ccass-hold-detail',
+          title: '中结持股明细',
+          icon: 'List',
+        },
+        {
+          path: '/stock-hm-detail',
+          title: '游资每日明细',
+          icon: 'List',
+        },
+        {
+          path: '/stock-limit-step',
+          title: '连板天梯',
+          icon: 'List',
+        },
+        {
           path: '/strategy-results',
           title: '策略选股',
           icon: 'List',

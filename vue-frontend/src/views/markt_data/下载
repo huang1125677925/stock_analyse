@@ -1072,6 +1072,251 @@ paths:
       responses:
         '204':
           description: No response body
+  /django/api/tasks/ah-comparison/:
+    get:
+      operationId: tasks_ah_comparison_retrieve
+      description: Tushare stk_ah_comparison 的代理接口，统一返回格式。
+      summary: AH股比价直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: hk_code
+        schema:
+          type: string
+        description: 港股股票代码（xxxxx.HK）
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: A股股票代码（xxxxxx.SH/SZ/BJ）
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseAhComparison'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/tasks/broker-recommend/:
+    get:
+      operationId: tasks_broker_recommend_retrieve
+      description: Tushare broker_recommend 的代理接口，统一返回格式。
+      summary: 券商月度金股直通代理
+      parameters:
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: month
+        schema:
+          type: string
+        description: 月度（YYYYMM）
+        required: true
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseBrokerRecommend'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/tasks/ccass-hold/:
+    get:
+      operationId: tasks_ccass_hold_retrieve
+      description: Tushare ccass_hold 的代理接口，统一返回格式。
+      summary: 中央结算系统持股汇总直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: hk_code
+        schema:
+          type: string
+        description: 港交所代码（e.g. 95009）
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 股票代码（e.g. 605009.SH / 00960.HK）
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseCcassHold'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/tasks/ccass-hold-detail/:
+    get:
+      operationId: tasks_ccass_hold_detail_retrieve
+      description: Tushare ccass_hold_detail 的代理接口，统一返回格式。
+      summary: 中央结算系统持股明细直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: hk_code
+        schema:
+          type: string
+        description: 港交所代码（e.g. 95009）
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 股票代码（e.g. 605009.SH / 00960.HK）
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseCcassHoldDetail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/tasks/dc-daily/:
     get:
       operationId: tasks_dc_daily_retrieve
@@ -1232,6 +1477,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponseGitInfo'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/tasks/hm-detail/:
+    get:
+      operationId: tasks_hm_detail_retrieve
+      description: Tushare hm_detail 的代理接口，统一返回格式。
+      summary: 游资每日明细直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: hm_name
+        schema:
+          type: string
+        description: 游资名称
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 股票代码
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseHmDetail'
           description: ''
         '400':
           content:
@@ -1435,6 +1746,72 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /django/api/tasks/limit-step/:
+    get:
+      operationId: tasks_limit_step_retrieve
+      description: Tushare limit_step 的代理接口，统一返回格式。
+      summary: 连板天梯直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: nums
+        schema:
+          type: string
+        description: 连板次数，支持多个（如 2,3）
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 股票代码
+      tags:
+      - Tushare Proxy
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseLimitStep'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/user/info/:
     get:
       operationId: user_info_retrieve
@@ -1524,6 +1901,156 @@ paths:
           description: No response body
 components:
   schemas:
+    AhComparisonData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/AhComparisonRecord'
+      required:
+      - count
+      - interface
+      - records
+    AhComparisonRecord:
+      type: object
+      description: |-
+        stk_ah_comparison 记录字段序列化器
+
+        字段参考文档：AH股比价。
+      properties:
+        hk_code:
+          type: string
+        ts_code:
+          type: string
+        trade_date:
+          type: string
+        hk_name:
+          type: string
+        hk_pct_chg:
+          type: number
+          format: double
+        hk_close:
+          type: number
+          format: double
+        name:
+          type: string
+        close:
+          type: number
+          format: double
+        pct_chg:
+          type: number
+          format: double
+        ah_comparison:
+          type: number
+          format: double
+        ah_premium:
+          type: number
+          format: double
+    BrokerRecommendData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrokerRecommendRecord'
+      required:
+      - count
+      - interface
+      - records
+    BrokerRecommendRecord:
+      type: object
+      description: |-
+        broker_recommend 记录字段序列化器
+
+        字段参考文档：券商每月荐股。
+      properties:
+        month:
+          type: string
+        broker:
+          type: string
+        ts_code:
+          type: string
+        name:
+          type: string
+    CcassHoldData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/CcassHoldRecord'
+      required:
+      - count
+      - interface
+      - records
+    CcassHoldDetailData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/CcassHoldDetailRecord'
+      required:
+      - count
+      - interface
+      - records
+    CcassHoldDetailRecord:
+      type: object
+      description: |-
+        ccass_hold_detail 记录字段序列化器
+
+        字段参考文档：中央结算系统持股明细。
+      properties:
+        trade_date:
+          type: string
+        ts_code:
+          type: string
+        name:
+          type: string
+        col_participant_id:
+          type: string
+        col_participant_name:
+          type: string
+        col_shareholding:
+          type: string
+        col_shareholding_percent:
+          type: string
+    CcassHoldRecord:
+      type: object
+      description: |-
+        ccass_hold 记录字段序列化器
+
+        字段参考文档：中央结算系统持股汇总。
+      properties:
+        trade_date:
+          type: string
+        ts_code:
+          type: string
+        name:
+          type: string
+        shareholding:
+          type: string
+        hold_nums:
+          type: string
+        hold_ratio:
+          type: string
     DcDailyData:
       type: object
       properties:
@@ -1680,6 +2207,49 @@ components:
       - count
       - interface
       - records
+    HmDetailData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/HmDetailRecord'
+      required:
+      - count
+      - interface
+      - records
+    HmDetailRecord:
+      type: object
+      description: |-
+        hm_detail 记录字段序列化器
+
+        字段参考文档：游资交易每日明细。
+      properties:
+        trade_date:
+          type: string
+        ts_code:
+          type: string
+        ts_name:
+          type: string
+        buy_amount:
+          type: number
+          format: double
+        sell_amount:
+          type: number
+          format: double
+        net_amount:
+          type: number
+          format: double
+        hm_name:
+          type: string
+        hm_orgs:
+          type: string
+        tag:
+          type: string
     IndexBasicData:
       type: object
       properties:
@@ -1801,6 +2371,100 @@ components:
         weight:
           type: number
           format: double
+    LimitStepData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/LimitStepRecord'
+      required:
+      - count
+      - interface
+      - records
+    LimitStepRecord:
+      type: object
+      description: |-
+        limit_step 记录字段序列化器
+
+        字段参考文档：涨停股票连板天梯。
+      properties:
+        ts_code:
+          type: string
+        name:
+          type: string
+        trade_date:
+          type: string
+        nums:
+          type: string
+    SuccessResponseAhComparison:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/AhComparisonData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseBrokerRecommend:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/BrokerRecommendData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseCcassHold:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/CcassHoldData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseCcassHoldDetail:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/CcassHoldDetailData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseConceptList:
       type: object
       description: |-
@@ -1877,6 +2541,22 @@ components:
       - data
       - message
       - timestamp
+    SuccessResponseHmDetail:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/HmDetailData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseIndexBasic:
       type: object
       properties:
@@ -1920,6 +2600,22 @@ components:
           type: string
         data:
           $ref: '#/components/schemas/IndexWeightData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseLimitStep:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/LimitStepData'
       required:
       - code
       - data
