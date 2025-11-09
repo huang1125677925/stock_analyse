@@ -40,7 +40,7 @@
                 </div>
                 <div class="fund-content">
                   <div class="fund-label">初始资金</div>
-                  <div class="fund-value">¥{{ formatMoney(taskInfo.initial_cash) }}</div>
+                  <div class="fund-value">¥{{ formatMoney(taskInfo?.initial_cash || 0) }}</div>
                 </div>
               </div>
               <div class="fund-item">
@@ -257,7 +257,6 @@
             style="width: 100%"
             :default-sort="{ prop: 'datetime', order: 'descending' }"
             class="trades-table"
-            v-loading="loading"
           >
             <el-table-column type="index" label="#" min-width="60" />
             <el-table-column prop="datetime" label="交易日期" min-width="120" sortable>
@@ -278,17 +277,17 @@
             </el-table-column>
             <el-table-column prop="price" label="价格" min-width="100" sortable align="right">
               <template #default="scope">
-                <span class="price-value">¥{{ scope.row.price.toFixed(2) }}</span>
+                <span class="price-value">¥{{ Number(scope.row.price ?? 0).toFixed(2) }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="size" label="数量" min-width="100" align="right">
               <template #default="scope">
-                <span class="quantity-value">{{ scope.row.size.toLocaleString() }}</span>
+                <span class="quantity-value">{{ Number(scope.row.size ?? 0).toLocaleString() }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="value" label="成本" min-width="120" sortable align="right">
               <template #default="scope">
-                <span class="amount-value">¥{{ scope.row.value.toLocaleString() }}</span>
+                <span class="amount-value">¥{{ Number(scope.row.value ?? 0).toLocaleString() }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="pnl" label="盈亏" min-width="120" sortable align="right">
@@ -356,8 +355,6 @@ import * as echarts from 'echarts'
 
 import { 
   getBacktestResult,
-  getBacktestObserver,
-  getBacktestRawIndicator,
   type BacktestResult as ApiBacktestResult
 } from '@/services/quantBacktestApi'
 interface BacktestResult {
@@ -549,37 +546,36 @@ const fetchBacktestResult = async () => {
       trades: result.detailed_data?.trade_records || result.trades || []
     }
     
+    // 设置任务信息（用于头部展示）
+    taskInfo.value = result.task_info
+
     // 设置交易记录数据
     if (backtestResult.value) {
       filteredTrades.value = backtestResult.value.trades as TradeRecord[]
+      console.log('filteredTrades.value', filteredTrades.value)
+    }
+
+    // 从回测结果中提取观测器数据（如果后端已合并返回）
+    const anyResult: any = result as any
+    if (anyResult.observer_data) {
+      observerData.value = {
+        task_info: result.task_info,
+        observer_data: anyResult.observer_data
+      }
+    }
+
+    // 从回测结果中提取原始数据和指标数据（如果后端已合并返回）
+    if (anyResult.raw_data || anyResult.indicator_data) {
+      rawIndicatorData.value = {
+        task_info: result.task_info,
+        raw_data: anyResult.raw_data ?? { datetime: [], open: [], high: [], low: [], close: [], volume: [] },
+        indicator_data: anyResult.indicator_data ?? {}
+      }
+      indicatorData.value = rawIndicatorData.value.indicator_data
     }
   } catch (error) {
     console.error('获取回测结果失败:', error)
     ElMessage.error('获取回测结果失败')
-  }
-}
-
-// 获取观测器数据
-const fetchObserverData = async () => {
-  try {
-    const result = await getBacktestObserver(taskId.value)
-    observerData.value = result.data
-    taskInfo.value = result.data.task_info
-  } catch (error) {
-    console.error('获取观测器数据失败:', error)
-    ElMessage.error('获取观测器数据失败')
-  }
-}
-
-// 获取原始数据和指标数据
-const fetchRawIndicatorData = async () => {
-  try {
-    const result = await getBacktestRawIndicator(taskId.value)
-    rawIndicatorData.value = result.data
-    indicatorData.value = result.data.indicator_data
-  } catch (error) {
-    console.error('获取原始数据和指标数据失败:', error)
-    ElMessage.error('获取原始数据和指标数据失败')
   }
 }
 
@@ -1029,11 +1025,8 @@ onMounted(async () => {
   loading.value = true
   
   try {
-    await Promise.all([
-      fetchBacktestResult(),
-      fetchObserverData(),
-      fetchRawIndicatorData()
-    ])
+    // 只调用一次回测结果接口，后端已合并返回所需数据
+    await fetchBacktestResult()
 
     
     
