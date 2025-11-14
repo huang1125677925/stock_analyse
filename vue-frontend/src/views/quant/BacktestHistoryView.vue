@@ -85,19 +85,28 @@
         >
           <el-table-column prop="stock_code" label="股票代码" min-width="100" align="center" />
           <el-table-column prop="stock_name" label="股票名称" min-width="100" align="center" />
-          <el-table-column label="策略" min-width="120">
+          <el-table-column label="策略" min-width="120" align="center">
             <template #default="scope">
               {{ getStrategyDescription(scope.row.strategy_name) }}
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="100">
+          <el-table-column label="状态" width="80" align="center">
             <template #default="scope">
               <el-tag :type="getStatusTagType(scope.row.status)">{{ getStatusText(scope.row.status) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="start_date" label="回测开始时间" min-width="100" align="center" />
-          <el-table-column prop="end_date" label="回测结束时间" min-width="100" align="center" />
+          <el-table-column label="回测时间范围" min-width="100" align="center">
+            <template #default="scope">
+              <div>{{ scope.row.start_date }}</div>
+              <div>{{ scope.row.end_date }}</div>
+            </template>
+          </el-table-column>
           <el-table-column prop="frequency" label="回测数据频率" min-width="100" align="center" />
+          <el-table-column label="策略参数" min-width="240" align="center">
+            <template #default="scope">
+              <JsonPreview :value="scope.row.strategy_params" :max-inline-length="120" />
+            </template>
+          </el-table-column>
           <el-table-column label="总收益率" min-width="120" align="center">
             <template #default="scope">
               <span v-if="scope.row.result_summary?.total_return !== undefined" :class="getReturnClass(scope.row.result_summary?.total_return)">
@@ -241,6 +250,9 @@
  * 2. 支持按策略、股票、状态筛选
  * 3. 支持状态查询和结果查看
  * 4. 支持运行已创建的任务
+ * 参数：无
+ * 返回值：无
+ * 事件：无
  */
 import { ref, reactive, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -256,6 +268,7 @@ import {
   type Strategy
 } from '@/services/quantBacktestApi'
 import BacktestResultDialog from '@/components/BacktestResultDialog.vue'
+import JsonPreview from '@/components/JsonPreview.vue'
 
 const router = useRouter()
 
@@ -503,6 +516,18 @@ const formatPercent = (value: number): string => {
 // 格式化日期时间
 const formatDateTime = (dateTime: string): string => {
   return new Date(dateTime).toLocaleString('zh-CN')
+}
+
+// 格式化时间范围
+// 功能：组合显示开始和结束时间，保持与页面中文语义一致
+// 参数：
+//  - startDate: string 回测开始日期（通常为 YYYY-MM-DD）
+//  - endDate: string 回测结束日期（通常为 YYYY-MM-DD）
+// 返回值：string "开始 至 结束" 形式的时间范围
+// 事件：无
+const formatDateRange = (startDate: string, endDate: string): string => {
+  return `${startDate}
+   ${endDate}`
 }
 
 // 监听 taskList 变化

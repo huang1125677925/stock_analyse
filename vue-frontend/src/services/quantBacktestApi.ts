@@ -49,6 +49,7 @@ export interface BacktestTask {
   commission?: number
   status: 'created' | 'running' | 'completed' | 'failed'
   created_at: string
+  strategy_params?: Record<string, any>
   updated_at?: string
   frequency?: string
   completed_at?: string
