@@ -58,7 +58,7 @@
           </el-row>
           
           <el-row :gutter="20">
-            <el-col :span="8">
+            <el-col :span="6">
               <el-form-item label="开始日期" required>
                 <el-date-picker
                   v-model="strategyForm.startDate"
@@ -71,7 +71,7 @@
               </el-form-item>
             </el-col>
             
-            <el-col :span="8">
+            <el-col :span="6">
               <el-form-item label="结束日期" required>
                 <el-date-picker
                   v-model="strategyForm.endDate"
@@ -84,7 +84,21 @@
               </el-form-item>
             </el-col>
             
-            <el-col :span="8">
+            <!-- 新增：数据频率选择 -->
+            <el-col :span="6">
+              <el-form-item label="数据频率">
+                <el-select
+                  v-model="strategyForm.frequency"
+                  placeholder="选择数据频率"
+                  class="full-width"
+                >
+                  <el-option label="日频" value="daily" />
+                  <el-option label="周频" value="weekly" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+
+            <el-col :span="6">
               <el-form-item label="初始资金">
                 <el-input-number
                   v-model="strategyForm.initialCash"
@@ -174,6 +188,11 @@
  * 1. 策略选择和参数配置
  * 2. 创建回测任务
  * 3. 显示最近创建的任务
+ * 4. 支持选择回测数据频率（daily/weekly），用于控制使用日级或周级数据
+ * 
+ * 参数：无
+ * 返回值：无
+ * 事件：无
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -191,12 +210,26 @@ import type { StockListParams, StockInfo } from '@/services/individualStockApi'
 const router = useRouter()
 const route = useRoute()
 
+// 表单数据类型定义，约束 frequency 为联合类型
+type BacktestFrequency = 'daily' | 'weekly'
+interface StrategyForm {
+  strategyName: string
+  symbol: string
+  startDate: string
+  endDate: string
+  frequency: BacktestFrequency
+  initialCash: number
+  strategyParams: Record<string, any>
+}
+
 // 表单数据
-const strategyForm = reactive({
+const strategyForm = reactive<StrategyForm>({
   strategyName: '',
   symbol: '',
   startDate: '',
   endDate: '',
+  // 新增：回测数据频率，默认日频
+  frequency: 'daily',
   initialCash: 1000000,
   strategyParams: {} as Record<string, any>
 })
@@ -335,6 +368,8 @@ const createBacktest = async () => {
       stock_code: strategyForm.symbol,
       start_date: strategyForm.startDate,
       end_date: strategyForm.endDate,
+      // 传递数据频率到后端：daily 或 weekly
+      frequency: strategyForm.frequency,
       initial_cash: strategyForm.initialCash,
       strategy_params: strategyForm.strategyParams
     }
@@ -352,6 +387,8 @@ const createBacktest = async () => {
       type: 'info'
     }).then(async () => {
       await runTask(task.task_id)
+      // 运行成功后跳转到回测历史页面，便于用户查看任务状态
+      router.push('/backtest-history')
     }).catch(() => {
       // 用户选择稍后运行
     })
@@ -387,6 +424,7 @@ const resetForm = () => {
   strategyForm.symbol = ''
   strategyForm.startDate = ''
   strategyForm.endDate = ''
+  strategyForm.frequency = 'daily'
   strategyForm.initialCash = 1000000
   strategyForm.strategyParams = {}
   selectedStrategy.value = null

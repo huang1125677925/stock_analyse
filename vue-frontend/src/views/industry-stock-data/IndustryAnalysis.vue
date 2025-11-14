@@ -38,6 +38,21 @@
             />
           </el-select>
         </div>
+
+        <!-- 日期范围选择（统一控制热力图与趋势图时间范围） -->
+        <div class="filter-item">
+          <label class="filter-label">日期范围：</label>
+          <el-date-picker
+            v-model="selectedDateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 320px"
+            @change="handleDateRangeChange"
+          />
+        </div>
       </div>
     </el-card>
 
@@ -50,6 +65,22 @@
       <IndustryKline 
         :industry-code="selectedIndustryCode"
         :title="`${selectedIndustryName} - 行业K线图`"
+        :start-date="startDate"
+        :end-date="endDate"
+      />
+    </el-card>
+
+    <!-- 资金流热力图 -->
+    <el-card 
+      class="fund-flow-panel" 
+      shadow="hover" 
+      v-if="selectedIndustry && selectedIndustry !== 'all'"
+    >
+      <IndustryFundFlowHeatmap 
+        :industry="selectedIndustryName"
+        :title="`${selectedIndustryName} - 资金流热力图`"
+        :start-date="startDate"
+        :end-date="endDate"
       />
     </el-card>
 
@@ -68,18 +99,6 @@
       description="请选择行业和季度查看趋势分析"
       :image-size="200"
     />
-
-    <!-- 资金流热力图 -->
-    <el-card 
-      class="fund-flow-panel" 
-      shadow="hover" 
-      v-if="selectedIndustry && selectedIndustry !== 'all'"
-    >
-      <IndustryFundFlowHeatmap 
-        :industry="selectedIndustryName"
-        :title="`${selectedIndustryName} - 资金流热力图`"
-      />
-    </el-card>
 
     <el-card 
       class="fund-flow-panel" 
@@ -113,8 +132,9 @@
  * 1. 提供行业选择、季度选择的交互界面
  * 2. 集成IndustryTrendCharts组件显示三个趋势图
  * 3. 集成IndustryFundFlowHeatmap组件显示资金流热力图
- * 4. 行业变更时同时更新趋势图和资金流数据
- * 5. 季度变更时只更新趋势图数据
+ * 4. 新增统一日期范围选择器，统一控制热力图与趋势图展示时间
+ * 5. 行业变更时同时更新趋势图和资金流数据
+ * 6. 季度变更时只更新趋势图数据
  * 
  * 参数：无
  * 返回值：无
@@ -138,6 +158,8 @@ const loading = ref(false)
 // 筛选条件
 const selectedIndustry = ref<string>()
 const selectedQuarter = ref<string>('')
+// 统一日期范围（YYYY-MM-DD字符串数组）
+const selectedDateRange = ref<[string, string] | null>(null)
 
 // 基础数据
 const industryList = ref<IndustrySector[]>([])
@@ -169,6 +191,20 @@ const selectedIndustryCode = computed(() => {
   return industry?.code || ''
 })
 
+// 统一日期范围的开始/结束（若未选择则使用最近20天）
+const startDate = computed(() => {
+  if (selectedDateRange.value) return selectedDateRange.value[0]
+  const end = new Date()
+  const start = new Date(end.getTime() - 20 * 24 * 60 * 60 * 1000)
+  return start.toISOString().split('T')[0]
+})
+
+const endDate = computed(() => {
+  if (selectedDateRange.value) return selectedDateRange.value[1]
+  const end = new Date()
+  return end.toISOString().split('T')[0]
+})
+
 // 方法
 /**
  * 初始化页面数据
@@ -186,6 +222,10 @@ const initializeData = async () => {
     if (quarterOptions.value.length > 0) {
       selectedQuarter.value = quarterOptions.value[0].value
     }
+    // 默认日期范围：最近20天
+    const end = new Date()
+    const start = new Date(end.getTime() - 20 * 24 * 60 * 60 * 1000)
+    selectedDateRange.value = [start.toISOString().split('T')[0], end.toISOString().split('T')[0]]
     
     ElMessage.success('页面初始化完成')
   } catch (error) {
@@ -213,6 +253,13 @@ const handleQuarterChange = () => {
   // 季度变更时，只有IndustryTrendCharts组件会重新获取数据
   // IndustryFundFlowHeatmap组件不受季度变更影响
   console.log('季度已变更为:', selectedQuarter.value)
+}
+
+/**
+ * 日期范围变更时，同时影响趋势图与资金流热力图的时间范围
+ */
+const handleDateRangeChange = () => {
+  console.log('日期范围已变更为:', selectedDateRange.value)
 }
 
 // 生命周期

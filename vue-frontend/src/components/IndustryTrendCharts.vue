@@ -55,6 +55,7 @@
  * 2. 显示增长率毛利率数据趋势图
  * 3. 显示ROA/ROE数据趋势图
  * 4. 支持行业和季度筛选
+ * 5. 不支持外部日期范围过滤（由父级移除该功能）
  * 
  * 参数：
  * - industry: string - 行业名称
@@ -145,7 +146,8 @@ const renderAllCharts = () => {
  * 渲染收入利润数据图表
  */
 const renderRevenueChart = () => {
-  if (!revenueChartRef.value || chartData.value.length === 0) return
+  const data = chartData.value
+  if (!revenueChartRef.value || data.length === 0) return
 
   // 销毁现有图表实例
   if (revenueChartInstance.value) {
@@ -155,9 +157,9 @@ const renderRevenueChart = () => {
   // 创建新的图表实例
   revenueChartInstance.value = echarts.init(revenueChartRef.value)
 
-  const quarters = chartData.value.map(item => item.report_date)
-  const revenueData = chartData.value.map(item => item.total_operating_revenue || 0)
-  const profitData = chartData.value.map(item => item.total_net_profit || 0)
+  const quarters = data.map(item => item.report_date)
+  const revenueData = data.map(item => item.total_operating_revenue || 0)
+  const profitData = data.map(item => item.total_net_profit || 0)
 
   const option: echarts.EChartsOption = {
     tooltip: {
@@ -228,7 +230,8 @@ const renderRevenueChart = () => {
  * 渲染增长率毛利率数据图表
  */
 const renderGrowthChart = () => {
-  if (!growthChartRef.value || chartData.value.length === 0) return
+  const data = chartData.value
+  if (!growthChartRef.value || data.length === 0) return
 
   // 销毁现有图表实例
   if (growthChartInstance.value) {
@@ -238,10 +241,10 @@ const renderGrowthChart = () => {
   // 创建新的图表实例
   growthChartInstance.value = echarts.init(growthChartRef.value)
 
-  const quarters = chartData.value.map(item => item.report_date)
-  const revenueGrowthData = chartData.value.map(item => item.avg_operating_revenue_growth_rate || 0)
-  const profitGrowthData = chartData.value.map(item => item.avg_net_profit_growth_rate || 0)
-  const grossMarginData = chartData.value.map(item => item.avg_gross_profit_margin || 0)
+  const quarters = data.map(item => item.report_date)
+  const revenueGrowthData = data.map(item => item.avg_operating_revenue_growth_rate || 0)
+  const profitGrowthData = data.map(item => item.avg_net_profit_growth_rate || 0)
+  const grossMarginData = data.map(item => item.avg_gross_profit_margin || 0)
 
   const option: echarts.EChartsOption = {
     tooltip: {
@@ -318,7 +321,8 @@ const renderGrowthChart = () => {
  * 渲染ROA/ROE数据图表
  */
 const renderRoeChart = () => {
-  if (!roeChartRef.value || chartData.value.length === 0) return
+  const data = chartData.value
+  if (!roeChartRef.value || data.length === 0) return
 
   // 销毁现有图表实例
   if (roeChartInstance.value) {
@@ -328,10 +332,10 @@ const renderRoeChart = () => {
   // 创建新的图表实例
   roeChartInstance.value = echarts.init(roeChartRef.value)
 
-  const quarters = chartData.value.map(item => item.report_date)
-  const roeData = chartData.value.map(item => item.avg_roe || 0)
+  const quarters = data.map(item => item.report_date)
+  const roeData = data.map(item => item.avg_roe || 0)
   // 由于API中没有ROA数据，这里使用ROE作为示例，实际项目中需要根据API调整
-  const roaData = chartData.value.map(item => (item.avg_roe || 0) * 0.8) // 模拟ROA数据
+  const roaData = data.map(item => (item.avg_roe || 0) * 0.8) // 模拟ROA数据
 
   const option: echarts.EChartsOption = {
     tooltip: {
@@ -405,6 +409,9 @@ const handleResize = () => {
 watch([() => props.industry, () => props.quarter], () => {
   fetchIndustryData()
 }, { immediate: false })
+
+// 监听外部日期范围变更，仅重新渲染（无需重新拉取）
+// 已移除外部日期范围监听，趋势图仅根据行业与季度变化重新渲染
 
 // 生命周期
 onMounted(() => {

@@ -22,6 +22,8 @@
  * - industryCode: string (必传) 行业板块代码，例如 "BK0001"
  * - title?: string 图表标题
  * - height?: string 图表高度，默认 "600px"
+ * - startDate?: string 开始日期（YYYY-MM-DD），用于限制拉取范围
+ * - endDate?: string 结束日期（YYYY-MM-DD），用于限制拉取范围
  * 
  * 返回值：无
  * 事件：无
@@ -35,6 +37,8 @@ interface Props {
   industryCode: string
   title?: string
   height?: string
+  startDate?: string
+  endDate?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -177,7 +181,13 @@ const fetchData = async () => {
   if (!props.industryCode) return
   loading.value = true
   try {
-    const res = await getIndustrySectorDaily(props.industryCode)
+    // 若传入了日期范围，转换为 YYYYMMDD 传给接口
+    const toCompact = (s?: string) => (s ? s.replace(/-/g, '') : undefined)
+    const params = {
+      start_date: toCompact(props.startDate),
+      end_date: toCompact(props.endDate)
+    }
+    const res = await getIndustrySectorDaily(props.industryCode, params)
     sectorName.value = res.sector_name
     klineData.value = (res.daily_data || []).sort((a, b) => (a.date > b.date ? 1 : -1))
     nextTick(updateChart)
@@ -200,6 +210,11 @@ const formatDate = (s: string) => {
 const handleResize = () => chart?.resize()
 
 watch(() => props.industryCode, () => {
+  fetchData()
+})
+
+// 外部日期范围变更时重新拉取
+watch([() => props.startDate, () => props.endDate], () => {
   fetchData()
 })
 

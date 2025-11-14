@@ -27,6 +27,12 @@ export interface BacktestCreateParams {
   stock_code: string
   start_date: string
   end_date: string
+  /**
+   * 回测数据频率
+   * 可选：'daily'（默认）或 'weekly'（周频）
+   * 由前端用户选择决定使用日级别数据或周级别数据
+   */
+  frequency?: 'daily' | 'weekly'
   initial_cash: number
   strategy_params: Record<string, any>
 }
@@ -44,6 +50,7 @@ export interface BacktestTask {
   status: 'created' | 'running' | 'completed' | 'failed'
   created_at: string
   updated_at?: string
+  frequency?: string
   completed_at?: string
   result_summary?: {
     total_return: number

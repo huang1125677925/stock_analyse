@@ -83,19 +83,22 @@
           @row-click="handleRowClick"
           class="full-width-table"
         >
-          <el-table-column prop="task_id" label="任务ID" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="stock_code" label="股票代码" min-width="100" align="center" />
+          <el-table-column prop="stock_name" label="股票名称" min-width="100" align="center" />
           <el-table-column label="策略" min-width="120">
             <template #default="scope">
               {{ getStrategyDescription(scope.row.strategy_name) }}
             </template>
           </el-table-column>
-          <el-table-column prop="stock_name" label="股票" min-width="100" />
           <el-table-column label="状态" width="100">
             <template #default="scope">
               <el-tag :type="getStatusTagType(scope.row.status)">{{ getStatusText(scope.row.status) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="总收益率" min-width="120">
+          <el-table-column prop="start_date" label="回测开始时间" min-width="100" align="center" />
+          <el-table-column prop="end_date" label="回测结束时间" min-width="100" align="center" />
+          <el-table-column prop="frequency" label="回测数据频率" min-width="100" align="center" />
+          <el-table-column label="总收益率" min-width="120" align="center">
             <template #default="scope">
               <span v-if="scope.row.result_summary?.total_return !== undefined" :class="getReturnClass(scope.row.result_summary?.total_return)">
                 {{ formatPercent(scope.row.result_summary?.total_return) }}
@@ -103,7 +106,7 @@
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column label="最大回撤" min-width="120">
+          <el-table-column label="最大回撤" min-width="100">
             <template #default="scope">
               <span v-if="scope.row.result_summary?.max_drawdown !== undefined" class="negative">
                 {{ formatPercent(scope.row.result_summary?.max_drawdown) }}
@@ -111,17 +114,15 @@
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" min-width="180">
+          <el-table-column label="夏普比率" min-width="100">
             <template #default="scope">
-              {{ formatDateTime(scope.row.created_at) }}
+              <span v-if="scope.row.result_summary?.sharpe_ratio !== undefined" class="positive">
+                {{ scope.row.result_summary?.sharpe_ratio}}
+              </span>
+              <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column prop="completed_at" label="完成时间" min-width="180">
-            <template #default="scope">
-              {{ scope.row.completed_at ? formatDateTime(scope.row.completed_at) : '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" min-width="250" fixed="right">
+          <el-table-column label="操作" min-width="250" fixed="right" align="center">
             <template #default="scope">
               <el-button 
                 type="primary" 

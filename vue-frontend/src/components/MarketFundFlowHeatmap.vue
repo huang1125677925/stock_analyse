@@ -320,3 +320,4 @@ const handleRatioChartClick = (params: any) => {
   display: none;
 }
 </style>
+
