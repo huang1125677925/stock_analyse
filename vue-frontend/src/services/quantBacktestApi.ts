@@ -25,6 +25,7 @@ export interface Strategy {
 export interface BacktestCreateParams {
   strategy_name: string
   stock_code: string
+  stock_name?: string
   start_date: string
   end_date: string
   /**

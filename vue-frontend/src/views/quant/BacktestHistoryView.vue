@@ -137,10 +137,16 @@
                 type="primary" 
                 size="small" 
                 @click.stop="runTask(scope.row.task_id)"
-                :disabled="scope.row.status !== 'created'"
                 :loading="runningTasks.has(scope.row.task_id)"
               >
                 运行
+              </el-button>
+              <el-button 
+                type="warning" 
+                size="small" 
+                @click.stop="copyConfig(scope.row)"
+              >
+                复制配置
               </el-button>
               <el-button 
                 type="info" 
@@ -148,13 +154,12 @@
                 @click.stop="checkStatus(scope.row.task_id)"
                 :loading="checkingTasks.has(scope.row.task_id)"
               >
-                查询状态
+                 查询状态
               </el-button>
               <el-button 
                 type="success" 
                 size="small" 
                 @click.stop="viewResult(scope.row.task_id)"
-                :disabled="scope.row.status !== 'completed'"
               >
                 查看结果
               </el-button>
@@ -207,7 +212,6 @@
           <el-button 
             type="primary" 
             @click="runTask(selectedTask.task_id)"
-            :disabled="selectedTask.status !== 'created'"
             :loading="runningTasks.has(selectedTask.task_id)"
           >
             运行任务
@@ -222,7 +226,6 @@
           <el-button 
             type="success" 
             @click="viewResult(selectedTask.task_id)"
-            :disabled="selectedTask.status !== 'completed'"
           >
             查看结果
           </el-button>
@@ -466,6 +469,52 @@ const handleSizeChange = (size: number) => {
 const handleCurrentChange = (page: number) => {
   pagination.page = page
   loadTaskList()
+}
+
+/**
+ * 复制任务配置并跳转到创建页
+ * 功能：将所选历史任务的配置组装为路由查询参数，跳转到回测创建页面以便参数预填。
+ * 参数：
+ *  - task: BacktestTask 历史任务记录
+ * 返回值：void
+ * 事件/副作用：调用路由跳转到 '/backtest-strategy'，并附带查询参数。
+ */
+const copyConfig = (task: BacktestTask) => {
+  try {
+    /**
+     * 推断数据源
+     * 功能：根据代码格式进行简单推断，带有市场后缀（如 .SH/.SZ）的视为 ETF，否则视为股票。
+     * 参数：code: string
+     * 返回值：'stock' | 'etf'
+     * 事件：无
+     */
+    const inferDataSource = (code: string): 'stock' | 'etf' => {
+      return code?.includes('.') ? 'etf' : 'stock'
+    }
+
+    const query: Record<string, any> = {
+      strategy: task.strategy_name,
+      symbol: task.stock_code,
+      stock_name: task.stock_name || '',
+      start_date: task.start_date,
+      end_date: task.end_date,
+      initial_cash: task.initial_cash,
+      data_source: inferDataSource(task.stock_code),
+    }
+    // 可选字段：frequency、strategy_params
+    if (task.frequency) {
+      query.frequency = task.frequency
+    }
+    if (task.strategy_params) {
+      // 使用 JSON 字符串编码，避免复杂对象在查询中丢失
+      query.strategy_params = encodeURIComponent(JSON.stringify(task.strategy_params))
+    }
+
+    router.push({ path: '/backtest-strategy', query })
+  } catch (error) {
+    console.error('复制配置失败:', error)
+    ElMessage.error('复制配置失败')
+  }
 }
 
 // 获取状态标签类型
