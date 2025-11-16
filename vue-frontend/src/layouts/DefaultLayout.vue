@@ -323,6 +323,16 @@ const menuItems = computed(() => {
       ],
     },
     {
+      path: '/etf',
+      title: 'ETF分析',
+      icon: 'DataLine',
+      children: [
+        { path: '/analysis/etf-basic', title: 'ETF基本信息', icon: 'List' },
+        { path: '/analysis/etf-daily', title: 'ETF日线行情', icon: 'TrendCharts' },
+        { path: '/analysis/etf-realtime', title: 'ETF实时行情', icon: 'TrendCharts' },
+      ],
+    },
+    {
       path: '/stock-picker',
       title: '智能选股',
       icon: 'MagicStick',
@@ -520,6 +530,13 @@ const fundamentalsMegaMenuSections = [
       { title: '指数分析', path: '/analysis/index-analysis' },
       { title: '指数列表', path: '/analysis/index-list' },
       { title: '指数日基本面', path: '/analysis/index-dailybasic' },
+    ],
+  },
+  {
+    title: '基金/ETF',
+    items: [
+      { title: 'ETF基本信息', path: '/analysis/etf-basic' },
+      { title: 'ETF日线行情', path: '/analysis/etf-daily' },
     ],
   },
   {

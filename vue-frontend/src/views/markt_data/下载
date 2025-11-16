@@ -4,6 +4,86 @@ info:
   version: 1.0.0
   description: 统一响应格式的 Django REST API 文档，包含 scheduled_tasks 下的 Tushare 直通代理接口
 paths:
+  /django/api/etf/basic/:
+    get:
+      operationId: etf_basic_retrieve
+      description: |-
+        查询ETF的基础信息，支持多条件筛选与分页。
+        参数（Query）：ts_code, index_code, exchange, list_status, mgr_name, etf_type, name, page, page_size。
+        统一响应结构（success_response），data 为分页后的 items 列表及分页元信息。
+      summary: ETF 基本信息查询
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseEtfBasicList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/etf/daily/:
+    get:
+      operationId: etf_daily_retrieve
+      description: |-
+        按 ts_code 与日期范围查询 ETF 日线行情。
+        参数（Query）：ts_code（必填），start_date（可选，YYYY-MM-DD），end_date（可选，YYYY-MM-DD）。
+        统一响应结构（success_response），data 为行情列表。
+      summary: ETF 日线行情查询
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseEtfDailyList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/etf/daily/latest/:
+    get:
+      operationId: etf_daily_latest_retrieve
+      description: |-
+        获取数据库中最新的交易日日期，并返回该日期下所有ETF的日线行情列表。
+        统一响应结构（success_response），data 为行情列表。
+      summary: ETF 最近交易日所有ETF日线行情
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseEtfDailyList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/forum/posts/:
     get:
       operationId: forum_posts_retrieve
@@ -506,7 +586,19 @@ paths:
   /django/api/individual_stock/stocks/{stock_code}/history/:
     get:
       operationId: individual_stock_stocks_history_retrieve
-      description: 获取股票历史行情数据
+      description: |-
+        功能：获取指定股票的历史行情数据，支持日频和周频。
+        参数：
+        - request(HttpRequest): 请求对象，查询参数包括：
+          - start_date(str, 可选): 开始日期，格式：YYYYMMDD，默认30天前
+          - end_date(str, 可选): 结束日期，格式：YYYYMMDD，默认今天
+          - adjust(str, 可选): 复权类型，""为不复权，"qfq"前复权，"hfq"后复权
+          - frequency(str, 可选): 数据频率，"daily"(默认) 或 "weekly"（周频）
+        - stock_code(str): 股票代码
+        返回值：
+        - JsonResponse: 使用success_response返回历史数据列表；参数错误或服务异常使用error_response返回错误信息。
+        事件：
+        - 当股票代码无效或参数格式错误时，记录日志并返回错误响应；当查询无数据时返回空列表。
       parameters:
       - in: path
         name: stock_code
@@ -1318,7 +1410,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /django/api/tasks/cyq-perf/:
-    get:`
+    get:
       operationId: tasks_cyq_perf_retrieve
       description: 获取每日筹码分布与胜率，支持按 ts_code 或日期区间过滤。
       summary: 每日筹码及胜率
@@ -2769,6 +2861,199 @@ components:
       - code
       - message
       - timestamp
+    EtfBasic:
+      type: object
+      description: |-
+        ETF 基本信息序列化器
+        功能：将 EtfBasic 模型实例序列化为 JSON。
+        参数：model=EtfBasic, fields='__all__'
+        返回值：序列化后的JSON数据
+        事件：无
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        setup_date:
+          type: string
+          format: date
+          nullable: true
+        list_date:
+          type: string
+          format: date
+          nullable: true
+        delist_date:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        mgt_fee:
+          type: number
+          format: double
+          nullable: true
+        ts_code:
+          type: string
+          title: TS代码
+          maxLength: 20
+        csname:
+          type: string
+          nullable: true
+          title: 中文简称
+          maxLength: 100
+        extname:
+          type: string
+          title: ETF扩位简称
+          maxLength: 100
+        cname:
+          type: string
+          nullable: true
+          title: 基金中文全称
+          maxLength: 200
+        index_code:
+          type: string
+          nullable: true
+          title: 跟踪指数代码
+          maxLength: 20
+        index_name:
+          type: string
+          nullable: true
+          title: 跟踪指数名称
+          maxLength: 100
+        exchange:
+          type: string
+          nullable: true
+          title: 交易所
+          maxLength: 20
+        list_status:
+          allOf:
+          - $ref: '#/components/schemas/ListStatusEnum'
+          title: 上市状态
+        etf_type:
+          type: string
+          nullable: true
+          title: ETF类型
+          maxLength: 20
+        mgr_name:
+          type: string
+          nullable: true
+          title: 基金管理人简称
+          maxLength: 100
+        custod_name:
+          type: string
+          nullable: true
+          title: 基金托管人名称
+          maxLength: 100
+      required:
+      - created_at
+      - extname
+      - id
+      - ts_code
+      - updated_at
+    EtfBasicListPayload:
+      type: object
+      description: |-
+        ETF 基本信息分页载荷
+        功能：描述统一响应中的 data 字段结构。
+        参数：无
+        返回值：
+        - items (EtfBasicSerializer[]): 当前页数据列表
+        - page (int): 当前页码
+        - page_size (int): 每页数量
+        - total (int): 总记录数
+        - pages (int): 总页数
+        事件：无
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EtfBasic'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+      required:
+      - items
+      - page
+      - page_size
+      - pages
+      - total
+    EtfDaily:
+      type: object
+      description: |-
+        ETF 日线行情序列化器
+        功能：将 EtfDaily 模型实例序列化为 JSON。
+        参数：model=EtfDaily, fields='__all__'
+        返回值：序列化后的JSON数据
+        事件：无
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        trade_date:
+          type: string
+          format: date
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        open:
+          type: number
+          format: double
+        high:
+          type: number
+          format: double
+        low:
+          type: number
+          format: double
+        close:
+          type: number
+          format: double
+        pre_close:
+          type: number
+          format: double
+          nullable: true
+        change:
+          type: number
+          format: double
+          nullable: true
+        pct_chg:
+          type: number
+          format: double
+          nullable: true
+        amount:
+          type: number
+          format: double
+        ts_code:
+          type: string
+          title: TS代码
+          maxLength: 20
+        vol:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          title: 成交量(手)
+      required:
+      - amount
+      - close
+      - created_at
+      - high
+      - id
+      - low
+      - open
+      - trade_date
+      - ts_code
+      - vol
     GitCommitRecord:
       type: object
       properties:
@@ -3303,6 +3588,16 @@ components:
           type: string
         nums:
           type: string
+    ListStatusEnum:
+      enum:
+      - L
+      - D
+      - P
+      type: string
+      description: |-
+        * `L` - 上市
+        * `D` - 退市
+        * `P` - 待上市
     StockHsgtData:
       type: object
       properties:
@@ -3473,6 +3768,60 @@ components:
           type: string
         data:
           $ref: '#/components/schemas/DcIndexData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseEtfBasicList:
+      type: object
+      description: |-
+        ETF 基本信息列表统一响应序列化器
+        功能：描述接口返回的统一结构，其中 data 为 EtfBasicSerializer 列表。
+        参数：无
+        返回值：
+        - code (int): 状态码
+        - message (str): 信息
+        - timestamp (str): 时间戳（ISO 格式）
+        - data (object): 分页载荷对象，包含 items 列表与分页元信息
+        事件：无
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/EtfBasicListPayload'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseEtfDailyList:
+      type: object
+      description: |-
+        ETF 日线行情列表统一响应序列化器
+        功能：描述接口返回的统一结构，其中 data 为 EtfDailySerializer 列表。
+        参数：无
+        返回值：
+        - code (int): 状态码
+        - message (str): 信息
+        - timestamp (str): 时间戳（ISO 格式）
+        - data (EtfDailySerializer[]): ETF 日线行情列表
+        事件：无
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EtfDaily'
       required:
       - code
       - data

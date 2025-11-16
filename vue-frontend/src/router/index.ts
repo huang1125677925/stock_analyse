@@ -263,6 +263,25 @@ const router = createRouter({
           component: () => import('@/views/analysis/FactorStockPickerView.vue'),
           meta: { title: '因子选股' }
         }
+        ,
+        {
+          path: '/analysis/etf-basic',
+          name: 'etf-basic',
+          component: () => import('@/views/etf/EtfBasicView.vue'),
+          meta: { title: 'ETF基本信息' }
+        },
+        {
+          path: '/analysis/etf-daily',
+          name: 'etf-daily',
+          component: () => import('@/views/etf/EtfDailyView.vue'),
+          meta: { title: 'ETF日线行情' }
+        },
+        {
+          path: '/analysis/etf-realtime',
+          name: 'etf-realtime',
+          component: () => import('@/views/etf/EtfRealtimeView.vue'),
+          meta: { title: 'ETF实时行情' }
+        }
       ]
     },
     {
