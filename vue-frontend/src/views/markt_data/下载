@@ -1164,6 +1164,40 @@ paths:
       responses:
         '204':
           description: No response body
+  /django/api/strategy/index-analysis/macd-up-prediction/{stock_code}/:
+    get:
+      operationId: strategy_index_analysis_macd_up_prediction_retrieve
+      description: |-
+        获取指定指数最近30天预测上涨的交易日期列表（基于已保存的MACD XGBoost模型）。
+        参数（Path）：stock_code（必填，指数TS代码），例如 000001.SH。
+        参数（Query）：days（可选，默认30），token（可选，覆盖环境变量）。
+        统一响应结构（success_response），data 包含 ts_code、list、count、params。
+      summary: 指数MACD XGBoost最近上涨日预测
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - index-analysis
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseMacdXgbGrowthDates'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/tasks/ah-comparison/:
     get:
       operationId: tasks_ah_comparison_retrieve
@@ -2992,8 +3026,8 @@ components:
       description: |-
         ETF 日线行情序列化器
         功能：将 EtfDaily 模型实例序列化为 JSON。
-        参数：model=EtfDaily, fields='__all__'
-        返回值：序列化后的JSON数据
+        参数：model=EtfDaily, fields='__all__'；并支持注解字段 csname。
+        返回值：序列化后的JSON数据（包含 csname 中文简称，若存在注解）。
         事件：无
       properties:
         id:
@@ -3006,6 +3040,9 @@ components:
           type: string
           format: date-time
           readOnly: true
+        csname:
+          type: string
+          nullable: true
         open:
           type: number
           format: double
@@ -3598,6 +3635,50 @@ components:
         * `L` - 上市
         * `D` - 退市
         * `P` - 待上市
+    MacdXgbGrowthDatesData:
+      type: object
+      description: |-
+        指数最近上涨预测日期数据序列化器
+        功能：描述统一响应结构中的 data 字段内容。
+        参数：无
+        返回值：
+        - ts_code(str): 指数TS代码
+        - list(str[]): 预测为“上涨”的交易日期列表（YYYYMMDD）
+        - count(int): 日期数量
+        - params(object): 预测参数
+        事件：无
+      properties:
+        ts_code:
+          type: string
+        list:
+          type: array
+          items:
+            type: string
+        count:
+          type: integer
+        params:
+          $ref: '#/components/schemas/MacdXgbGrowthDatesParams'
+      required:
+      - count
+      - list
+      - params
+      - ts_code
+    MacdXgbGrowthDatesParams:
+      type: object
+      description: |-
+        MACD XGBoost 预测参数序列化器
+        功能：描述预测过程中使用的关键参数。
+        参数：无
+        返回值：lookback_days(int)、forecast_days(int)、growth_threshold(float)
+        事件：无
+      properties:
+        lookback_days:
+          type: integer
+        forecast_days:
+          type: integer
+        growth_threshold:
+          type: number
+          format: double
     StockHsgtData:
       type: object
       properties:
@@ -4030,6 +4111,32 @@ components:
           type: string
         data:
           $ref: '#/components/schemas/LimitStepData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseMacdXgbGrowthDates:
+      type: object
+      description: |-
+        指数MACD XGBoost最近上涨日预测统一响应序列化器
+        功能：描述接口返回的统一结构，其中 data 为 MacdXgbGrowthDatesDataSerializer。
+        参数：无
+        返回值：
+        - code (int): 状态码
+        - message (str): 信息
+        - timestamp (str): 时间戳（ISO 格式）
+        - data (MacdXgbGrowthDatesDataSerializer): 预测结果载荷
+        事件：无
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/MacdXgbGrowthDatesData'
       required:
       - code
       - data

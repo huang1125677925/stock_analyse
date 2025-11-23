@@ -11,14 +11,39 @@
       </div>
     </div>
     <div ref="chartRef" class="chart" />
+    <!-- 上涨预测日期列表（MACD XGBoost） -->
+    <div class="prediction-section">
+      <div class="prediction-header">
+        <h4>指数上涨预测日期（MACD XGBoost）</h4>
+        <div class="prediction-actions">
+          <el-tag type="info">最近 {{ predictionDays }} 天</el-tag>
+          <el-button size="small" @click="reloadPredictions" :loading="loadingPredictions">刷新</el-button>
+        </div>
+      </div>
+      <div v-if="loadingPredictions" class="prediction-loading">正在加载预测数据...</div>
+      <el-empty v-else-if="predictedDates.length === 0" description="暂无预测上涨日期" />
+      <el-space v-else wrap>
+        <el-tag v-for="d in predictedDates" :key="d" type="success">{{ formatDateDisplay(d) }}</el-tag>
+      </el-space>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * 组件名称：IndexVolumeTrend
+ * 功能：展示指定指数在选择的时间范围内的成交量、成交额、收盘价趋势图，并在下方展示基于 MACD XGBoost 模型预测的最近 N 天上涨交易日期列表。
+ * 参数（Props）：
+ * - tsCode?: 指数代码（默认 '000001.SH'）
+ * - height?: 图表高度（默认 '420px'）
+ * 返回值：无（组合式组件不返回值）
+ * 事件（Emits）：无
+ */
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchIndexDailyVolume, type IndexDailyVolumeItem } from '@/services/indexDailyApi'
+import { fetchIndexMacdUpPredictionDates } from '@/services/strategyIndexAnalysisApi'
 
 interface Props {
   tsCode?: string
@@ -33,6 +58,11 @@ const props = withDefaults(defineProps<Props>(), {
 const range = ref<'1y' | '3y' | '5y'>('1y')
 const chartRef = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
+
+// 预测日期相关状态
+const predictedDates = ref<string[]>([])
+const loadingPredictions = ref<boolean>(false)
+const predictionDays = ref<number>(30)
 
 function formatToYYYYMMDD(date: Date): string {
   const y = date.getFullYear()
@@ -58,6 +88,34 @@ async function reload() {
     console.error('加载指数成交量失败:', error)
     ElMessage.error('加载指数成交量失败')
   }
+}
+
+/**
+ * 刷新上涨预测日期列表
+ */
+async function reloadPredictions() {
+  try {
+    loadingPredictions.value = true
+    const data = await fetchIndexMacdUpPredictionDates(props.tsCode, predictionDays.value)
+    predictedDates.value = Array.isArray(data.list) ? data.list : []
+  } catch (error) {
+    console.error('加载上涨预测日期失败:', error)
+    ElMessage.error('加载上涨预测日期失败')
+  } finally {
+    loadingPredictions.value = false
+  }
+}
+
+/**
+ * 日期显示格式化：支持将 YYYYMMDD 转为 YYYY-MM-DD
+ */
+function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return ''
+  if (dateStr.includes('-')) return dateStr
+  if (dateStr.length === 8) {
+    return `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`
+  }
+  return dateStr
 }
 
 function renderChart(data: IndexDailyVolumeItem[]) {
@@ -125,6 +183,7 @@ function handleResize() {
 
 onMounted(() => {
   reload()
+  reloadPredictions()
   window.addEventListener('resize', handleResize)
 })
 
@@ -137,6 +196,7 @@ onBeforeUnmount(() => {
 // 监听指数代码变化，自动刷新图表
 watch(() => props.tsCode, () => {
   reload()
+  reloadPredictions()
 })
 </script>
 
@@ -155,5 +215,26 @@ watch(() => props.tsCode, () => {
   width: 100%;
   height: v-bind(height);
   margin-top: 16px;
+}
+
+.prediction-section {
+  margin-top: 16px;
+}
+
+.prediction-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.prediction-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.prediction-loading {
+  color: #909399;
 }
 </style>

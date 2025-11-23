@@ -1,0 +1,1 @@
+import{x as t}from"./index-DflXyc7k.js";async function n(a){return(await t.get("/django/api/etf/basic/",{params:a})).data}async function i(a){return(await t.get("/django/api/etf/daily/",{params:a})).data}async function r(){return(await t.get("/django/api/etf/daily/latest/")).data}export{i as a,r as b,n as g};
