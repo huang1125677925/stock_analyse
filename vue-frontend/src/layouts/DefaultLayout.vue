@@ -4,14 +4,6 @@
     <el-header class="topbar">
       <div class="topbar-left">
         <h3 class="app-title">股票分析系统</h3>
-        <el-breadcrumb v-if="!isMobile" separator="/" class="breadcrumb">
-          <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path">
-            {{ item.title }}
-          </el-breadcrumb-item>
-        </el-breadcrumb>
-        <div v-if="!isMobile" class="risk-warning">
-          <strong>注意：所有数据仅作参考，不作为任何投资建议，风险自担</strong>
-        </div>
       </div>
 
       <!-- 桌面端：横向菜单 + 用户操作 -->
@@ -120,6 +112,22 @@
         <el-icon><Menu /></el-icon>
       </el-button>
     </el-header>
+
+    <!-- 顶栏下方子栏：桌面端显示面包屑与风险提示 -->
+    <div v-if="!isMobile" class="subbar">
+      <div class="subbar-content">
+        <div>
+          <el-breadcrumb separator="/" class="breadcrumb">
+            <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path">
+              {{ item.title }}
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+        <div class="risk-warning">
+          <strong>注意：所有数据仅作参考，不作为任何投资建议，风险自担</strong>
+        </div>
+      </div>
+    </div>
 
     <!-- 主内容 -->
     <el-main class="main-content">
@@ -432,6 +440,14 @@ const menuItems = computed(() => {
         },
       ],
     },
+    {
+      path: '/ml',
+      title: '机器学习研究',
+      icon: 'DataAnalysis',
+      children: [
+        { path: '/ml/index-prediction-validation', title: '指数预测验证', icon: 'TrendCharts' },
+      ],
+    },
     // 在此处新增个人中心入口
     {
       path: '/personal/holdings',
@@ -618,13 +634,14 @@ watch(
 
 .breadcrumb {
   margin-left: 8px;
+  white-space: nowrap;
 }
 
 .risk-warning {
-  margin-left: 20px;
   font-weight: bold;
   color: #ff0000;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .topbar-right {
@@ -750,5 +767,18 @@ watch(
 
 .mobile-auth {
   margin-top: 12px;
+}
+/* 顶栏下方子栏样式，确保面包屑与风险提示同一行 */
+.subbar {
+  background-color: #fff;
+  border-bottom: 1px solid #e4e7ed;
+}
+.subbar-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 16px;
+  padding: 8px 16px;
 }
 </style>

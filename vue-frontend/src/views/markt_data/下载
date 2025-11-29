@@ -1198,6 +1198,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /django/api/strategy/individual-analysis/actual-rise-ratio/{stock_code}/:
+    get:
+      operationId: strategy_individual_analysis_actual_rise_ratio_retrieve
+      description: |-
+        按代码查询选股记录中的5日实际上涨比例，支持日期区间与预测类型过滤。
+        参数（Path）：stock_code。
+        参数（Query）：start_date, end_date, prediction_type。
+        统一响应结构（success_response 样式，DRF封装为 drf_success_response）。
+      summary: 查询5日实际上涨比例
+      parameters:
+      - in: path
+        name: stock_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - individual-analysis
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseActualRiseRatio5D'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/tasks/ah-comparison/:
     get:
       operationId: tasks_ah_comparison_retrieve
@@ -2555,6 +2589,56 @@ paths:
           description: No response body
 components:
   schemas:
+    ActualRiseRatioItem:
+      type: object
+      description: |-
+        5日实际上涨比例列表项序列化器
+        功能：用于统一响应结构中 data 字段的列表项，字段完全对齐 StockSelectionRecord.to_dict()。
+        参数：无
+        返回值：
+        - market(str): 市场
+        - code(str): 代码
+        - name(str): 名称
+        - trade_date(str): 交易日期（YYYY-MM-DD）
+        - predict_rise_prob(float): 预测上涨概率（百分比）
+        - confidence(float): 预测置信度（百分比）
+        - actual_rise_ratio_5d(float|null): 5日实际上涨比例（百分比），可为空
+        - prediction_type(str): 预测类型
+        - created_at(str): 创建时间（ISO格式）
+        事件：无
+      properties:
+        market:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        trade_date:
+          type: string
+        predict_rise_prob:
+          type: number
+          format: double
+        confidence:
+          type: number
+          format: double
+        actual_rise_ratio_5d:
+          type: number
+          format: double
+          nullable: true
+        prediction_type:
+          type: string
+        created_at:
+          type: string
+      required:
+      - actual_rise_ratio_5d
+      - code
+      - confidence
+      - created_at
+      - market
+      - name
+      - predict_rise_prob
+      - prediction_type
+      - trade_date
     AhComparisonData:
       type: object
       properties:
@@ -3714,6 +3798,34 @@ components:
           type: string
         type_name:
           type: string
+    SuccessResponseActualRiseRatio5D:
+      type: object
+      description: |-
+        查询5日实际上涨比例统一响应序列化器（列表返回）
+        功能：描述接口返回的统一结构，其中 data 为 ActualRiseRatioItemSerializer 列表。
+        参数：无
+        返回值：
+        - code (int): 状态码
+        - message (str): 信息
+        - timestamp (str): 时间戳（ISO 格式）
+        - data ([ActualRiseRatioItemSerializer]): 查询结果列表
+        事件：无
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActualRiseRatioItem'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseAhComparison:
       type: object
       properties:

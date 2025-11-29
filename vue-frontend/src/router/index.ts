@@ -310,6 +310,19 @@ const router = createRouter({
       ]
     },
     {
+      path: '/ml',
+      name: 'ml',
+      meta: { title: '机器学习研究' },
+      children: [
+        {
+          path: '/ml/index-prediction-validation',
+          name: 'ml-index-prediction-validation',
+          component: () => import('@/views/ml/MlIndexPredictionValidation.vue'),
+          meta: { title: '机器学习-指数预测验证', requiresAuth: false }
+        }
+      ]
+    },
+    {
       path: '/forum',
       name: 'forum',
       meta: { title: '论坛讨论区' },
