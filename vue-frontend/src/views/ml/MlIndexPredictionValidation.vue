@@ -197,9 +197,22 @@ async function onQuery() {
   }
   loading.value = true
   try {
+    // 默认查询最近七天：结束日期为今日，开始日期为7天前
+    const format = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+    const end = new Date()
+    const start = new Date(end)
+    // 近7天区间：包含今天在内的最近7个自然日
+    start.setDate(end.getDate() - 6)
+    const defaultStart = format(start)
+    const defaultEnd = format(end)
     const res = await fetchActualRiseRatio(form.value.stockCode, {
-      startDate: form.value.startDate || undefined,
-      endDate: form.value.endDate || undefined,
+      startDate: form.value.startDate || defaultStart,
+      endDate: form.value.endDate || defaultEnd,
       predictionType: form.value.predictionType || undefined
     })
     result.value = res
