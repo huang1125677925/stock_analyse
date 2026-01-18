@@ -97,6 +97,12 @@ const router = createRouter({
       ]
     },
     {
+      path: '/etf-system',
+      name: 'etf-system',
+      component: () => import('../views/etf-investment-system/EtfSystemView.vue'),
+      meta: { title: '全天候ETF投资系统' }
+    },
+    {
       path: '/analysis',
       name: 'analysis',
       meta: { title: '股票分析' },
@@ -282,6 +288,20 @@ const router = createRouter({
           component: () => import('@/views/etf/EtfRealtimeView.vue'),
           meta: { title: 'ETF实时行情' }
         }
+        ,
+        {
+          path: '/analysis/etf-correlation',
+          name: 'etf-correlation',
+          component: () => import('@/views/etf/EtfCorrelationView.vue'),
+          meta: { title: 'ETF相关性分析' }
+        }
+        ,
+        {
+          path: '/analysis/etf-volatility',
+          name: 'etf-volatility',
+          component: () => import('@/views/etf/EtfVolatilityView.vue'),
+          meta: { title: 'ETF波动性列表' }
+        }
       ]
     },
     {
@@ -441,6 +461,18 @@ const router = createRouter({
           name: 'stock-hsgt-list',
           component: () => import('@/views/indival_stock_data/StockHsgtListView.vue'),
           meta: { title: '沪深港通股票列表' }
+        },
+        {
+          path: '/stock-correlation',
+          name: 'stock-correlation',
+          component: () => import('@/views/indival_stock_data/StockCorrelationView.vue'),
+          meta: { title: '股票相关性分析' }
+        },
+        {
+          path: '/stock-volatility',
+          name: 'stock-volatility',
+          component: () => import('@/views/indival_stock_data/StockVolatilityView.vue'),
+          meta: { title: '股票波动率分析' }
         }
       ]
     },

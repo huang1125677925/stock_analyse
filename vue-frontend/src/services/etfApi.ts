@@ -121,3 +121,59 @@ export async function getEtfDailyLatest(): Promise<EtfDailyItem[]> {
   )
   return res.data
 }
+
+// ETF 收盘价相关性矩阵
+export interface EtfCorrelationData {
+  labels: string[]
+  matrix: number[][]
+}
+
+export interface GetEtfCorrelationParams {
+  ts_codes: string[] | string
+  start_date?: string
+  end_date?: string
+}
+
+export async function getEtfCorrelation(
+  params: GetEtfCorrelationParams
+): Promise<EtfCorrelationData> {
+  const query = {
+    ts_codes: Array.isArray(params.ts_codes) ? params.ts_codes.join(',') : params.ts_codes,
+    start_date: params.start_date,
+    end_date: params.end_date,
+  }
+  const res = await axios.get<ApiResponse<EtfCorrelationData>, ApiResponse<EtfCorrelationData>>(
+    '/django/api/etf/daily/correlation/',
+    { params: query }
+  )
+  return res.data
+}
+
+// ETF 区间波动度统计
+export interface EtfVolatilityItem {
+  [key: string]: any
+  ts_code?: string
+}
+
+export interface GetEtfVolatilityParams {
+  ts_codes: string[] | string
+  start_date?: string
+  end_date?: string
+  sample_n?: number
+}
+
+export async function getEtfVolatility(
+  params: GetEtfVolatilityParams
+): Promise<EtfVolatilityItem[]> {
+  const query = {
+    ts_codes: Array.isArray(params.ts_codes) ? params.ts_codes.join(',') : params.ts_codes,
+    start_date: params.start_date,
+    end_date: params.end_date,
+    sample_n: params.sample_n,
+  }
+  const res = await axios.get<ApiResponse<{ items: EtfVolatilityItem[] }>, ApiResponse<{ items: EtfVolatilityItem[] }>>(
+    '/django/api/etf/daily/volatility/',
+    { params: query }
+  )
+  return (res.data as any)?.items ?? []
+}

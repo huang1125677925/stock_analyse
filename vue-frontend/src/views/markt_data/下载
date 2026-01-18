@@ -58,6 +58,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /django/api/etf/daily/correlation/:
+    get:
+      operationId: etf_daily_correlation_retrieve
+      description: |-
+        输入ETF代码列表与时间范围，计算收盘价曲线的Pearson相关性，两两组合生成相关性矩阵，用于热力图展示。
+        参数（Query）：ts_codes（必填，逗号分隔），start_date（可选，YYYY-MM-DD），end_date（可选，YYYY-MM-DD）。
+        统一响应结构（success_response），data包含labels与matrix。
+      summary: ETF 收盘价相关性矩阵
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseEtfCorrelation'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/etf/daily/latest/:
     get:
       operationId: etf_daily_latest_retrieve
@@ -77,6 +104,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponseEtfDailyList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/etf/daily/volatility/:
+    get:
+      operationId: etf_daily_volatility_retrieve
+      description: 对ETF列表在区间内的收盘价曲线进行统计：最高/最低、最大下跌/上涨、最新价在区间的百分位、方差、均值、趋势（涨/跌/震荡）与网格交易适配。最小时间范围需≥1年；可选抽样
+        sample_n 参与趋势判定。
+      summary: ETF 区间波动度统计
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseEtfVolatilityList'
           description: ''
         '500':
           content:
@@ -231,6 +283,54 @@ paths:
       responses:
         '200':
           description: No response body
+  /django/api/individual_stock/daily/correlation/:
+    get:
+      operationId: individual_stock_daily_correlation_retrieve
+      description: 输入股票代码列表与时间范围，计算收盘价曲线的Pearson相关性，两两组合生成相关性矩阵。
+      summary: 股票收盘价相关性矩阵
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseStockCorrelation'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/individual_stock/daily/volatility/:
+    get:
+      operationId: individual_stock_daily_volatility_retrieve
+      description: 对股票列表在区间内的收盘价曲线进行统计：最高/最低、最大下跌/上涨、最新价在区间的百分位、方差、均值、趋势与网格交易适配。时间范围需≥1年。
+      summary: 股票区间波动度统计
+      tags:
+      - individual_stock
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseStockVolatilityList'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/individual_stock/dc-concepts/:
     get:
       operationId: individual_stock_dc_concepts_retrieve
@@ -1198,21 +1298,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
-  /django/api/strategy/individual-analysis/actual-rise-ratio/{stock_code}/:
+  /django/api/strategy/individual-analysis/actual-rise-ratio/:
     get:
       operationId: strategy_individual_analysis_actual_rise_ratio_retrieve
       description: |-
         按代码查询选股记录中的5日实际上涨比例，支持日期区间与预测类型过滤。
         参数（Path）：stock_code。
         参数（Query）：start_date, end_date, prediction_type。
+        注意：end_date 将被强制设为当前日期减3个交易日（不计周末），忽略传入的 end_date，以保证数据截止为最近交易日。
         统一响应结构（success_response 样式，DRF封装为 drf_success_response）。
       summary: 查询5日实际上涨比例
-      parameters:
-      - in: path
-        name: stock_code
-        schema:
-          type: string
-        required: true
       tags:
       - individual-analysis
       security:
@@ -2789,6 +2884,40 @@ components:
           type: string
         hold_ratio:
           type: string
+    CorrelationMatrixPayload:
+      type: object
+      description: |-
+        ETF 收盘价相关性矩阵载荷
+        功能：用于描述相似度热力图所需的数据结构（标签与矩阵）。
+        参数：无
+        返回值：
+        - labels (str[]): ETF代码标签列表（矩阵行列顺序）
+        - matrix (number[][]): 相关性矩阵，取值范围[-1,1]，无数据用null
+        - start_date (str, 可选): 开始日期（YYYY-MM-DD）
+        - end_date (str, 可选): 结束日期（YYYY-MM-DD）
+        事件：无
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+        matrix:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+              nullable: true
+        start_date:
+          type: string
+          nullable: true
+        end_date:
+          type: string
+          nullable: true
+      required:
+      - labels
+      - matrix
     CyqPerfData:
       type: object
       properties:
@@ -3175,6 +3304,125 @@ components:
       - trade_date
       - ts_code
       - vol
+    EtfVolatilityItem:
+      type: object
+      description: |-
+        ETF 波动度指标项
+        功能：描述单个ETF在区间内的波动度统计。
+        参数：无
+        返回值：
+        - ts_code (str)
+        - start_date (str)
+        - end_date (str)
+        - highest_value (float)
+        - highest_date (str)
+        - lowest_value (float)
+        - lowest_date (str)
+        - max_drawdown_pct (float)
+        - mdd_start_date (str)
+        - mdd_end_date (str)
+        - mdd_days (int)
+        - max_rise_pct (float)
+        - rise_start_date (str)
+        - rise_end_date (str)
+        - rise_days (int)
+        - latest_price (float)
+        - latest_date (str)
+        - percentile_between_min_max (float)
+        - mean (float)
+        - variance (float)
+        - stddev (float)
+        - trend (str)  # up/down/range
+        - grid_applicable (bool)
+        - sample_used (bool)
+        - sample_n (int, 可选)
+        事件：无
+      properties:
+        ts_code:
+          type: string
+        start_date:
+          type: string
+        end_date:
+          type: string
+        highest_value:
+          type: number
+          format: double
+        highest_date:
+          type: string
+        lowest_value:
+          type: number
+          format: double
+        lowest_date:
+          type: string
+        max_drawdown_pct:
+          type: number
+          format: double
+        mdd_start_date:
+          type: string
+        mdd_end_date:
+          type: string
+        mdd_days:
+          type: integer
+        max_rise_pct:
+          type: number
+          format: double
+        rise_start_date:
+          type: string
+        rise_end_date:
+          type: string
+        rise_days:
+          type: integer
+        latest_price:
+          type: number
+          format: double
+        latest_date:
+          type: string
+        percentile_between_min_max:
+          type: number
+          format: double
+        mean:
+          type: number
+          format: double
+        variance:
+          type: number
+          format: double
+        stddev:
+          type: number
+          format: double
+        trend:
+          type: string
+        grid_applicable:
+          type: boolean
+        sample_used:
+          type: boolean
+        sample_n:
+          type: integer
+          nullable: true
+      required:
+      - end_date
+      - grid_applicable
+      - highest_date
+      - highest_value
+      - latest_date
+      - latest_price
+      - lowest_date
+      - lowest_value
+      - max_drawdown_pct
+      - max_rise_pct
+      - mdd_days
+      - mdd_end_date
+      - mdd_start_date
+      - mean
+      - percentile_between_min_max
+      - rise_days
+      - rise_end_date
+      - rise_start_date
+      - sample_used
+      - start_date
+      - stddev
+      - trend
+      - ts_code
+      - variance
     GitCommitRecord:
       type: object
       properties:
@@ -3763,6 +4011,50 @@ components:
         growth_threshold:
           type: number
           format: double
+    Payload:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EtfVolatilityItem'
+        total:
+          type: integer
+        start_date:
+          type: string
+          nullable: true
+        end_date:
+          type: string
+          nullable: true
+        skipped:
+          type: integer
+      required:
+      - items
+      - total
+    StockCorrelationMatrixPayload:
+      type: object
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+        matrix:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+              nullable: true
+        start_date:
+          type: string
+          nullable: true
+        end_date:
+          type: string
+          nullable: true
+      required:
+      - labels
+      - matrix
     StockHsgtData:
       type: object
       properties:
@@ -3992,6 +4284,32 @@ components:
       - data
       - message
       - timestamp
+    SuccessResponseEtfCorrelation:
+      type: object
+      description: |-
+        ETF 收盘价相关性统一响应序列化器
+        功能：描述统一返回结构，其中 data 为相关性矩阵载荷。
+        参数：无
+        返回值：
+        - code (int): 状态码
+        - message (str): 信息
+        - timestamp (str): 时间戳（ISO 格式）
+        - data (CorrelationMatrixPayloadSerializer): 相关性矩阵载荷
+        事件：无
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/CorrelationMatrixPayload'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseEtfDailyList:
       type: object
       description: |-
@@ -4015,6 +4333,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/EtfDaily'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseEtfVolatilityList:
+      type: object
+      description: |-
+        ETF 波动度列表统一响应
+        功能：描述统一返回结构，其中 data 为指标项列表。
+        参数：无
+        返回值：
+        - code (int)
+        - message (str)
+        - timestamp (str)
+        - data (object): 包含 items、total、start_date、end_date
+        事件：无
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/Payload'
       required:
       - code
       - data
@@ -4254,6 +4598,22 @@ components:
       - data
       - message
       - timestamp
+    SuccessResponseStockCorrelation:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/StockCorrelationMatrixPayload'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseStockHsgt:
       type: object
       properties:
@@ -4265,6 +4625,22 @@ components:
           type: string
         data:
           $ref: '#/components/schemas/StockHsgtData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseStockVolatilityList:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/Payload'
       required:
       - code
       - data

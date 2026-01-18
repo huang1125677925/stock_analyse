@@ -456,3 +456,53 @@ export const getStockCashFlowStatements = async (stockCode: string, params: Fina
   const response = await axios.get<FinancialStatementResponse<CashFlowStatement>>(`${API_BASE_URL}/${stockCode}/cash-flow-statements/`, { params })
   return response.data
 }
+
+export interface StockCorrelationData {
+  labels: string[]
+  matrix: number[][]
+}
+
+export interface GetStockCorrelationParams {
+  ts_codes: string[] | string
+  start_date?: string
+  end_date?: string
+}
+
+export const getStockCorrelation = async (
+  params: GetStockCorrelationParams
+): Promise<StockCorrelationData> => {
+  const query = {
+    stock_codes: Array.isArray(params.ts_codes) ? params.ts_codes.join(',') : params.ts_codes,
+    start_date: params.start_date,
+    end_date: params.end_date,
+  }
+  const response = await axios.get<StockCorrelationData>('/django/api/individual_stock/daily/correlation/', { params: query })
+  return response.data
+}
+
+export interface StockVolatilityItem {
+  [key: string]: any
+  stock_code?: string
+  ts_code?: string
+}
+
+export interface GetStockVolatilityParams {
+  ts_codes: string[] | string
+  start_date?: string
+  end_date?: string
+  sample_n?: number
+}
+
+export const getStockVolatility = async (
+  params: GetStockVolatilityParams
+): Promise<StockVolatilityItem[]> => {
+  const query = {
+    stock_codes: Array.isArray(params.ts_codes) ? params.ts_codes.join(',') : params.ts_codes,
+    start_date: params.start_date,
+    end_date: params.end_date,
+    sample_n: params.sample_n,
+  }
+  const response = await axios.get<{ items: StockVolatilityItem[] }>('/django/api/individual_stock/daily/volatility/', { params: query })
+  const data = response.data as any
+  return (data?.items ?? []) as StockVolatilityItem[]
+}

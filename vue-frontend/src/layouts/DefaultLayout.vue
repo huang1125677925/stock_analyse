@@ -59,7 +59,7 @@
             </template>
 
             <!-- 其他菜单维持原有渲染逻辑 -->
-            <el-sub-menu v-else-if="item.children && item.children.length" :index="item.path">
+            <el-sub-menu v-else-if="item.children && item.children.length" :index="item.path" :key="item.path + ':sub'">
               <template #title>
                 <el-icon>
                   <component :is="item.icon" />
@@ -73,7 +73,7 @@
                 <template #title>{{ child.title }}</template>
               </el-menu-item>
             </el-sub-menu>
-            <el-menu-item v-else :index="item.path">
+            <el-menu-item v-else :index="item.path" :key="item.path + ':item'">
               <el-icon>
                 <component :is="item.icon" />
               </el-icon>
@@ -338,6 +338,9 @@ const menuItems = computed(() => {
         { path: '/analysis/etf-basic', title: 'ETF基本信息', icon: 'List' },
         { path: '/analysis/etf-daily', title: 'ETF日线行情', icon: 'TrendCharts' },
         { path: '/analysis/etf-realtime', title: 'ETF实时行情', icon: 'TrendCharts' },
+        { path: '/analysis/etf-correlation', title: 'ETF相关性分析', icon: 'DataLine' },
+        { path: '/analysis/etf-volatility', title: 'ETF波动性列表', icon: 'TrendCharts' },
+        { path: '/etf-system', title: '全天候ETF投资系统', icon: 'TrendCharts'},
       ],
     },
     {
@@ -414,6 +417,16 @@ const menuItems = computed(() => {
           path: '/stock-hsgt-list',
           title: '沪深港通股票列表',
           icon: 'List',
+        },
+        {
+          path: '/stock-correlation',
+          title: '股票相关性分析',
+          icon: 'DataLine',
+        },
+        {
+          path: '/stock-volatility',
+          title: '股票波动率分析',
+          icon: 'TrendCharts',
         },
         
       ],
