@@ -130,30 +130,102 @@ function renderChart(data: IndexDailyVolumeItem[]) {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      axisPointer: { type: 'cross' },
       formatter: (params: any) => {
         const idx = params[0]?.dataIndex ?? 0
+        const dateStr = dates[idx]
+        const formattedDate = dateStr && dateStr.length === 8 
+          ? `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}` 
+          : dateStr
+        
+        const vol = volumes[idx]
         const amt = amounts[idx]
         const cls = closes[idx]
-        return `日期: ${dates[idx]}<br/>成交量: ${volumes[idx]}<br/>成交额: ${amt ?? '-'}<br/>收盘价: ${cls ?? '-'}`
+        
+        // 格式化数值辅助函数
+        const formatNum = (num: number | null | undefined, unit: string = '') => {
+          if (num == null) return '-'
+          return num.toLocaleString() + unit
+        }
+
+        const formatMoney = (num: number | null | undefined) => {
+           if (num == null) return '-'
+           if (num > 100000000) return (num / 100000000).toFixed(2) + '亿'
+           if (num > 10000) return (num / 10000).toFixed(2) + '万'
+           return num.toFixed(2)
+        }
+
+        return `
+          <div style="font-weight: bold; margin-bottom: 4px;">${formattedDate}</div>
+          <div style="display: flex; justify-content: space-between; gap: 20px;">
+            <span style="color: #67C23A">● 收盘价:</span>
+            <span style="font-weight: bold;">${formatNum(cls)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 20px;">
+            <span style="color: #E6A23C">● 成交量:</span>
+            <span style="font-weight: bold;">${formatNum(vol, ' 手')}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 20px;">
+            <span style="color: #409EFF">● 成交额:</span>
+            <span style="font-weight: bold;">${formatMoney(amt)}</span>
+          </div>
+        `
       }
     },
-    legend: { data: ['成交量', '成交额', '收盘价'], top: 0 },
-    grid: { left: 50, right: 70, top: 30, bottom: 40 },
-    xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45 } },
+    legend: { 
+      data: ['收盘价', '成交量', '成交额'],
+      top: 0 
+    },
+    grid: { left: 60, right: 60, top: 40, bottom: 60 },
+    xAxis: { 
+      type: 'category', 
+      data: dates, 
+      axisLabel: { 
+        rotate: 0,
+        formatter: (value: string) => {
+           // 简化日期显示，例如 20230101 -> 01/01
+           if (value && value.length === 8) {
+             return `${value.slice(4, 6)}/${value.slice(6, 8)}`
+           }
+           return value
+        }
+      },
+      axisTick: { alignWithLabel: true }
+    },
     yAxis: [
-      { type: 'value', name: '成交量/成交额', position: 'left' },
-      { type: 'value', name: '收盘价', position: 'right' }
+      { 
+        type: 'value', 
+        name: '成交量/额', 
+        position: 'right',
+        splitLine: { show: false },
+        axisLabel: {
+          formatter: (value: number) => {
+            if (value >= 100000000) return (value / 100000000).toFixed(0) + '亿'
+            if (value >= 10000) return (value / 10000).toFixed(0) + '万'
+            return value + ''
+          }
+        }
+      },
+      { 
+        type: 'value', 
+        name: '收盘价', 
+        position: 'left',
+        scale: true, // 自适应刻度，不从0开始
+        splitLine: { show: true, lineStyle: { type: 'dashed', color: '#eee' } }
+      }
     ],
     dataZoom: [
       { type: 'inside', start: 0, end: 100 },
-      { type: 'slider', start: 0, end: 100 }
+      { type: 'slider', start: 0, end: 100, bottom: 0 }
     ],
     series: [
       {
         name: '成交量',
         type: 'bar',
+        yAxisIndex: 0,
         data: volumes,
-        itemStyle: { color: '#E6A23C' }
+        itemStyle: { color: 'rgba(230, 162, 60, 0.6)' },
+        barMaxWidth: 30
       },
       {
         name: '成交额',
@@ -161,7 +233,8 @@ function renderChart(data: IndexDailyVolumeItem[]) {
         yAxisIndex: 0,
         data: amounts,
         smooth: true,
-        lineStyle: { color: '#409EFF' }
+        showSymbol: false,
+        lineStyle: { color: '#409EFF', width: 2, type: 'dashed' }
       },
       {
         name: '收盘价',
@@ -169,7 +242,14 @@ function renderChart(data: IndexDailyVolumeItem[]) {
         yAxisIndex: 1,
         data: closes,
         smooth: true,
-        lineStyle: { color: '#67C23A' }
+        showSymbol: false,
+        lineStyle: { color: '#67C23A', width: 2 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
+            { offset: 1, color: 'rgba(103, 194, 58, 0.05)' }
+          ])
+        }
       }
     ]
   }

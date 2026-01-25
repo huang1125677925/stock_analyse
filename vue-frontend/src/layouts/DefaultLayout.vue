@@ -422,18 +422,13 @@ const menuItems = computed(() => {
       icon: 'DataAnalysis',
     },
     {
-      path: '/analysis',
-      title: '行业分析',
-      icon: 'TrendCharts',
-    },
-    {
       path: '/etf',
-      title: 'ETF/指数',
+      title: '行业/指数/ETF',
       icon: 'DataLine',
     },
     {
       path: '/stock-picker',
-      title: '智能选股',
+      title: '股票综合',
       icon: 'MagicStick',
     },
     {
@@ -447,32 +442,6 @@ const menuItems = computed(() => {
 
   return baseMenuItems
 })
-
-// 行业分析大导航结构（悬停展开的 mega menu）
-const analysisMegaMenuSections = [
-  {
-    title: '拥挤度指标',
-    items: [
-      { title: '行业整体分析', path: '/analysis/congestion' },
-      { title: '单一行业分析', path: '/industries' },
-      { title: '成交金额占比分位数', path: '/analysis/congestion/turnover' },
-      { title: '行业业绩指标', path: '/analysis/congestion/performance' },
-      { title: '行业资金流', path: '/analysis/congestion/fundflow' },
-      { title: '行业矩形树图', path: '/analysis/congestion/treemap' },
-      { title: '行业宽度热力图', path: '/analysis/congestion/breadth' },
-      { title: '行业规模宽度', path: '/analysis/congestion/scale-breadth' },
-      { title: '行业产出营收', path: '/analysis/congestion/output-scale' },
-      { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
-    ],
-  },
-  {
-    title: '申万行业数据',
-    items: [
-      { title: '申万行业分类', path: '/analysis/sw-index-classify' },
-      { title: '行业成分构成', path: '/analysis/sw-index-member-all' },
-    ],
-  },
-]
 
 // 股市基本面大导航结构（悬停展开的 mega menu）
 const fundamentalsMegaMenuSections = [
@@ -503,10 +472,27 @@ const fundamentalsMegaMenuSections = [
 // ETF/指数大导航结构（悬停展开的 mega menu）
 const etfIndexMegaMenuSections = [
   {
+    title: '行业分析',
+    items: [
+      { title: '行业整体分析', path: '/analysis/congestion' },
+      { title: '单一行业分析', path: '/industries' },
+      { title: '成交金额占比分位数', path: '/analysis/congestion/turnover' },
+      { title: '行业业绩指标', path: '/analysis/congestion/performance' },
+      { title: '行业资金流', path: '/analysis/congestion/fundflow' },
+      { title: '行业矩形树图', path: '/analysis/congestion/treemap' },
+      { title: '行业宽度热力图', path: '/analysis/congestion/breadth' },
+      { title: '行业规模宽度', path: '/analysis/congestion/scale-breadth' },
+      { title: '行业产出营收', path: '/analysis/congestion/output-scale' },
+      { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
+    ],
+  },
+  {
     title: '指数分析',
     items: [
-      { title: '指数分析', path: '/analysis/index-analysis' },
       { title: '指数列表', path: '/analysis/index-list' },
+      { title: '指数趋势图', path: '/analysis/index-analysis' },
+      { title: '申万行业指数分类', path: '/analysis/sw-index-classify' },
+      { title: '申万行业指数成分构成', path: '/analysis/sw-index-member-all' },
     ],
   },
   {
@@ -596,8 +582,6 @@ function hasMegaMenu(path: string) {
 
 function getMegaMenuSections(path: string) {
   switch (path) {
-    case '/analysis':
-      return analysisMegaMenuSections
     case '/market-fundamentals':
       return fundamentalsMegaMenuSections
     case '/stock-picker':

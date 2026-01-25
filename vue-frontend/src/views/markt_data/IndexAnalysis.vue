@@ -32,14 +32,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import IndexVolumeTrend from '@/components/IndexVolumeTrend.vue'
 import { fetchIndexBasicList, type IndexBasicItem } from '@/services/indexBasicApi'
 
+const route = useRoute()
+
 // 指数列表与选择
 const indexList = ref<IndexBasicItem[]>([])
-const selectedIndexTsCode = ref<string>('000001.SH')
-const selectedMarket = ref<'MSCI' | 'CSI' | 'SSE' | 'SZSE' | 'CICC' | 'SW' | 'OTH'>('SSE')
+const selectedIndexTsCode = ref<string>((route.query.ts_code as string) || '000001.SH')
+const selectedMarket = ref<'MSCI' | 'CSI' | 'SSE' | 'SZSE' | 'CICC' | 'SW' | 'OTH'>((route.query.market as any) || 'SSE')
 
 async function loadIndexList() {
   try {
