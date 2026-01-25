@@ -53,7 +53,7 @@ const loadFeatureUpdates = async () => {
     const BACKEND_REPO = '/root/django/stock_data_service'
     const LIMIT = 1000
 
-    const [fe, be] = await Promise.all([
+    const [feResult, beResult] = await Promise.allSettled([
       getGitInfo(FRONTEND_REPO, LIMIT),
       getGitInfo(BACKEND_REPO, LIMIT)
     ])
@@ -70,10 +70,20 @@ const loadFeatureUpdates = async () => {
         content: `${prefix}${r.message}` 
       }))
 
-    featureUpdates.value = [...mapRecords(fe.records, '【前端】：'), ...mapRecords(be.records, '【后端】：')]
+    const feRecords = feResult.status === 'fulfilled' ? feResult.value.records : []
+    const beRecords = beResult.status === 'fulfilled' ? beResult.value.records : []
+
+    if (feResult.status === 'rejected') {
+      console.warn('前端提交记录加载失败:', feResult.reason)
+    }
+    if (beResult.status === 'rejected') {
+      console.warn('后端提交记录加载失败:', beResult.reason)
+    }
+
+    featureUpdates.value = [...mapRecords(feRecords, '【前端】：'), ...mapRecords(beRecords, '【后端】：')]
   } catch (error) {
     console.error('加载功能迭代失败:', error)
-    ElMessage.error('加载功能迭代失败，请稍后重试')
+    // 错误已由各个请求单独处理或忽略，不再弹出全局错误提示，避免遮挡页面
   }
 }
 

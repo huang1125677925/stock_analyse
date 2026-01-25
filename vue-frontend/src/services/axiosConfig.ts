@@ -39,6 +39,15 @@ instance.interceptors.request.use(
   }
 );
 
+const showError = (message: string) => {
+  ElMessage.error({
+    message,
+    grouping: true,
+    showClose: true,
+    duration: 3000
+  });
+};
+
 // 响应拦截器
 instance.interceptors.response.use(
   response => {
@@ -54,18 +63,18 @@ instance.interceptors.response.use(
       // 未认证或认证失败，清除本地存储并重定向到登录页
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      ElMessage.error(res.message || '认证失败，请重新登录');
+      showError(res.message || '认证失败，请重新登录');
       window.location.href = '/login';
       return Promise.reject(new Error(res.message || '认证失败'));
     }
     
     if (res.code === 403) {
-      ElMessage.error(res.message || '权限不足');
+      showError(res.message || '权限不足');
       return Promise.reject(new Error(res.message || '权限不足'));
     }
     
     // 其他错误
-    ElMessage.error(res.message || '请求失败');
+    showError(res.message || '请求失败');
     return Promise.reject(new Error(res.message || '请求失败'));
   },
   error => {
@@ -90,15 +99,14 @@ instance.interceptors.response.use(
         message = '服务器内部错误';
       }
       
-      ElMessage.error(message);
+      showError(message);
     } else if (error.request) {
       // 请求已发送但没有收到响应
-      ElMessage.error('服务器无响应，请稍后再试');
+      showError('服务器无响应，请稍后再试');
     } else {
       // 请求配置出错
-      ElMessage.error('请求配置错误');
+      showError('请求配置错误');
     }
-    
     return Promise.reject(error);
   }
 );
