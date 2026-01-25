@@ -147,7 +147,7 @@ const router = createRouter({
           path: '/analysis/index-dailybasic',
           name: 'index-dailybasic',
           component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
-          meta: { title: '指数日基本面' }
+          meta: { title: '大盘指数估值' }
         },
         {
           path: '/analysis/market-change',

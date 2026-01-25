@@ -551,6 +551,7 @@ const fundamentalsMegaMenuSections = [
     items: [
       { title: '大盘涨跌', path: '/analysis/market-change' },
       { title: '大盘分析', path: '/analysis/market' },
+      { title: '大盘估值', path: '/analysis/index-dailybasic' },
     ],
   },
   {
@@ -558,7 +559,6 @@ const fundamentalsMegaMenuSections = [
     items: [
       { title: '指数分析', path: '/analysis/index-analysis' },
       { title: '指数列表', path: '/analysis/index-list' },
-      { title: '指数日基本面', path: '/analysis/index-dailybasic' },
     ],
   },
   {
