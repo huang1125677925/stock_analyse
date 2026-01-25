@@ -1,6 +1,6 @@
 <template>
   <div class="holdings-view">
-    <el-card class="page-header">
+    <el-card class="page-header" shadow="never">
       <template #header>
         <div class="header-content">
           <h2>个人中心 - 持有/关注股票</h2>
@@ -128,8 +128,8 @@ const viewHistory = (code: string) => {
 </script>
 
 <style scoped>
-.holdings-view { padding: 20px; }
-.page-header { margin-bottom: 20px; }
+.holdings-view { padding: 0; }
+.page-header { margin-bottom: 0; border: none; border-radius: 0; }
 .header-content { display: flex; justify-content: space-between; align-items: center; }
 .header-content h2 { margin: 0; font-size: 20px; font-weight: 600; }
 .table-container { margin-top: 10px; width: 100%; }
