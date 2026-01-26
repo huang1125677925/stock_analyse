@@ -8,6 +8,13 @@
  */
 import axios from './axiosConfig'
 
+export interface ApiResponse<T = unknown> {
+  code: number
+  message: string
+  timestamp?: string
+  data: T
+}
+
 // 行业板块基本信息接口
 export interface IndustrySector {
   code: string
@@ -54,6 +61,39 @@ export interface Stock {
   change_60day?: number
   change_ytd?: number
   timestamp?: string
+}
+
+// 申万行业估值分析接口参数
+export interface SwValuationAnalysisParams {
+  start_date: string
+  end_date: string
+  level: string // L1/L2/L3
+}
+
+export interface SwValuationAnalysisResponse {
+  records: SwValuationAnalysisItem[]
+}
+
+// 申万行业估值分析响应项
+export interface SwValuationAnalysisItem {
+  ts_code: string
+  name: string // 行业名称
+  pe: number
+  pe_percentile: number
+  pb: number
+  pb_percentile: number
+  trade_date: string
+  // 可能还有其他字段，根据实际返回补充
+}
+
+/**
+ * 获取申万行业估值分析数据
+ */
+export async function getSwValuationAnalysis(params: SwValuationAnalysisParams) {
+  const res = await axios.get<SwValuationAnalysisResponse>('/django/api/index/sw-valuation-analysis/', {
+    params
+  })
+  return res.data.records
 }
 
 // 行业详情接口（包含统计数据）

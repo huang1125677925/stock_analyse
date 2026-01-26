@@ -21,20 +21,34 @@ export interface ApiResponse<T = unknown> {
 // Etf 基本信息项
 export interface EtfBasicItem {
   id: number
+  /** 基金交易代码（类型：str，默认显示：Y） */
   ts_code: string
+  /** ETF扩位简称(对应交易所简称)（类型：str，默认显示：Y） */
   extname: string
+  /** ETF中文简称（类型：str，默认显示：Y） */
   csname?: string | null
+  /** 基金中文全称（类型：str，默认显示：Y） */
   cname?: string | null
+  /** ETF基准指数代码（类型：str，默认显示：Y） */
   index_code?: string | null
+  /** ETF基准指数中文全称（类型：str，默认显示：Y） */
   index_name?: string | null
+  /** 交易所（上交所SH 深交所SZ）（类型：str，默认显示：Y） */
   exchange?: string | null
+  /** 存续状态（L上市 D退市 P待上市）（类型：str，默认显示：Y） */
   list_status?: 'L' | 'D' | 'P' | string | null
+  /** 基金投资通道类型（境内、QDII）（类型：str，默认显示：Y） */
   etf_type?: string | null
+  /** 基金管理人简称（类型：str，默认显示：Y） */
   mgr_name?: string | null
+  /** 基金托管人名称（类型：str，默认显示：Y） */
   custod_name?: string | null
+  /** 设立日期（格式：YYYYMMDD）（类型：str，默认显示：Y） */
   setup_date?: string | null
+  /** 上市日期（格式：YYYYMMDD）（类型：str，默认显示：Y） */
   list_date?: string | null
   delist_date?: string | null
+  /** 基金管理人收取的费用（类型：float，默认显示：Y） */
   mgt_fee?: number | null
   created_at: string
   updated_at: string

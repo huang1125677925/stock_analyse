@@ -216,6 +216,18 @@ const router = createRouter({
           meta: { title: '申万行业分类' }
         },
         {
+          path: '/analysis/sw-industry-daily',
+          name: 'sw-industry-daily',
+          component: () => import('@/views/industry-stock-data/SwIndustryDailyView.vue'),
+          meta: { title: '申万行业日线行情' }
+        },
+        {
+          path: '/analysis/sw-industry-valuation',
+          name: 'sw-industry-valuation',
+          component: () => import('@/views/industry-stock-data/SwIndustryValuationView.vue'),
+          meta: { title: '申万行业估值分析' }
+        },
+        {
           path: '/analysis/sw-index-member-all',
           name: 'sw-index-member-all',
           component: () => import('@/views/industry-stock-data/IndexMemberAllView.vue'),
@@ -275,6 +287,12 @@ const router = createRouter({
           name: 'etf-basic',
           component: () => import('@/views/etf/EtfBasicView.vue'),
           meta: { title: 'ETF基本信息' }
+        },
+        {
+          path: '/analysis/etf-analysis',
+          name: 'etf-analysis',
+          component: () => import('@/views/etf/EtfAnalysisView.vue'),
+          meta: { title: 'ETF数据统计分析' }
         },
         {
           path: '/analysis/etf-daily',

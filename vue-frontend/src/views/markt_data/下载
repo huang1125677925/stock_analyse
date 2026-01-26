@@ -136,6 +136,172 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /django/api/etf/index/valuation/:
+    get:
+      operationId: etf_index_valuation_retrieve
+      description: 输入指数代码，获取指数成分与权重（index_weight），再结合成分股每日指标（daily_basic），按权重聚合计算指数层面的估值指标（如PE/PB/PS/股息率等）。
+      summary: 指数估值信息查询
+      parameters:
+      - in: query
+        name: index_code
+        schema:
+          type: string
+        description: 指数代码（如 399300.SZ）
+        required: true
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（可选，覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期（YYYYMMDD，可选；用于选择当月权重窗口，默认今天）
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexValuation'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/etf/index/valuation/income/:
+    get:
+      operationId: etf_index_valuation_income_retrieve
+      description: 输入指数代码，获取指数成分与权重（index_weight），再结合成分股每日指标（daily_basic）与利润表（income），按权重聚合计算指数层面的估值指标，其中PE按市值与利润表净利润的权重汇总计算。
+      summary: 指数估值信息查询（利润表PE）
+      parameters:
+      - in: query
+        name: index_code
+        schema:
+          type: string
+        description: 指数代码（如 399300.SZ）
+        required: true
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（可选，覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期（YYYYMMDD，可选；用于选择当月权重窗口，默认今天）
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexValuation'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/etf/index/valuation/range/:
+    get:
+      operationId: etf_index_valuation_range_retrieve
+      description: 按指数代码与日期范围，计算每个交易日的指数估值指标。
+      summary: 指数估值区间查询
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期（YYYYMMDD）
+        required: true
+      - in: query
+        name: index_code
+        schema:
+          type: string
+        description: 指数代码（如 399300.SZ）
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期（YYYYMMDD）
+        required: true
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（可选）
+      tags:
+      - etf
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexValuationRange'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/forum/posts/:
     get:
       operationId: forum_posts_retrieve
@@ -239,6 +405,203 @@ paths:
       responses:
         '200':
           description: No response body
+  /django/api/index/sw-daily/:
+    get:
+      operationId: index_sw_daily_retrieve
+      description: |-
+        获取申万行业日线行情（默认是申万2021版行情）。
+        参数（Query）：ts_code, trade_date, start_date, end_date, fields, token。
+        统一响应结构（success_response），data 为行情列表。
+      summary: 申万行业日线行情
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 限定返回字段列表
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare API Token
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 行业代码
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseSwDaily'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/index/sw-index-classify/:
+    get:
+      operationId: index_sw_index_classify_retrieve
+      description: |-
+        获取申万行业分类信息。
+        参数（Query）：level。
+        统一响应结构（success_response），data 为分类列表。
+      summary: 申万行业分类
+      parameters:
+      - in: query
+        name: level
+        schema:
+          type: string
+        description: 行业分级：L1/L2/L3
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexClassify'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/index/sw-industry-members/:
+    get:
+      operationId: index_sw_industry_members_retrieve
+      description: |-
+        按分级或TS代码获取申万行业成分构成。
+        参数（Query）：l1_code, l2_code, l3_code, ts_code, is_new, fields, token。
+        统一响应结构（success_response），data 为成分列表。
+      summary: 申万行业成分构成(分级)
+      parameters:
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 限定返回字段列表
+      - in: query
+        name: is_new
+        schema:
+          type: integer
+        description: 是否最新：1是/0否
+      - in: query
+        name: l1_code
+        schema:
+          type: string
+        description: 一级行业代码
+      - in: query
+        name: l2_code
+        schema:
+          type: string
+        description: 二级行业代码
+      - in: query
+        name: l3_code
+        schema:
+          type: string
+        description: 三级行业代码
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare API Token
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 行业或指数TS代码
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexMemberAll'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/index/sw-valuation-analysis/:
+    get:
+      operationId: index_sw_valuation_analysis_retrieve
+      description: 获取指定level、日期范围的所有行业PE/PB现值及分位数。
+      summary: 申万行业估值分析
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 (YYYYMMDD)
+        required: true
+      - in: query
+        name: level
+        schema:
+          type: string
+        description: 行业分级：L1/L2/L3
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 (YYYYMMDD)
+        required: true
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseSwValuationAnalysis'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/individual_stock/balance-sheets/:
     get:
       operationId: individual_stock_balance_sheets_retrieve
@@ -2061,41 +2424,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
-  /django/api/tasks/index-classify/:
-    get:
-      operationId: tasks_index_classify_retrieve
-      description: 获取申万行业分类信息。
-      summary: 申万行业分类
-      parameters:
-      - in: query
-        name: fields
-        schema:
-          type: string
-        description: 限定返回字段列表
-      - in: query
-        name: token
-        schema:
-          type: string
-        description: Tushare API Token
-      tags:
-      - Tushare Proxy
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponseIndexClassify'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
   /django/api/tasks/index-daily/:
     get:
       operationId: tasks_index_daily_retrieve
@@ -2206,66 +2534,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponseIndexDailybasic'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-  /django/api/tasks/index-member-all/:
-    get:
-      operationId: tasks_index_member_all_retrieve
-      description: 按分级或TS代码获取申万行业成分构成。
-      summary: 申万行业成分构成(分级)
-      parameters:
-      - in: query
-        name: fields
-        schema:
-          type: string
-        description: 限定返回字段列表
-      - in: query
-        name: is_new
-        schema:
-          type: integer
-        description: 是否最新：1是/0否
-      - in: query
-        name: l1_code
-        schema:
-          type: string
-        description: 一级行业代码
-      - in: query
-        name: l2_code
-        schema:
-          type: string
-        description: 二级行业代码
-      - in: query
-        name: l3_code
-        schema:
-          type: string
-        description: 三级行业代码
-      - in: query
-        name: token
-        schema:
-          type: string
-        description: Tushare API Token
-      - in: query
-        name: ts_code
-        schema:
-          type: string
-        description: 行业或指数TS代码
-      tags:
-      - Tushare Proxy
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponseIndexMemberAll'
           description: ''
         '500':
           content:
@@ -3794,13 +4062,6 @@ components:
       - records
     IndexMemberAllRecord:
       type: object
-      description: |-
-        index_member_all 记录字段序列化器
-
-        功能：序列化申万行业成分构成（分级）记录。
-        参数：无。
-        返回值：单条记录的序列化结构。
-        事件：无。
       properties:
         l1_code:
           type: string
@@ -4508,6 +4769,38 @@ components:
       - data
       - message
       - timestamp
+    SuccessResponseIndexValuation:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/Payload'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseIndexValuationRange:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/Payload'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseIndexWeight:
       type: object
       properties:
@@ -4646,6 +4939,202 @@ components:
       - data
       - message
       - timestamp
+    SuccessResponseSwDaily:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/SwDailyData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SuccessResponseSwValuationAnalysis:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/SwValuationAnalysisData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
+    SwDailyData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/SwDailyRecord'
+      required:
+      - count
+      - interface
+      - records
+    SwDailyRecord:
+      type: object
+      description: sw_daily 记录字段序列化器
+      properties:
+        ts_code:
+          type: string
+          description: 指数代码
+        trade_date:
+          type: string
+          description: 交易日期
+        name:
+          type: string
+          description: 指数名称
+        open:
+          type: number
+          format: double
+          description: 开盘点位
+        low:
+          type: number
+          format: double
+          description: 最低点位
+        high:
+          type: number
+          format: double
+          description: 最高点位
+        close:
+          type: number
+          format: double
+          description: 收盘点位
+        change:
+          type: number
+          format: double
+          description: 涨跌点位
+        pct_change:
+          type: number
+          format: double
+          description: 涨跌幅
+        vol:
+          type: number
+          format: double
+          description: 成交量（万股）
+        amount:
+          type: number
+          format: double
+          description: 成交额（万元）
+        pe:
+          type: number
+          format: double
+          description: 市盈率
+        pb:
+          type: number
+          format: double
+          description: 市净率
+        float_mv:
+          type: number
+          format: double
+          description: 流通市值（万元）
+        total_mv:
+          type: number
+          format: double
+          description: 总市值（万元）
+    SwValuationAnalysisData:
+      type: object
+      properties:
+        interface:
+          type: string
+        count:
+          type: integer
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/SwValuationAnalysisRecord'
+      required:
+      - count
+      - interface
+      - records
+    SwValuationAnalysisRecord:
+      type: object
+      description: 申万估值分析记录序列化器
+      properties:
+        ts_code:
+          type: string
+          description: 指数代码
+        trade_date:
+          type: string
+          description: 交易日期
+        name:
+          type: string
+          description: 指数名称
+        open:
+          type: number
+          format: double
+          description: 开盘点位
+        low:
+          type: number
+          format: double
+          description: 最低点位
+        high:
+          type: number
+          format: double
+          description: 最高点位
+        close:
+          type: number
+          format: double
+          description: 收盘点位
+        change:
+          type: number
+          format: double
+          description: 涨跌点位
+        pct_change:
+          type: number
+          format: double
+          description: 涨跌幅
+        vol:
+          type: number
+          format: double
+          description: 成交量（万股）
+        amount:
+          type: number
+          format: double
+          description: 成交额（万元）
+        pe:
+          type: number
+          format: double
+          description: 市盈率
+        pb:
+          type: number
+          format: double
+          description: 市净率
+        float_mv:
+          type: number
+          format: double
+          description: 流通市值（万元）
+        total_mv:
+          type: number
+          format: double
+          description: 总市值（万元）
+        pe_ttm:
+          type: number
+          format: double
+          description: 滚动市盈率
+        pe_percentile:
+          type: number
+          format: double
+          description: PE分位数
+        pb_percentile:
+          type: number
+          format: double
+          description: PB分位数
   securitySchemes:
     basicAuth:
       type: http

@@ -13,14 +13,36 @@
 
     <el-card class="search-card">
       <el-form :model="query" label-width="110px" label-position="left" inline>
-        <el-form-item label="TS代码">
-          <el-input v-model="query.ts_code" placeholder="如 510300.SH" clearable />
-        </el-form-item>
         <el-form-item label="指数代码">
-          <el-input v-model="query.index_code" placeholder="如 000300.SH" clearable />
+          <el-select 
+            v-model="query.index_code" 
+            placeholder="选择或搜索指数" 
+            clearable 
+            filterable
+            style="width: 200px"
+          >
+            <el-option
+              v-for="item in indexCodeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="交易所">
-          <el-input v-model="query.exchange" placeholder="如 SSE/ SZSE" clearable />
+          <el-select 
+            v-model="query.exchange" 
+            placeholder="选择交易所" 
+            clearable 
+            style="width: 140px"
+          >
+            <el-option
+              v-for="item in exchangeOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="上市状态">
           <el-select v-model="query.list_status" placeholder="全部" clearable style="width: 160px">
@@ -31,10 +53,35 @@
           </el-select>
         </el-form-item>
         <el-form-item label="ETF类型">
-          <el-input v-model="query.etf_type" placeholder="如 指数、行业 等" clearable />
+          <el-select 
+            v-model="query.etf_type" 
+            placeholder="选择类型" 
+            clearable 
+            style="width: 160px"
+          >
+            <el-option
+              v-for="item in etfTypeOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="管理人">
-          <el-input v-model="query.mgr_name" placeholder="基金管理人简称" clearable />
+          <el-select 
+            v-model="query.mgr_name" 
+            placeholder="选择或搜索管理人" 
+            clearable 
+            filterable
+            style="width: 180px"
+          >
+            <el-option
+              v-for="item in mgrNameOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="名称关键词">
           <el-input v-model="query.name" placeholder="支持模糊搜索" clearable />
@@ -44,24 +91,30 @@
 
     <el-card class="table-card">
       <el-table :data="items" v-loading="loading" border style="width: 100%">
-        <el-table-column prop="extname" label="ETF简称" min-width="160" />
-        <el-table-column prop="ts_code" label="TS代码" min-width="140" />
-        <el-table-column prop="index_name" label="跟踪指数" min-width="160" />
-        <el-table-column prop="exchange" label="交易所" min-width="120" />
-        <el-table-column prop="list_status" label="上市状态" min-width="100" />
-        <el-table-column prop="mgr_name" label="管理人" min-width="160" />
+        <el-table-column prop="extname" label="ETF简称" min-width="160" align="center" />
+        <el-table-column prop="ts_code" label="ETF代码" min-width="140" align="center" />
+        <el-table-column prop="index_name" label="跟踪指数" min-width="160" align="center" />
+        <el-table-column prop="index_code" label="指数代码" min-width="140" align="center">
+          <template #default="{ row }">
+            <el-link type="primary" :underline="false" @click="goToIndexAnalysis(row.index_code)">
+              {{ row.index_code }}
+            </el-link>
+          </template>
+        </el-table-column>
+        <el-table-column prop="exchange" label="交易所" min-width="80" align="center" />
+        <!-- <el-table-column prop="list_status" label="上市状态" min-width="100" align="center" /> -->
+        <!-- <el-table-column prop="mgr_name" label="管理人" min-width="160" align="center" /> -->
         <!-- 补充其他字段展示：包含基金名称、代码、类型、费率、日期与托管人等 -->
-        <el-table-column prop="csname" label="基金简称" min-width="160" />
-        <el-table-column prop="cname" label="基金全称" min-width="240" />
-        <el-table-column prop="index_code" label="指数代码" min-width="140" />
-        <el-table-column prop="etf_type" label="ETF类型" min-width="120" />
-        <el-table-column prop="mgt_fee" label="管理费率" min-width="100" />
-        <el-table-column prop="setup_date" label="成立日期" min-width="120" />
-        <el-table-column prop="list_date" label="上市日期" min-width="120" />
-        <el-table-column prop="delist_date" label="退市日期" min-width="120" />
-        <el-table-column prop="custod_name" label="托管人" min-width="180" />
-        <el-table-column prop="created_at" label="创建时间" min-width="180" />
-        <el-table-column prop="updated_at" label="更新时间" min-width="180" />
+        <el-table-column prop="csname" label="基金简称" min-width="160" align="center" />
+        <!-- <el-table-column prop="cname" label="基金全称" min-width="240" align="center" /> -->
+        <el-table-column prop="etf_type" label="ETF类型" min-width="120" align="center" />
+        <el-table-column prop="mgt_fee" label="管理费率" min-width="100" align="center" />
+        <!-- <el-table-column prop="setup_date" label="成立日期" min-width="120" align="center" /> -->
+        <el-table-column prop="list_date" label="上市日期" min-width="120" align="center" />
+        <el-table-column prop="delist_date" label="退市日期" min-width="120" align="center" />
+        <el-table-column prop="custod_name" label="托管人" min-width="180" align="center" />
+        <!-- <el-table-column prop="created_at" label="创建时间" min-width="180" /> -->
+        <!-- <el-table-column prop="updated_at" label="更新时间" min-width="180" /> -->
       </el-table>
 
       <div class="pagination">
@@ -89,9 +142,12 @@
  * 事件：无（页面不主动对外 emit 事件）。
  */
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { getEtfBasic, type EtfBasicItem } from '@/services/etfApi'
+
+const router = useRouter()
 
 // 加载状态
 const loading = ref(false)
@@ -110,6 +166,62 @@ const query = reactive({
   mgr_name: '',
   name: '',
 })
+
+// 下拉选项数据
+const indexCodeOptions = ref<{ value: string; label: string }[]>([])
+const exchangeOptions = ref<string[]>([])
+const etfTypeOptions = ref<string[]>([])
+const mgrNameOptions = ref<string[]>([])
+
+// 获取筛选选项数据（全量）
+const fetchFilterOptions = async () => {
+  try {
+    // 获取全量数据用于提取选项（假设数量不超过 5000，如果更多需要后端提供专用接口）
+    const data = await getEtfBasic({
+      page: 1,
+      page_size: 5000
+    })
+    
+    if (data.data) {
+      const records = data.data
+      
+      // 提取指数代码
+      const indexMap = new Map<string, string>()
+      records.forEach(item => {
+        if (item.index_code) {
+          indexMap.set(item.index_code, item.index_name || '')
+        }
+      })
+      indexCodeOptions.value = Array.from(indexMap.entries()).map(([code, name]) => ({
+        value: code,
+        label: name ? `${code} ${name}` : code
+      }))
+
+      // 提取交易所
+      const exchanges = new Set<string>()
+      records.forEach(item => {
+        if (item.exchange) exchanges.add(item.exchange)
+      })
+      exchangeOptions.value = Array.from(exchanges).sort()
+
+      // 提取ETF类型
+      const types = new Set<string>()
+      records.forEach(item => {
+        if (item.etf_type) types.add(item.etf_type)
+      })
+      etfTypeOptions.value = Array.from(types).sort()
+
+      // 提取管理人
+      const mgrs = new Set<string>()
+      records.forEach(item => {
+        if (item.mgr_name) mgrs.add(item.mgr_name)
+      })
+      mgrNameOptions.value = Array.from(mgrs).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+    }
+  } catch (e) {
+    console.error('获取筛选选项失败', e)
+  }
+}
 
 // 获取数据
 const fetchList = async () => {
@@ -167,7 +279,16 @@ const handlePageChange = (page: number) => {
   fetchList()
 }
 
+const goToIndexAnalysis = (indexCode: string) => {
+  if (!indexCode) return
+  router.push({
+    name: 'index-analysis',
+    query: { ts_code: indexCode }
+  })
+}
+
 onMounted(() => {
+  fetchFilterOptions()
   fetchList()
 })
 </script>
