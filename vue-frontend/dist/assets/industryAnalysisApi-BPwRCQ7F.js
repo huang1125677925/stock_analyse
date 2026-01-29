@@ -1,0 +1,1 @@
+import{x as t}from"./index-yvE1imiI.js";const e="/django/api/stock",c=async(s,r)=>{const n={};return(await t.get(`${e}/industry-sectors/`,{params:n})).data},p=async(s={})=>(await t.get(`${e}/industry/performance-reports/`,{params:s})).data;export{c as a,p as g};
