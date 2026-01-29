@@ -161,7 +161,7 @@ const metricOptions = [
   { label: '总市值', value: 'total_mv' },
 ]
 
-const selectedMetric = ref('close')
+const selectedMetric = ref('pe')
 const records = ref<DailyRecord[]>([])
 
 // 当前估值状态
@@ -172,11 +172,11 @@ const currentValuation = ref<{
   type: 'success' | 'warning' | 'danger' | 'info' | 'primary'
 } | null>(null)
 
-// 初始化默认日期范围（最近一年）
+// 初始化默认日期范围（最近十年）
 function initDateRange() {
   const end = new Date()
   const start = new Date()
-  start.setFullYear(start.getFullYear() - 1)
+  start.setFullYear(start.getFullYear() - 10)
   
   const formatDate = (date: Date) => {
     const y = date.getFullYear()

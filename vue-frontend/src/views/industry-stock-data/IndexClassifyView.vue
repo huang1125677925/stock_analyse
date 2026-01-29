@@ -10,11 +10,14 @@
       <div class="form-row">
         <el-form :inline="true" label-width="100px">
           <el-form-item label="行业级别">
-            <el-select v-model="query.level" placeholder="请选择级别" clearable style="width: 200px">
+            <el-select v-model="query.level" placeholder="请选择级别" clearable style="width: 200px" @change="fetchData">
               <el-option label="一级行业" value="L1" />
               <el-option label="二级行业" value="L2" />
               <el-option label="三级行业" value="L3" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="关键字">
+            <el-input v-model="query.keyword" placeholder="输入代码或名称筛选" clearable style="width: 200px" />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading="loading" @click="fetchData">查询</el-button>
@@ -107,13 +110,27 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 
 const query = reactive({
-  level: ''
+  level: 'L1',
+  keyword: ''
 })
 
-const total = computed(() => tableData.records?.length || 0)
+const total = computed(() => filteredRecords.value.length)
+
+const filteredRecords = computed(() => {
+  const records = tableData.records || []
+  if (!query.keyword) {
+    return records
+  }
+  const kw = query.keyword.toLowerCase().trim()
+  return records.filter(item => {
+    return (item.index_code && item.index_code.toLowerCase().includes(kw)) ||
+           (item.industry_name && item.industry_name.toLowerCase().includes(kw)) ||
+           (item.industry_code && item.industry_code.toLowerCase().includes(kw))
+  })
+})
 
 const paginatedRecords = computed(() => {
-  const records = tableData.records || []
+  const records = filteredRecords.value
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   return records.slice(start, end)
@@ -138,8 +155,10 @@ function handleCurrentChange(val: number) {
 }
 
 function resetDefaults() {
-  query.level = ''
+  query.level = 'L1'
+  query.keyword = ''
   currentPage.value = 1
+  fetchData()
 }
 
 function viewTrend(row: any) {

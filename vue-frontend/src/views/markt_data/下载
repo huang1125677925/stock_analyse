@@ -468,15 +468,31 @@ paths:
       operationId: index_sw_index_classify_retrieve
       description: |-
         获取申万行业分类信息。
-        参数（Query）：level。
+        参数（Query）：index_code, level, parent_code, src。
+        默认 src 为 SW2021。
         统一响应结构（success_response），data 为分类列表。
       summary: 申万行业分类
       parameters:
+      - in: query
+        name: index_code
+        schema:
+          type: string
+        description: 指数代码
       - in: query
         name: level
         schema:
           type: string
         description: 行业分级：L1/L2/L3
+      - in: query
+        name: parent_code
+        schema:
+          type: string
+        description: 父级代码（一级为0）
+      - in: query
+        name: src
+        schema:
+          type: string
+        description: 指数来源：SW2014/SW2021，默认 SW2021
       tags:
       - index
       security:

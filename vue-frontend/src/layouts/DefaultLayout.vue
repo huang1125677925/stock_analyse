@@ -492,6 +492,7 @@ const etfIndexMegaMenuSections = [
       { title: '指数列表', path: '/analysis/index-list' },
       { title: '指数趋势图', path: '/analysis/index-analysis' },
       { title: '申万行业指数分类', path: '/analysis/sw-index-classify' },
+      { title: '申万指数图谱', path: '/analysis/sw-index-graph'},
       { title: '申万行业指数成分构成', path: '/analysis/sw-index-member-all' },
       // { title: '申万行业指数日线行情', path: '/analysis/sw-industry-daily' },
       { title: '申万行业估值分析', path: '/analysis/sw-industry-valuation' },

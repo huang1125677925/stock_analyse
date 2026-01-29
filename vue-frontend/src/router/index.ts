@@ -228,6 +228,12 @@ const router = createRouter({
           meta: { title: '申万行业估值分析' }
         },
         {
+          path: '/analysis/sw-index-graph',
+          name: 'sw-index-graph',
+          component: () => import('@/views/industry-stock-data/SwIndexGraphView.vue'),
+          meta: { title: '申万指数图谱' }
+        },
+        {
           path: '/analysis/sw-index-member-all',
           name: 'sw-index-member-all',
           component: () => import('@/views/industry-stock-data/IndexMemberAllView.vue'),

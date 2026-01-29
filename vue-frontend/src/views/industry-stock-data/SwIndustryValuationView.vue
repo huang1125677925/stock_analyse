@@ -108,10 +108,10 @@ const query = reactive({
   level: 'L1'
 })
 
-// 默认查询最近一年的数据
+// 默认查询最近十年的数据
 const endDate = new Date()
 const startDate = new Date()
-startDate.setFullYear(startDate.getFullYear() - 1)
+startDate.setFullYear(startDate.getFullYear() - 10)
 
 /**
  * 格式化日期对象为 YYYYMMDD 字符串
@@ -209,25 +209,26 @@ const formatNumber = (num: number) => {
 
 /**
  * 获取分位数对应的样式
- * @param percentile 分位数 (0-1)
+ * @param percentile 分位数 (0-100)
  * @returns 样式对象
  * 
  * 规则:
- * - >= 0.8: 高风险 (红色)
- * - <= 0.2: 低风险 (绿色)
- * - >= 0.6: 中高风险 (橙色)
- * - 其他: 正常 (黑色)
+ * - >= 80: 高估 (红色)
+ * - <= 20: 低估 (绿色)
+ * - 其他: 适中 (蓝色)
  */
 const getPercentileStyle = (percentile: number) => {
-  // percentile is 0-1
-  if (percentile >= 0.8) {
-    return { color: '#F56C6C', fontWeight: 'bold' } // High risk - Red
-  } else if (percentile <= 0.2) {
-    return { color: '#67C23A', fontWeight: 'bold' } // Low risk - Green
-  } else if (percentile >= 0.6) {
-    return { color: '#E6A23C' } // Medium-High - Orange
+  // percentile is 0-100
+  if (percentile === undefined || percentile === null) {
+    return {}
+  }
+  
+  if (percentile >= 80) {
+    return { color: '#F56C6C', fontWeight: 'bold' } // High - Red
+  } else if (percentile <= 20) {
+    return { color: '#67C23A', fontWeight: 'bold' } // Low - Green
   } else {
-    return { color: '#303133' } // Normal
+    return { color: '#409EFF', fontWeight: 'bold' } // Moderate - Blue
   }
 }
 
