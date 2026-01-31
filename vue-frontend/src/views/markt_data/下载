@@ -405,6 +405,275 @@ paths:
       responses:
         '200':
           description: No response body
+  /django/api/index/index-basic/:
+    get:
+      operationId: index_index_basic_retrieve
+      description: Tushare index_basic 的代理接口，统一返回格式。
+      summary: 指数基本信息直通代理
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: 指数类别
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 返回字段列表，逗号分隔
+      - in: query
+        name: market
+        schema:
+          type: string
+        description: 市场：MSCI/CSI/SSE/SZSE/CICC/SW/OTH
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: 指数简称
+      - in: query
+        name: publisher
+        schema:
+          type: string
+        description: 发布方
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 指数代码
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexBasic'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/index/index-daily/:
+    get:
+      operationId: index_index_daily_retrieve
+      description: Tushare index_daily 的代理接口，统一返回格式。
+      summary: 指数日线行情直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 指数代码（必填）
+        required: true
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexDaily'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/index/index-dailybasic/:
+    get:
+      operationId: index_index_dailybasic_retrieve
+      description: 获取大盘指数每日指标，至少提供 trade_date 或 ts_code。
+      summary: 大盘指数每日指标
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 限定返回字段列表
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare API Token
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期YYYYMMDD
+      - in: query
+        name: ts_code
+        schema:
+          type: string
+        description: 指数TS代码
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexDailybasic'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/index/index-valuation-summary/:
+    get:
+      operationId: index_index_valuation_summary_retrieve
+      description: 获取主要指数（上证综指、沪深300等）的当前估值及历史分位数。
+      summary: 指数估值摘要
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexValuationSummary'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /django/api/index/index-weight/:
+    get:
+      operationId: index_index_weight_retrieve
+      description: Tushare index_weight 的代理接口，统一返回格式。
+      summary: 指数成分和权重直通代理
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: 结束日期 YYYYMMDD
+      - in: query
+        name: fields
+        schema:
+          type: string
+        description: 字段列表（逗号分隔）
+      - in: query
+        name: index_code
+        schema:
+          type: string
+        description: 指数代码（必填）
+        required: true
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: 开始日期 YYYYMMDD
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Tushare Token（覆盖环境变量）
+      - in: query
+        name: trade_date
+        schema:
+          type: string
+        description: 交易日期 YYYYMMDD
+      tags:
+      - index
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponseIndexWeight'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /django/api/index/sw-daily/:
     get:
       operationId: index_sw_daily_retrieve
@@ -2374,251 +2643,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
-  /django/api/tasks/index-basic/:
-    get:
-      operationId: tasks_index_basic_retrieve
-      description: Tushare index_basic 的代理接口，统一返回格式。
-      summary: 指数基本信息直通代理
-      parameters:
-      - in: query
-        name: category
-        schema:
-          type: string
-        description: 指数类别
-      - in: query
-        name: fields
-        schema:
-          type: string
-        description: 返回字段列表，逗号分隔
-      - in: query
-        name: market
-        schema:
-          type: string
-        description: 市场：MSCI/CSI/SSE/SZSE/CICC/SW/OTH
-      - in: query
-        name: name
-        schema:
-          type: string
-        description: 指数简称
-      - in: query
-        name: publisher
-        schema:
-          type: string
-        description: 发布方
-      - in: query
-        name: token
-        schema:
-          type: string
-        description: Tushare Token（覆盖环境变量）
-      - in: query
-        name: ts_code
-        schema:
-          type: string
-        description: 指数代码
-      tags:
-      - Tushare Proxy
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponseIndexBasic'
-          description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-  /django/api/tasks/index-daily/:
-    get:
-      operationId: tasks_index_daily_retrieve
-      description: Tushare index_daily 的代理接口，统一返回格式。
-      summary: 指数日线行情直通代理
-      parameters:
-      - in: query
-        name: end_date
-        schema:
-          type: string
-        description: 结束日期 YYYYMMDD
-      - in: query
-        name: fields
-        schema:
-          type: string
-        description: 字段列表（逗号分隔）
-      - in: query
-        name: start_date
-        schema:
-          type: string
-        description: 开始日期 YYYYMMDD
-      - in: query
-        name: token
-        schema:
-          type: string
-        description: Tushare Token（覆盖环境变量）
-      - in: query
-        name: trade_date
-        schema:
-          type: string
-        description: 交易日期 YYYYMMDD
-      - in: query
-        name: ts_code
-        schema:
-          type: string
-        description: 指数代码（必填）
-        required: true
-      tags:
-      - Tushare Proxy
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponseIndexDaily'
-          description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-  /django/api/tasks/index-dailybasic/:
-    get:
-      operationId: tasks_index_dailybasic_retrieve
-      description: 获取大盘指数每日指标，至少提供 trade_date 或 ts_code。
-      summary: 大盘指数每日指标
-      parameters:
-      - in: query
-        name: end_date
-        schema:
-          type: string
-        description: 结束日期YYYYMMDD
-      - in: query
-        name: fields
-        schema:
-          type: string
-        description: 限定返回字段列表
-      - in: query
-        name: start_date
-        schema:
-          type: string
-        description: 开始日期YYYYMMDD
-      - in: query
-        name: token
-        schema:
-          type: string
-        description: Tushare API Token
-      - in: query
-        name: trade_date
-        schema:
-          type: string
-        description: 交易日期YYYYMMDD
-      - in: query
-        name: ts_code
-        schema:
-          type: string
-        description: 指数TS代码
-      tags:
-      - Tushare Proxy
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponseIndexDailybasic'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-  /django/api/tasks/index-weight/:
-    get:
-      operationId: tasks_index_weight_retrieve
-      description: Tushare index_weight 的代理接口，统一返回格式。
-      summary: 指数成分和权重直通代理
-      parameters:
-      - in: query
-        name: end_date
-        schema:
-          type: string
-        description: 结束日期 YYYYMMDD
-      - in: query
-        name: fields
-        schema:
-          type: string
-        description: 字段列表（逗号分隔）
-      - in: query
-        name: index_code
-        schema:
-          type: string
-        description: 指数代码（必填）
-        required: true
-      - in: query
-        name: start_date
-        schema:
-          type: string
-        description: 开始日期 YYYYMMDD
-      - in: query
-        name: token
-        schema:
-          type: string
-        description: Tushare Token（覆盖环境变量）
-      - in: query
-        name: trade_date
-        schema:
-          type: string
-        description: 交易日期 YYYYMMDD
-      tags:
-      - Tushare Proxy
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponseIndexWeight'
-          description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
   /django/api/tasks/irm-qa-sh/:
     get:
       operationId: tasks_irm_qa_sh_retrieve
@@ -4101,6 +4125,64 @@ components:
           type: string
         is_new:
           type: string
+    IndexValuationSummaryData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexValuationSummaryRecord'
+      required:
+      - items
+    IndexValuationSummaryRecord:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        pe:
+          type: number
+          format: double
+          nullable: true
+        pb:
+          type: number
+          format: double
+          nullable: true
+        total_mv:
+          type: number
+          format: double
+          nullable: true
+        pe_quantile_5y:
+          type: number
+          format: double
+          nullable: true
+        pb_quantile_5y:
+          type: number
+          format: double
+          nullable: true
+        pe_quantile_10y:
+          type: number
+          format: double
+          nullable: true
+        pb_quantile_10y:
+          type: number
+          format: double
+          nullable: true
+        trade_date:
+          type: string
+          nullable: true
+      required:
+      - label
+      - pb
+      - pb_quantile_10y
+      - pb_quantile_5y
+      - pe
+      - pe_quantile_10y
+      - pe_quantile_5y
+      - total_mv
+      - trade_date
+      - value
     IndexWeightData:
       type: object
       properties:
@@ -4817,6 +4899,22 @@ components:
       - data
       - message
       - timestamp
+    SuccessResponseIndexValuationSummary:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+        data:
+          $ref: '#/components/schemas/IndexValuationSummaryData'
+      required:
+      - code
+      - data
+      - message
+      - timestamp
     SuccessResponseIndexWeight:
       type: object
       properties:
@@ -5068,6 +5166,7 @@ components:
       properties:
         interface:
           type: string
+          default: sw_valuation_analysis
         count:
           type: integer
         records:
@@ -5076,7 +5175,6 @@ components:
             $ref: '#/components/schemas/SwValuationAnalysisRecord'
       required:
       - count
-      - interface
       - records
     SwValuationAnalysisRecord:
       type: object
@@ -5139,15 +5237,11 @@ components:
           type: number
           format: double
           description: 总市值（万元）
-        pe_ttm:
-          type: number
-          format: double
-          description: 滚动市盈率
-        pe_percentile:
+        pe_quantile:
           type: number
           format: double
           description: PE分位数
-        pb_percentile:
+        pb_quantile:
           type: number
           format: double
           description: PB分位数

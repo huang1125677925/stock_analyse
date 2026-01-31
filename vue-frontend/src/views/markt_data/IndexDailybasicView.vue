@@ -70,7 +70,7 @@
 /**
  * 组件名称：IndexDailybasicView
  * 功能：
- * - 查询并展示 `/django/api/tasks/index-dailybasic/` 的指数每日基础指标数据
+ * - 查询并展示 `/django/api/index/index-dailybasic/` 的指数每日基础指标数据
  * - 提供指数代码和日期范围筛选
  * - 使用 ECharts 展示数据趋势
  * 参数（props）：无

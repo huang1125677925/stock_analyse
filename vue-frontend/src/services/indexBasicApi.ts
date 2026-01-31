@@ -34,7 +34,7 @@ export interface FetchIndexBasicParams {
  */
 export async function fetchIndexBasicList(params: FetchIndexBasicParams = {}): Promise<IndexBasicItem[]> {
   const res = await axios.get<ApiResponse<IndexBasicData>, ApiResponse<IndexBasicData>>(
-    '/django/api/tasks/index-basic/',
+    '/django/api/index/index-basic/',
     {
       params: {
         fields: params.fields ?? 'ts_code,name,market,publisher,category',

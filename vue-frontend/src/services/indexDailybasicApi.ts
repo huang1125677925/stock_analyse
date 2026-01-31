@@ -2,7 +2,7 @@ import axios from './axiosConfig'
 
 /**
  * 组件/服务名称：indexDailybasicApi
- * 功能：封装调用后端 `/django/api/tasks/index-dailybasic/` 接口，获取大盘指数每日基础指标数据。
+ * 功能：封装调用后端 `/django/api/index/index-dailybasic/` 接口，获取大盘指数每日基础指标数据。
  * 参数：
  * - tsCode?: 指数代码，如 `000001.SH`
  * - startDate?: 开始日期，`YYYYMMDD`
@@ -48,7 +48,7 @@ export async function fetchIndexDailybasic(
   params: FetchIndexDailybasicParams
 ): Promise<IndexDailybasicData> {
   const res = await axios.get<ApiResponse<IndexDailybasicData>, ApiResponse<IndexDailybasicData>>(
-    '/django/api/tasks/index-dailybasic/',
+    '/django/api/index/index-dailybasic/',
     {
       params: {
         ts_code: params.tsCode,

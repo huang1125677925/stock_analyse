@@ -240,6 +240,12 @@ const router = createRouter({
           meta: { title: '申万行业成分构成' }
         },
         {
+          path: '/analysis/index-fund-atlas',
+          name: 'index-fund-atlas',
+          component: () => import('@/views/industry-stock-data/IndexFundAtlasView.vue'),
+          meta: { title: '指数基金图谱说明' }
+        },
+        {
           path: '/analysis/news-list',
           name: 'news-list',
           component: () => import('@/views/analysis/NewsList.vue'),

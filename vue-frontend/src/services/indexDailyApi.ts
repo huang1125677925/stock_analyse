@@ -53,7 +53,7 @@ export async function fetchIndexDailyVolume(
   endDate?: string
 ): Promise<IndexDailyVolumeItem[]> {
   const res = await axios.get<ApiResponse<IndexDailyVolumeData>, ApiResponse<IndexDailyVolumeData>>(
-    '/django/api/tasks/index-daily/',
+    '/django/api/index/index-daily/',
     {
       params: {
         ts_code: tsCode,

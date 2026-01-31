@@ -183,13 +183,13 @@ async function fetchData() {
     
     // 这里假设接口已改为 /django/api/index/sw-index-classify/ 以匹配其他模块的命名规范，如果仍是 tasks 路径请指正
     // 根据 IndexMemberAllView 的变更推测，此处也应使用新的API路径规范
-    // 原路径: /django/api/tasks/index-classify/
+    // 原路径: /django/api/index/index-classify/
     // 假设新路径: /django/api/index/sw-index-classify/ (根据用户意图推测)
     // 但为保险起见，如果后端未变，应保持原路径。
     // 鉴于用户要求重构查询逻辑，通常伴随API变更。
     // 这里我们先使用原路径，或者根据 IndexMemberAllView 的模式，推测可能为 /django/api/index/sw-index-classify/
     // 但用户未明确指定新接口路径，只给出了数据结构。
-    // 我们先尝试保持原路径 /django/api/tasks/index-classify/ 并传递 level 参数。
+    // 我们先尝试保持原路径 /django/api/index/index-classify/ 并传递 level 参数。
     // 
     // UPDATE: 再次确认用户需求 "重构该页面的查询逻辑...数据示例..."
     // 通常这意味着后端接口返回格式也变了（从 items/fields 变为 records）。
