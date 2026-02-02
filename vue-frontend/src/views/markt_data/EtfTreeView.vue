@@ -8,12 +8,17 @@
           </div>
         </template>
         <div class="tree-wrapper">
+          <div class="tree-search">
+            <el-input v-model="filterText" clearable size="small" placeholder="筛选节点（模糊匹配名称/代码/管理人）" />
+          </div>
           <el-tree
+            ref="treeRef"
             :props="defaultProps"
             :load="loadNode"
             lazy
             node-key="key"
             highlight-current
+            :filter-node-method="filterNode"
             @node-click="handleNodeClick"
             @node-expand="handleNodeExpand"
           >
@@ -251,6 +256,11 @@
                 <div ref="industryChartRef" style="width: 100%; height: 280px;"></div>
               </div>
             </el-tab-pane>
+            <el-tab-pane v-if="currentData.nodeType === 'CAT'" label="波动性分析" name="cat-volatility">
+              <div class="tab-content">
+                <etf-category-volatility-tab :etf-codes="catEtfCodes" :code-name-map="catCodeNameMapObj" />
+              </div>
+            </el-tab-pane>
             <el-tab-pane v-if="currentData.nodeType === 'INDEX'" label="趋势图" name="index-trend">
               <div class="tab-content">
                 <div v-if="indexTrendLoading" style="padding: 20px;">
@@ -287,6 +297,7 @@ import * as echarts from 'echarts'
 import { fetchIndexBasicList, type IndexBasicItem, fetchIndexWeight, type IndexWeightItem } from '@/services/indexBasicApi'
 import { getEtfDaily, type EtfDailyItem } from '@/services/etfApi'
 import StockKLineChart from '@/components/StockKLineChart.vue'
+import EtfCategoryVolatilityTab from '@/components/EtfCategoryVolatilityTab.vue'
 import { fetchIndexDailyKline, type IndexDailyKlineItem } from '@/services/indexDailyApi'
 import { getStockList } from '@/services/individualStockApi'
 
@@ -303,6 +314,9 @@ interface TreeNodeData {
   category?: string
   item?: EtfBasicItem
 }
+const treeRef = ref()
+const filterText = ref('')
+
 
 const currentData = ref<TreeNodeData | null>(null)
 const currentNode = ref<Node | null>(null)
@@ -359,6 +373,29 @@ const defaultProps = {
   }
 }
 
+const filterNode = (value: string, data: TreeNodeData, node: Node) => {
+  if (!value) return true
+  const q = value.trim().toLowerCase()
+  const fields = [
+    data.label || '',
+    data.etf_type || '',
+    data.index_code || '',
+    data.index_name || '',
+    data.mgr_name || '',
+    data.category || '',
+    data.item?.ts_code || '',
+    data.item?.csname || '',
+    data.item?.extname || ''
+  ]
+  return fields.some(f => f.toLowerCase().includes(q))
+}
+
+watch(filterText, (val) => {
+  if (treeRef.value && typeof treeRef.value.filter === 'function') {
+    treeRef.value.filter(val)
+  }
+})
+
 const updateCurrentChildren = (node: Node) => {
   if (node && node.childNodes) {
     currentChildren.value = node.childNodes.map(child => child.data as TreeNodeData)
@@ -367,6 +404,54 @@ const updateCurrentChildren = (node: Node) => {
   }
 }
 
+const waitForChildren = async (node: Node, timeout = 12000) => {
+  const start = Date.now()
+  while (Date.now() - start < timeout) {
+    await nextTick()
+    if (node.childNodes && node.childNodes.length > 0) return
+    await new Promise(r => setTimeout(r, 100))
+  }
+}
+
+const expandByKey = async (key: string) => {
+  const tree: any = treeRef.value
+  const node = tree?.getNode?.(key)
+  if (!node) return
+  if (typeof node.expand === 'function') {
+    node.expand()
+  } else if (typeof tree.setExpandedKeys === 'function') {
+    const expanded = typeof tree.getExpandedKeys === 'function' ? tree.getExpandedKeys() : []
+    tree.setExpandedKeys(Array.from(new Set([...(expanded || []), key])))
+  }
+  await waitForChildren(node)
+  return node as Node
+}
+
+const preloadTreeAll = async () => {
+  await nextTick()
+  const rootNode = await expandByKey('ROOT')
+  if (!rootNode) return
+  for (const typeNode of rootNode.childNodes || []) {
+    const type = await expandByKey(typeNode.key as string)
+    if (!type) continue
+    for (const mgrNode of type.childNodes || []) {
+      const mgr = await expandByKey(mgrNode.key as string)
+      if (!mgr) continue
+      for (const catNode of mgr.childNodes || []) {
+        const cat = await expandByKey(catNode.key as string)
+        if (!cat) continue
+        for (const indexNode of cat.childNodes || []) {
+          const idx = await expandByKey(indexNode.key as string)
+          if (!idx) continue
+          // 加载 ETF 叶子
+          for (const etfNode of idx.childNodes || []) {
+            // 叶子无需展开
+          }
+        }
+      }
+    }
+  }
+}
 const fetchAllEtfBasic = async (etf_type: string): Promise<EtfBasicItem[]> => {
   const cached = typeCache.value.get(etf_type)
   if (cached) return cached
@@ -640,7 +725,7 @@ const updateCategoryChart = () => {
 }
 
 onMounted(() => {
-  // no-op
+  preloadTreeAll()
 })
 
 onUnmounted(() => {
@@ -659,6 +744,40 @@ const etfListTable = computed(() => {
   const list = typeCache.value.get(currentData.value.etf_type || '') || []
   return list.filter(i => i.index_code === currentData.value?.index_code && i.mgr_name === currentData.value?.mgr_name)
 })
+
+const catEtfCodes = computed(() => {
+  if (!currentData.value || currentData.value.nodeType !== 'CAT') return [] as string[]
+  const list = typeCache.value.get(currentData.value.etf_type || '') || []
+  const filtered = list.filter(i => i.mgr_name === currentData.value?.mgr_name)
+  const codes: string[] = []
+  for (const it of filtered) {
+    const code = it.index_code || ''
+    if (!code) continue
+    const basic = indexBasicMap.value.get(code)
+    const cat = basic?.category || '未知'
+    if (cat !== currentData.value.category) continue
+    if (it.ts_code) codes.push(it.ts_code)
+  }
+  return codes
+})
+
+const catEtfNameMap = computed(() => {
+  if (!currentData.value || currentData.value.nodeType !== 'CAT') return new Map<string, string>()
+  const list = typeCache.value.get(currentData.value.etf_type || '') || []
+  const filtered = list.filter(i => i.mgr_name === currentData.value?.mgr_name)
+  const map = new Map<string, string>()
+  for (const it of filtered) {
+    const code = it.index_code || ''
+    if (!code) continue
+    const basic = indexBasicMap.value.get(code)
+    const cat = basic?.category || '未知'
+    if (cat !== currentData.value.category) continue
+    const name = it.extname || it.csname || it.cname || it.ts_code || ''
+    if (it.ts_code) map.set(it.ts_code, name)
+  }
+  return map
+})
+const catCodeNameMapObj = computed(() => Object.fromEntries(catEtfNameMap.value as Map<string, string>))
 
 watch(currentChildren, () => {
   activeTab.value = 'basic'
@@ -712,7 +831,7 @@ const loadIndexWeights = async () => {
     const filtered = list.filter(it => norm(it.trade_date) === latest)
     indexWeights.value = [...filtered].sort((a, b) => (Number(b.weight || 0) - Number(a.weight || 0)))
     const stripSuffix = (c?: string) => (c || '').replace(/\.[A-Z]+$/i, '')
-    const baseCodes = Array.from(new Set(indexWeights.value.map(w => stripSuffix(w.con_code))))
+    const baseCodes = Array.from(new Set(indexWeights.value.map((w: IndexWeightItem) => stripSuffix(w.con_code))))
     let codeToName = new Map<string, string>()
     let codeToIndustry = new Map<string, string>()
     if (baseCodes.length > 0) {
@@ -723,7 +842,7 @@ const loadIndexWeights = async () => {
         codeToIndustry = new Map<string, string>(list.map(it => [it.code, it.industry]))
       } catch {}
     }
-    displayIndexWeights.value = indexWeights.value.map(w => {
+    displayIndexWeights.value = indexWeights.value.map((w: IndexWeightItem) => {
       const base_code = stripSuffix(w.con_code)
       const stock_name = base_code ? (codeToName.get(base_code) || undefined) : undefined
       const industry = base_code ? (codeToIndustry.get(base_code) || undefined) : undefined
@@ -775,6 +894,8 @@ watch(activeTab, async (tab) => {
     await loadEtfTrend()
   } else if (tab === 'index-trend') {
     await loadIndexTrend()
+  } else if (tab === 'cat-volatility') {
+    await ensureIndexBasicLoaded()
   }
 })
 

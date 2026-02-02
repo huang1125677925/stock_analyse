@@ -29,6 +29,26 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="ETF代码">
+          <el-select
+            v-model="query.ts_code"
+            placeholder="选择或搜索 ETF 代码/名称"
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            :remote-method="remoteSearchEtf"
+            :loading="selectLoading"
+            style="width: 220px"
+          >
+            <el-option
+              v-for="item in etfOptions"
+              :key="item.ts_code"
+              :label="`${item.extname || item.csname || item.cname || ''}（${item.ts_code}）`"
+              :value="item.ts_code"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="交易所">
           <el-select 
             v-model="query.exchange" 
@@ -166,6 +186,7 @@ const router = useRouter()
 
 // 加载状态
 const loading = ref(false)
+const selectLoading = ref(false)
 
 // 列表与分页
 const items = ref<EtfBasicItem[]>([])
@@ -189,6 +210,30 @@ const exchangeOptions = ref<string[]>([])
 const etfTypeOptions = ref<string[]>([])
 const mgrNameOptions = ref<string[]>([])
 const listYearOptions = ref<string[]>([])
+
+// ETF 代码远程搜索选项
+const etfOptions = ref<EtfBasicItem[]>([])
+
+// 远程搜索 ETF 基础列表，用于下拉选项
+const remoteSearchEtf = async (keyword: string) => {
+  const q = (keyword || '').trim()
+  if (!q) return
+  selectLoading.value = true
+  try {
+    const isTsCode = /^[0-9]{3,6}\.[A-Z]{2,3}$/.test(q)
+    const res = await getEtfBasic({
+      ts_code: isTsCode ? q : undefined,
+      name: !isTsCode ? q : undefined,
+      page: 1,
+      page_size: 20,
+    })
+    etfOptions.value = res.data || []
+  } catch (e: any) {
+    ElMessage.error(e?.message || 'ETF 基础列表搜索失败')
+  } finally {
+    selectLoading.value = false
+  }
+}
 
 // 获取筛选选项数据（全量）
 const fetchFilterOptions = async () => {
