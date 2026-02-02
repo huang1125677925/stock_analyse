@@ -216,6 +216,12 @@ const router = createRouter({
           meta: { title: '申万行业分类' }
         },
         {
+          path: '/analysis/sw-industry-tree',
+          name: 'sw-industry-tree',
+          component: () => import('@/views/industry-stock-data/SwIndustryTreeView.vue'),
+          meta: { title: '申万行业分类树状图' }
+        },
+        {
           path: '/analysis/sw-industry-daily',
           name: 'sw-industry-daily',
           component: () => import('@/views/industry-stock-data/SwIndustryDailyView.vue'),

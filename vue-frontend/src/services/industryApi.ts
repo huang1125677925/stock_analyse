@@ -68,6 +68,7 @@ export interface SwValuationAnalysisParams {
   start_date: string
   end_date: string
   level: string // L1/L2/L3
+  index_codes?: string // 行业代码列表，逗号分隔
 }
 
 export interface SwValuationAnalysisResponse {

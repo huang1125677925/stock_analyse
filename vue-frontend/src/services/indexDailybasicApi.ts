@@ -61,3 +61,22 @@ export async function fetchIndexDailybasic(
   )
   return res.data
 }
+
+/**
+ * 获取全市场综合指标数据
+ */
+export async function fetchMarketCombinedDailybasic(
+  params: Omit<FetchIndexDailybasicParams, 'tsCode'>
+): Promise<IndexDailybasicData> {
+  const res = await axios.get<ApiResponse<IndexDailybasicData>, ApiResponse<IndexDailybasicData>>(
+    '/django/api/index/market-combined-dailybasic/',
+    {
+      params: {
+        start_date: params.startDate,
+        end_date: params.endDate,
+        trade_date: params.tradeDate,
+      },
+    }
+  )
+  return res.data
+}

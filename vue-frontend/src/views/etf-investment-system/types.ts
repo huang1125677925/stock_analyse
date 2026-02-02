@@ -10,6 +10,7 @@ export interface EtfData {
   pbPercentile: number; // 0-100
   currentPrice: number;
   maxDrawdownHistory: number; // e.g., 0.60 for 60%
+  totalMv?: number; // Total Market Value
 }
 
 export interface UserProfile {

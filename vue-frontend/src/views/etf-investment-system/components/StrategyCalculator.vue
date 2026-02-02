@@ -8,7 +8,7 @@
 
     <el-tabs type="border-card">
       <el-tab-pane label="网格交易模拟器">
-        <el-form :model="gridForm" label-width="120px">
+        <el-form :model="gridForm" label-width="150px">
           <el-form-item label="起始价格">
             <el-input-number v-model="gridForm.startPrice" :precision="2" :step="0.1" />
           </el-form-item>
@@ -52,7 +52,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="目标市值跟踪">
-        <el-form :model="targetForm" label-width="120px">
+        <el-form :model="targetForm" label-width="150px">
           <el-form-item label="初始投入">
             <el-input-number v-model="targetForm.initialCapital" :step="10000" />
           </el-form-item>

@@ -57,49 +57,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
-import { getMockEtfData, getValuationStatus } from '../core';
+import { computed, onMounted } from 'vue';
+import { getValuationStatus } from '../core';
 import type { EtfData } from '../types';
-import axios from '@/services/axiosConfig';
+import { useMarketData } from '../useMarketData';
 
-// Extend EtfData locally to include totalMv if not present in global types
-interface ExtendedEtfData extends EtfData {
-  totalMv: number;
-}
-
-// Data
-const etfList = ref<ExtendedEtfData[]>([]);
-
-const fetchEtfData = async () => {
-  try {
-    const response = await axios.get('/django/api/index/index-valuation-summary/');
-    // Check if response has data property (wrapped response) or is the data itself
-    const data = response.data || response;
-    // Handle array directly or wrapped in results/items
-    const results = Array.isArray(data) ? data : (data.results || data.items);
-    
-    if (results) {
-      etfList.value = results.map((item: any) => ({
-        code: item.value,
-        name: item.label,
-        category: 'STOCK_CN',
-        pe: item.pe,
-        pePercentile: item.pe_quantile_10y * 100, // Use 10y percentile
-        pb: item.pb,
-        pbPercentile: item.pb_quantile_10y * 100, // Use 10y percentile
-        currentPrice: 0,
-        maxDrawdownHistory: 0,
-        totalMv: item.total_mv
-      }));
-    } else {
-      // Fallback to mock data if API fails or empty
-      etfList.value = getMockEtfData().map(d => ({ ...d, totalMv: 0 }));
-    }
-  } catch (error) {
-    console.error('Failed to fetch ETF data:', error);
-    etfList.value = getMockEtfData().map(d => ({ ...d, totalMv: 0 }));
-  }
-};
+// Use shared market data
+const { etfList, fetchEtfData, marketTemp, targetPosition } = useMarketData();
 
 onMounted(() => {
   fetchEtfData();
@@ -147,10 +111,9 @@ const getActionSuggestion = (percentile: number) => {
 };
 
 // Market Temperature Logic (Average of all percentiles for simplicity)
-const marketTemp = computed(() => {
-  const sum = etfList.value.reduce((acc, cur) => acc + cur.pePercentile, 0);
-  return sum / etfList.value.length;
-});
+// Moved to useMarketData composable
+// const marketTemp = computed(() => { ... })
+// const targetPosition = computed(() => { ... })
 
 const marketStatusText = computed(() => {
   if (marketTemp.value < 30) return '市场极冷 (遍地黄金)';

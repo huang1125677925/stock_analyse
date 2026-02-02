@@ -80,7 +80,7 @@
  */
 import { ref, reactive, onMounted, nextTick, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchIndexDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
+import { fetchIndexDailybasic, fetchMarketCombinedDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
 import * as echarts from 'echarts'
 
 // emits：对外发出 loaded 事件
@@ -91,7 +91,7 @@ const loading = ref(false)
 
 // 指数代码选项
 const indexOptions = [
-  { label: '上证综指', value: '000001.SH' },
+  { label: '全市场综指', value: 'all_market' },
   { label: '沪深300', value: '000300.SH' },
   { label: '中证500', value: '000905.SH' },
   { label: '深证成指', value: '399001.SZ' },
@@ -99,6 +99,7 @@ const indexOptions = [
   { label: '创业板指', value: '399006.SZ' },
   { label: '深证创新', value: '399016.SZ' },
   { label: '沪深300(深)', value: '399300.SZ' },
+  { label: '上证综指', value: '000001.SH' },
 ]
 
 // 指标选项
@@ -157,7 +158,7 @@ const dateShortcuts = [
 
 // 表单状态与默认参数
 const form = reactive({
-  tsCode: '000001.SH',
+  tsCode: 'all_market',
   fields: '',
 })
 
@@ -245,12 +246,21 @@ async function fetchData() {
     }
     
     const [startDate, endDate] = dateRange.value || buildDefaultDateRange()
-    const res = await fetchIndexDailybasic({
-      tsCode: form.tsCode,
-      startDate,
-      endDate,
-      fields: form.fields || undefined,
-    })
+    
+    let res;
+    if (form.tsCode === 'all_market') {
+      res = await fetchMarketCombinedDailybasic({
+        startDate,
+        endDate
+      })
+    } else {
+      res = await fetchIndexDailybasic({
+        tsCode: form.tsCode,
+        startDate,
+        endDate,
+        fields: form.fields || undefined,
+      })
+    }
     
     // 对数据按日期排序，确保图表展示正确
     records.value = (res.records || []).sort((a, b) => {
