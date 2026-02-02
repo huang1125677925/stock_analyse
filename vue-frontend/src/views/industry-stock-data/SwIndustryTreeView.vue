@@ -135,6 +135,17 @@
                 />
               </div>
             </el-tab-pane>
+            <el-tab-pane label="指数成分股" name="members">
+              <div class="tab-content">
+                <SwIndustryMembersTab
+                  v-if="activeTab === 'members'"
+                  :key="`${currentIndustry.industry_code}-${currentIndustry.level}`"
+                  :industry-code="currentIndustry.industry_code"
+                  :index-code="currentIndustry.index_code"
+                  :level="currentIndustry.level"
+                />
+              </div>
+            </el-tab-pane>
           </el-tabs>
         </div>
         <div v-else class="empty-state">
@@ -159,6 +170,7 @@ import type Node from 'element-plus/es/components/tree/src/model/node'
 import { fetchSwIndexClassify, type SwIndexClassifyItem } from '@/services/swIndexClassifyApi'
 import { getSwValuationAnalysis, type SwValuationAnalysisItem } from '@/services/industryApi'
 import SwIndustryTrendChart from './components/SwIndustryTrendChart.vue'
+import SwIndustryMembersTab from './components/SwIndustryMembersTab.vue'
 import { ElMessage } from 'element-plus'
 
 // 当前选中的行业

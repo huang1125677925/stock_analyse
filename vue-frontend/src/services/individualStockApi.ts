@@ -268,10 +268,11 @@ export interface StockListParams extends PageParams {
   industry?: string; // 行业筛选
   stock_names?: string; // 仅看我的：以逗号分隔的股票名称列表
   dc_concept?: string; // 东财概念筛选（模糊匹配）
+  codes?: string; // 以逗号分隔的股票代码列表
 }
 
 export const getStockList = async (params: StockListParams = {}): Promise<StockListResponse> => {
-  const { page, page_size, keyword, industry, stock_names, dc_concept } = params
+  const { page, page_size, keyword, industry, stock_names, dc_concept, codes } = params
   const queryParams = new URLSearchParams()
   
   if (page !== undefined) {
@@ -296,6 +297,10 @@ export const getStockList = async (params: StockListParams = {}): Promise<StockL
   
   if (dc_concept) {
     queryParams.append('dc_concept', dc_concept)
+  }
+  
+  if (codes) {
+    queryParams.append('codes', codes)
   }
   
   const queryString = queryParams.toString()

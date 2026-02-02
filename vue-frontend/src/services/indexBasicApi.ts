@@ -54,3 +54,45 @@ export async function fetchIndexBasicList(params: FetchIndexBasicParams = {}): P
     return a.ts_code.localeCompare(b.ts_code)
   })
 }
+
+export interface IndexWeightItem {
+  index_code: string
+  con_code: string
+  con_name?: string
+  weight?: number
+  in_date?: string
+  out_date?: string
+  trade_date?: string
+}
+
+export interface IndexWeightData {
+  count: number
+  interface: string
+  records: IndexWeightItem[]
+}
+
+export interface FetchIndexWeightParams {
+  index_code: string
+  trade_date?: string
+  start_date?: string
+  end_date?: string
+  fields?: string
+  token?: string
+}
+
+export async function fetchIndexWeight(params: FetchIndexWeightParams): Promise<IndexWeightItem[]> {
+  const res = await axios.get<ApiResponse<IndexWeightData>, ApiResponse<IndexWeightData>>(
+    '/django/api/index/index-weight/',
+    {
+      params: {
+        index_code: params.index_code,
+        trade_date: params.trade_date,
+        start_date: params.start_date,
+        end_date: params.end_date,
+        fields: params.fields,
+        token: params.token
+      }
+    }
+  )
+  return res.data?.records || []
+}

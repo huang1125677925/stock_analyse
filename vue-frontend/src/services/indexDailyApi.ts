@@ -28,6 +28,16 @@ export interface IndexDailyVolumeItem {
   close?: number
 }
 
+export interface IndexDailyKlineItem {
+  date: string // YYYY-MM-DD
+  open: number
+  high: number
+  low: number
+  close: number
+  vol?: number
+  amount?: number
+}
+
 function formatYYYYMMDDToISO(dateStr: string): string {
   if (!dateStr) return ''
   const s = String(dateStr)
@@ -80,6 +90,48 @@ export async function fetchIndexDailyVolume(
     // 过滤无效日期，避免排序报错
     .filter(d => !!d.date)
     // 默认按日期升序
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  return mapped
+}
+
+/**
+ * 获取指数K线（index_daily）
+ * @param tsCode 指数代码，如 000001.SH
+ * @param startDate 开始日期，格式：YYYYMMDD
+ * @param endDate 结束日期，格式：YYYYMMDD
+ */
+export async function fetchIndexDailyKline(
+  tsCode: string,
+  startDate?: string,
+  endDate?: string
+): Promise<IndexDailyKlineItem[]> {
+  const res = await axios.get<ApiResponse<IndexDailyVolumeData>, ApiResponse<IndexDailyVolumeData>>(
+    '/django/api/index/index-daily/',
+    {
+      params: {
+        ts_code: tsCode,
+        start_date: startDate,
+        end_date: endDate,
+        fields: 'trade_date,open,high,low,close,vol,amount'
+      }
+    }
+  )
+
+  const raw = res.data?.records || []
+  const mapped: IndexDailyKlineItem[] = raw
+    .map(item => {
+      const dateRaw = (item as any).trade_date ?? (item as any).date
+      const open = Number((item as any).open ?? 0)
+      const high = Number((item as any).high ?? 0)
+      const low = Number((item as any).low ?? 0)
+      const close = Number((item as any).close ?? 0)
+      const vol = (item as any).vol != null ? Number((item as any).vol) : undefined
+      const amount = (item as any).amount != null ? Number((item as any).amount) : undefined
+      const date = formatYYYYMMDDToISO(String(dateRaw || ''))
+      return { date, open, high, low, close, vol, amount }
+    })
+    .filter(d => !!d.date)
     .sort((a, b) => a.date.localeCompare(b.date))
 
   return mapped

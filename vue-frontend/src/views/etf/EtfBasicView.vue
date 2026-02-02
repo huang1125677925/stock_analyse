@@ -52,6 +52,21 @@
             <el-option label="暂停" value="P" />
           </el-select>
         </el-form-item>
+        <el-form-item label="上市年份">
+          <el-select 
+            v-model="query.list_year" 
+            placeholder="选择年份" 
+            clearable 
+            style="width: 120px"
+          >
+            <el-option
+              v-for="y in listYearOptions"
+              :key="y"
+              :label="y"
+              :value="y"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="ETF类型">
           <el-select 
             v-model="query.etf_type" 
@@ -165,6 +180,7 @@ const query = reactive({
   etf_type: '',
   mgr_name: '',
   name: '',
+  list_year: '',
 })
 
 // 下拉选项数据
@@ -172,6 +188,7 @@ const indexCodeOptions = ref<{ value: string; label: string }[]>([])
 const exchangeOptions = ref<string[]>([])
 const etfTypeOptions = ref<string[]>([])
 const mgrNameOptions = ref<string[]>([])
+const listYearOptions = ref<string[]>([])
 
 // 获取筛选选项数据（全量）
 const fetchFilterOptions = async () => {
@@ -217,6 +234,16 @@ const fetchFilterOptions = async () => {
         if (item.mgr_name) mgrs.add(item.mgr_name)
       })
       mgrNameOptions.value = Array.from(mgrs).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+
+      // 提取上市年份
+      const years = new Set<string>()
+      records.forEach(item => {
+        const d = item.list_date || ''
+        if (d && d.length >= 4) {
+          years.add(d.slice(0, 4))
+        }
+      })
+      listYearOptions.value = Array.from(years).sort((a, b) => b.localeCompare(a))
     }
   } catch (e) {
     console.error('获取筛选选项失败', e)
@@ -227,20 +254,49 @@ const fetchFilterOptions = async () => {
 const fetchList = async () => {
   loading.value = true
   try {
-    const data = await getEtfBasic({
-      ts_code: query.ts_code || undefined,
-      index_code: query.index_code || undefined,
-      exchange: query.exchange || undefined,
-      list_status: query.list_status || undefined,
-      etf_type: query.etf_type || undefined,
-      mgr_name: query.mgr_name || undefined,
-      name: query.name || undefined,
-      page: pagination.page,
-      page_size: pagination.page_size,
-    })
-    items.value = data.data || []
-    pagination.total = data.total || 0
-    pagination.pages = data.pages || 0
+    const needClientFilterByYear = !!query.list_year
+    if (needClientFilterByYear) {
+      const all = await getEtfBasic({
+        ts_code: query.ts_code || undefined,
+        index_code: query.index_code || undefined,
+        exchange: query.exchange || undefined,
+        list_status: query.list_status || undefined,
+        etf_type: query.etf_type || undefined,
+        mgr_name: query.mgr_name || undefined,
+        name: query.name || undefined,
+        page: 1,
+        page_size: 5000,
+      })
+      const records = (all.data || []).filter(it => {
+        const d = it.list_date || ''
+        return d && d.startsWith(query.list_year)
+      })
+      const total = records.length
+      const pages = Math.ceil(total / pagination.page_size)
+      const start = (pagination.page - 1) * pagination.page_size
+      const end = start + pagination.page_size
+      items.value = records.slice(start, end)
+      pagination.total = total
+      pagination.pages = pages
+      if (pagination.page > pages) {
+        pagination.page = Math.max(1, pages)
+      }
+    } else {
+      const data = await getEtfBasic({
+        ts_code: query.ts_code || undefined,
+        index_code: query.index_code || undefined,
+        exchange: query.exchange || undefined,
+        list_status: query.list_status || undefined,
+        etf_type: query.etf_type || undefined,
+        mgr_name: query.mgr_name || undefined,
+        name: query.name || undefined,
+        page: pagination.page,
+        page_size: pagination.page_size,
+      })
+      items.value = data.data || []
+      pagination.total = data.total || 0
+      pagination.pages = data.pages || 0
+    }
   } catch (e: any) {
     ElMessage.error(e?.message || 'ETF 基本信息获取失败')
   } finally {
@@ -262,6 +318,7 @@ const handleReset = () => {
   query.etf_type = ''
   query.mgr_name = ''
   query.name = ''
+   query.list_year = ''
   pagination.page = 1
   fetchList()
 }

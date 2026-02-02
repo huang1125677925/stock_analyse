@@ -294,6 +294,12 @@ const router = createRouter({
           meta: { title: '指数列表' }
         },
         {
+          path: '/analysis/index-tree',
+          name: 'index-tree',
+          component: () => import('@/views/markt_data/IndexTreeView.vue'),
+          meta: { title: '指数分类树状图' }
+        },
+        {
           path: '/analysis/factor-stock-picker',
           name: 'factor-stock-picker',
           component: () => import('@/views/analysis/FactorStockPickerView.vue'),
@@ -323,6 +329,13 @@ const router = createRouter({
           name: 'etf-realtime',
           component: () => import('@/views/etf/EtfRealtimeView.vue'),
           meta: { title: 'ETF实时行情' }
+        }
+        ,
+        {
+          path: '/analysis/etf-tree',
+          name: 'etf-tree',
+          component: () => import('@/views/markt_data/EtfTreeView.vue'),
+          meta: { title: 'ETF分类树状图' }
         }
         ,
         {
