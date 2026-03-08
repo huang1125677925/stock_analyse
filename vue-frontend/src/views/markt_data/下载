@@ -4,6 +4,122 @@ info:
   version: 1.0.0
   description: 统一响应格式的 Django REST API 文档，包含 scheduled_tasks 下的 Tushare 直通代理接口
 paths:
+  /django/api/ai/analyze/:
+    post:
+      operationId: ai_analyze_create
+      description: 提交数据，利用 AI 进行分析。如果未指定 interface_name，默认使用 'default' 配置。
+      summary: AI 数据分析接口
+      tags:
+      - AI 服务
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiAnalyzeRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiAnalyzeResponse'
+          description: ''
+  /django/api/ai/prompts/:
+    get:
+      operationId: ai_prompts_list
+      description: 返回所有已配置的 Prompt 列表，按更新时间倒序排列。
+      summary: 获取 Prompt 配置列表
+      tags:
+      - AI 服务
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromptConfigList'
+          description: ''
+    post:
+      operationId: ai_prompts_create
+      description: 根据 interface_name 创建或更新 Prompt 模板。
+      summary: 创建或更新 Prompt 配置
+      tags:
+      - AI 服务
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptConfigRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptConfig'
+          description: ''
+  /django/api/ai/prompts/{interface_name}/:
+    get:
+      operationId: ai_prompts_retrieve
+      description: 根据 interface_name 获取单个 Prompt 配置。
+      summary: 获取 Prompt 配置详情
+      parameters:
+      - in: path
+        name: interface_name
+        schema:
+          type: string
+        description: 接口名称
+        required: true
+      tags:
+      - AI 服务
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptConfig'
+          description: ''
+        '404':
+          description: No response body
+    delete:
+      operationId: ai_prompts_destroy
+      description: 根据 interface_name 删除对应的 Prompt 配置。
+      summary: 删除 Prompt 配置
+      parameters:
+      - in: path
+        name: interface_name
+        schema:
+          type: string
+        description: 接口名称
+        required: true
+      tags:
+      - AI 服务
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+        '404':
+          description: No response body
   /django/api/etf/basic/:
     get:
       operationId: etf_basic_retrieve
@@ -3142,6 +3258,39 @@ components:
         ah_premium:
           type: number
           format: double
+    AiAnalyzeRequestRequest:
+      type: object
+      properties:
+        interface_name:
+          type: string
+          default: default
+          description: 接口名称，默认为 default
+        data:
+          type: object
+          additionalProperties: {}
+          description: 需要分析的数据，可以是任意 JSON 结构
+      required:
+      - data
+    AiAnalyzeResponse:
+      type: object
+      properties:
+        interface_name:
+          type: string
+          description: 接口名称
+        prompt_source:
+          type: string
+          description: Prompt 来源 (configured/default)
+        prompt:
+          type: string
+          description: 生成的完整 Prompt
+        result:
+          type: string
+          description: AI 分析结果
+      required:
+      - interface_name
+      - prompt
+      - prompt_source
+      - result
     BrokerRecommendData:
       type: object
       properties:
@@ -4440,6 +4589,78 @@ components:
       required:
       - items
       - total
+    PromptConfig:
+      type: object
+      properties:
+        interface_name:
+          type: string
+          description: 接口名称，唯一标识
+        prompt_template:
+          type: string
+          description: Prompt 模板，支持 {data} 占位符
+        is_active:
+          type: boolean
+          default: true
+          description: 是否启用
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: 更新时间
+      required:
+      - created_at
+      - interface_name
+      - prompt_template
+      - updated_at
+    PromptConfigList:
+      type: object
+      properties:
+        interface_name:
+          type: string
+          description: 接口名称
+        prompt_template:
+          type: string
+          description: Prompt 模板
+        is_active:
+          type: boolean
+          description: 是否启用
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新时间
+      required:
+      - created_at
+      - interface_name
+      - is_active
+      - prompt_template
+      - updated_at
+    PromptConfigRequest:
+      type: object
+      properties:
+        interface_name:
+          type: string
+          minLength: 1
+          description: 接口名称，唯一标识
+        prompt_template:
+          type: string
+          minLength: 1
+          description: Prompt 模板，支持 {data} 占位符
+        is_active:
+          type: boolean
+          default: true
+          description: 是否启用
+      required:
+      - interface_name
+      - prompt_template
     StockCorrelationMatrixPayload:
       type: object
       properties:

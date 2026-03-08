@@ -34,6 +34,7 @@
           </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading="loading" @click="fetchData">查询</el-button>
+            <el-button type="success" :loading="analyzing" @click="handleAiAnalyze">AI 智能分析</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -80,6 +81,21 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <el-card v-if="showAiAnalysis" class="ai-analysis-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <div class="header-title">
+            <span>AI 智能分析结果</span>
+          </div>
+          <el-button v-if="!analyzing" link type="primary" @click="handleAiAnalyze">重新分析</el-button>
+        </div>
+      </template>
+      <div v-loading="analyzing" element-loading-text="AI 正在分析数据，请耐心等待..." class="ai-content-wrapper">
+        <div v-if="aiAnalysisResult" class="markdown-body" v-html="renderMarkdown(aiAnalysisResult)"></div>
+        <el-empty v-else-if="!analyzing" description="暂无分析结果" />
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -93,15 +109,22 @@
  * 2. 提供日期范围选择，支持快捷选项
  * 3. 展示行业估值数据表格 (PE/PB及其分位数)
  * 4. 对分位数进行颜色标记 (高风险/低风险)
+ * 5. AI 智能分析当前展示的数据
  * 
  * 依赖接口:
  * - getSwValuationAnalysis: 获取估值数据
+ * - analyzeData: AI 分析数据
  */
 import { ref, reactive, onMounted } from 'vue'
 import { getSwValuationAnalysis, type SwValuationAnalysisItem } from '@/services/industryApi'
+import { analyzeData } from '@/services/aiApi'
 import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
 
 const loading = ref(false)
+const analyzing = ref(false)
+const showAiAnalysis = ref(false)
+const aiAnalysisResult = ref('')
 const tableData = ref<SwValuationAnalysisItem[]>([])
 
 const query = reactive({
@@ -232,6 +255,66 @@ const getPercentileStyle = (percentile: number) => {
   }
 }
 
+/**
+ * 处理 AI 分析请求
+ */
+const handleAiAnalyze = async () => {
+  if (tableData.value.length === 0) {
+    ElMessage.warning('暂无数据可分析')
+    return
+  }
+  
+  analyzing.value = true
+  showAiAnalysis.value = true
+  aiAnalysisResult.value = ''
+  
+  try {
+    // 构造发送给 AI 的数据
+    const dataToAnalyze = {
+      query: {
+        level: query.level,
+        dateRange: dateRange.value
+      },
+      data: tableData.value.map(item => ({
+        name: item.name,
+        date: item.trade_date,
+        pe: item.pe,
+        pe_pct: item.pe_percentile,
+        pb: item.pb,
+        pb_pct: item.pb_percentile
+      }))
+    }
+    
+    const res = await analyzeData(dataToAnalyze, 'sw_industry_valuation')
+    
+    if (res && res.result) {
+      aiAnalysisResult.value = res.result
+    } else if (typeof res === 'string') {
+      aiAnalysisResult.value = res
+    } else {
+      aiAnalysisResult.value = 'AI 未返回有效分析结果'
+    }
+    
+  } catch (error: any) {
+    console.error('AI Analysis Error:', error)
+    aiAnalysisResult.value = 'AI 分析发生错误: ' + (error.message || '未知错误')
+  } finally {
+    analyzing.value = false
+  }
+}
+
+/**
+ * 渲染 Markdown 内容
+ * @param content Markdown 字符串
+ */
+const renderMarkdown = (content: string) => {
+  if (!content) return ''
+  // marked.parse 返回的是 Promise<string> | string，但在同步模式下通常是 string
+  // 如果是 Promise，需要 await，但 v-html 不支持 await
+  // marked v4+ 是同步的，除非启用了 async: true
+  return marked.parse(content) as string
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -255,5 +338,80 @@ onMounted(() => {
 
 .form-row {
   margin-bottom: 20px;
+}
+
+.ai-analysis-card {
+  margin-top: 20px;
+}
+
+.ai-content-wrapper {
+  min-height: 100px;
+}
+
+/* Markdown Styles */
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4),
+.markdown-body :deep(h5),
+.markdown-body :deep(h6) {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+  color: #303133;
+}
+
+.markdown-body :deep(p) {
+  margin-bottom: 1em;
+  line-height: 1.6;
+  color: #606266;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 2em;
+  margin-bottom: 1em;
+}
+
+.markdown-body :deep(li) {
+  margin-bottom: 0.5em;
+  line-height: 1.6;
+}
+
+.markdown-body :deep(blockquote) {
+  border-left: 4px solid #409EFF;
+  padding-left: 1em;
+  background-color: #ecf5ff;
+  color: #606266;
+  margin-bottom: 1em;
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+}
+
+.markdown-body :deep(code) {
+  background-color: #f5f7fa;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+  color: #c0392b;
+}
+
+.markdown-body :deep(pre) {
+  background-color: #f5f7fa;
+  padding: 1em;
+  border-radius: 5px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+.markdown-body :deep(pre code) {
+  padding: 0;
+  background-color: transparent;
+  color: #303133;
+}
+
+.markdown-body :deep(strong) {
+  color: #303133;
+  font-weight: 600;
 }
 </style>

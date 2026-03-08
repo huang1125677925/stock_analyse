@@ -26,6 +26,7 @@
               </el-select>
               <!-- 仅看我的开关 -->
               <el-checkbox v-model="onlyMine" @change="handleOnlyMineChange" style="margin-left: 12px">仅看我的</el-checkbox>
+              <el-button type="success" :loading="analyzing" @click="handleAiAnalyze" style="margin-left: 12px">AI 智能分析</el-button>
             </div>
           </div>
         </template>
@@ -254,6 +255,21 @@
           />
         </div>
       </el-card>
+
+      <el-card v-if="showAiAnalysis" class="ai-analysis-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <div class="header-title">
+              <span>AI 智能分析结果</span>
+            </div>
+            <el-button v-if="!analyzing" link type="primary" @click="handleAiAnalyze">重新分析</el-button>
+          </div>
+        </template>
+        <div v-loading="analyzing" element-loading-text="AI 正在分析数据，请耐心等待..." class="ai-content-wrapper">
+          <div v-if="aiAnalysisResult" class="markdown-body" v-html="renderMarkdown(aiAnalysisResult)"></div>
+          <el-empty v-else-if="!analyzing" description="暂无分析结果" />
+        </div>
+      </el-card>
     </div>
 
     <!-- 无数据提示 -->
@@ -271,6 +287,8 @@ import type { IndexRpsItem } from '@/services/strategyApi'
 import { isAuthenticated } from '@/services/auth'
 import { getPersonalHoldings, type PersonalHoldingsListResponse } from '@/services/personalHoldingsApi'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
+import { analyzeData } from '@/services/aiApi'
+import { marked } from 'marked'
 
 /**
  * 组件：指数RPS强度排名视图（IndexRpsView）
@@ -544,6 +562,73 @@ const LeadRiseDetailDialog = defineComponent({
   }
 })
 
+// AI 分析相关
+const analyzing = ref(false)
+const showAiAnalysis = ref(false)
+const aiAnalysisResult = ref('')
+
+/**
+ * 渲染 Markdown 内容
+ * @param content Markdown 字符串
+ */
+const renderMarkdown = (content: string) => {
+  if (!content) return ''
+  // marked.parse 返回的是 Promise<string> | string，但在同步模式下通常是 string
+  return marked.parse(content) as string
+}
+
+/**
+ * 处理 AI 分析请求
+ */
+const handleAiAnalyze = async () => {
+  if (filteredRpsData.value.length === 0) {
+    ElMessage.warning('暂无数据可分析')
+    return
+  }
+  
+  analyzing.value = true
+  showAiAnalysis.value = true
+  aiAnalysisResult.value = ''
+  
+  try {
+    // 构造发送给 AI 的数据，取前50条数据进行分析
+    const dataToAnalyze = {
+      query: {
+        idxType: idxType.value,
+        searchKeyword: searchKeyword.value,
+        onlyMine: onlyMine.value,
+        queryTime: queryTime.value
+      },
+      data: filteredRpsData.value.slice(0, 50).map(item => ({
+        name: item.name,
+        ts_code: item.ts_code,
+        return_5: item.return_5,
+        RPS_5: item.RPS_5,
+        return_20: item.return_20,
+        RPS_20: item.RPS_20,
+        return_60: item.return_60,
+        RPS_60: item.RPS_60
+      }))
+    }
+    
+    const res = await analyzeData(dataToAnalyze, 'index_rps_analysis')
+    
+    if (res && res.result) {
+      aiAnalysisResult.value = res.result
+    } else if (typeof res === 'string') {
+      aiAnalysisResult.value = res
+    } else {
+      aiAnalysisResult.value = 'AI 未返回有效分析结果'
+    }
+    
+  } catch (error: any) {
+    console.error('AI Analysis Error:', error)
+    aiAnalysisResult.value = 'AI 分析发生错误: ' + (error.message || '未知错误')
+  } finally {
+    analyzing.value = false
+  }
+}
+
 // 详情对话框状态
 const detailDialogVisible = ref(false)
 const currentTsCode = ref('')
@@ -775,5 +860,90 @@ const handleOnlyMineChange = async () => {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.ai-analysis-card {
+  margin-top: 20px;
+}
+
+.ai-content-wrapper {
+  min-height: 100px;
+}
+
+/* Markdown Styles */
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4),
+.markdown-body :deep(h5),
+.markdown-body :deep(h6) {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+  color: #303133;
+}
+
+.markdown-body :deep(p) {
+  margin-bottom: 1em;
+  line-height: 1.6;
+  color: #606266;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 2em;
+  margin-bottom: 1em;
+}
+
+.markdown-body :deep(li) {
+  margin-bottom: 0.5em;
+  line-height: 1.6;
+}
+
+.markdown-body :deep(blockquote) {
+  border-left: 4px solid #409EFF;
+  padding-left: 1em;
+  background-color: #ecf5ff;
+  color: #606266;
+  margin-bottom: 1em;
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+}
+
+.markdown-body :deep(code) {
+  background-color: #f5f7fa;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+  color: #c0392b;
+}
+
+.markdown-body :deep(pre) {
+  background-color: #f5f7fa;
+  padding: 1em;
+  border-radius: 5px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+.markdown-body :deep(pre code) {
+  padding: 0;
+  background-color: transparent;
+  color: #303133;
+}
+
+.markdown-body :deep(strong) {
+  color: #303133;
+  font-weight: 600;
 }
 </style>
