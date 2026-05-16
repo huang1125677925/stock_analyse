@@ -38,6 +38,15 @@
         </div>
       </template>
 
+      <div class="methodology">
+        <p>
+          统计口径：基于申万一级行业分类及行业成分股映射，将股票归入对应行业后，按交易日统计各行业内部走势强弱。
+        </p>
+        <p>
+          计算方式：行业宽度 = 收盘价高于 MA{{ maWindow }} 的股票数 / 行业内可统计股票总数。数值越高，表示该行业内站上均线的股票占比越高，整体走势越强。
+        </p>
+      </div>
+
       <HeatmapChart
         v-if="heatmapOption"
         :option="heatmapOption"
@@ -56,28 +65,16 @@
  * 功能：
  * - 使用行业MA宽度数据渲染热力图（日期 × 行业，值为宽度比例）
  * - 支持选择时间范围与MA窗口
- * - 支持行业白名单过滤
- * 
- * 参数（Props）：
- * - industryWhitelist?: string[] 行业白名单（行业名称），用于过滤显示
  * 
  * 返回值：无
  * 事件（Emits）：
  * - chartReady(chart): 图表初始化完成
  * - chartClick(payload): 图表点击事件，包含 { industry, date, value }
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import HeatmapChart from '@/components/HeatmapChart.vue'
 import { fetchIndustryMaBreadth, type IndustryMaBreadthItem } from '@/services/strategyBreadthApi'
-
-interface Props {
-  industryWhitelist?: string[]
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  industryWhitelist: () => []
-})
 
 const emit = defineEmits<{ chartReady: [chart: echarts.ECharts]; chartClick: [payload: { industry: string; date: string; value: number }] }>()
 
@@ -110,12 +107,7 @@ const toggleLastColumnSort = () => {
 
 // 计算行业与日期维度
 const industries = computed<string[]>(() => {
-  let names = Array.from(new Set(rawData.value.map(d => d.sector_name)))
-  
-  // 应用行业白名单过滤
-  if (props.industryWhitelist && props.industryWhitelist.length > 0) {
-    names = names.filter(n => props.industryWhitelist!.includes(n))
-  }
+  const names = Array.from(new Set(rawData.value.map(d => d.sector_name)))
   
   // 如果启用按最后一列排序
   if (sortByLastColumn.value && dates.value.length > 0) {
@@ -240,11 +232,6 @@ const onChartClick = (params: any) => {
   emit('chartClick', payload)
 }
 
-// 监听白名单变化以重新过滤
-watch(() => props.industryWhitelist, () => {
-  // 仅触发重新计算，不必重新拉取数据
-}, { deep: true })
-
 onMounted(() => {
   fetchData()
 })
@@ -281,6 +268,18 @@ onMounted(() => {
     align-items: center;
     font-weight: 600;
   }
+  .methodology {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid #ebeef5;
+    border-radius: 8px;
+    background: #f7f8fa;
+    color: #606266;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .methodology p { margin: 0; }
+  .methodology p + p { margin-top: 6px; }
   .tips { color: #999; font-size: 12px; }
   .empty-tip { color: #999; padding: 24px; text-align: center; }
 }

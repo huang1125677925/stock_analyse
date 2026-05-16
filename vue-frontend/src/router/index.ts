@@ -142,22 +142,16 @@ const router = createRouter({
           meta: { title: '成交金额占比分位数' }
         },
         {
-          path: '/analysis/congestion/performance',
-          name: 'congestion-performance',
-          component: () => import('@/views/industry-stock-data/CongestionPerformanceView.vue'),
-          meta: { title: '行业业绩指标' }
-        },
-        {
           path: '/analysis/congestion/fundflow',
           name: 'congestion-fundflow',
           component: () => import('@/views/industry-stock-data/CongestionFundFlowView.vue'),
-          meta: { title: '行业资金流' }
+          meta: { title: '行业流入资金分析' }
         },
         {
           path: '/analysis/congestion/breadth',
           name: 'congestion-breadth',
           component: () => import('@/views/industry-stock-data/CongestionBreadthView.vue'),
-          meta: { title: '行业宽度热力图' }
+          meta: { title: '行业宽度分析' }
         },
         {
           path: '/analysis/congestion/scale-breadth',
@@ -211,7 +205,7 @@ const router = createRouter({
           path: '/analysis/etf-tree',
           name: 'etf-tree',
           component: () => import('@/views/markt_data/EtfTreeView.vue'),
-          meta: { title: 'ETF分类树状图' }
+          meta: { title: 'ETF全面分析' }
         },
       ]
     },

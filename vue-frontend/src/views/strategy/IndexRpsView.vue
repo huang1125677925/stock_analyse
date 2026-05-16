@@ -24,11 +24,31 @@
                 <el-option label="概念板块" value="概念板块" />
                 <el-option label="地域板块" value="地域板块" />
               </el-select>
-              <!-- 仅看我的开关 -->
-              <el-checkbox v-model="onlyMine" @change="handleOnlyMineChange" style="margin-left: 12px">仅看我的</el-checkbox>
+              <el-select
+                v-if="idxType === '行业板块'"
+                v-model="industryLevel"
+                placeholder="选择行业级别"
+                style="width: 160px; margin-left: 12px"
+              >
+                <el-option
+                  v-for="level in industryLevelOptions"
+                  :key="level"
+                  :label="level"
+                  :value="level"
+                />
+              </el-select>
             </div>
           </div>
         </template>
+
+        <div class="methodology">
+          <p>
+            RPS（Relative Price Strength）用于衡量当前指数相对同组指数的价格强度。系统先计算各指数在 5、20、60 日周期内的涨跌幅，再按涨跌幅从高到低排序。
+          </p>
+          <p>
+            计算方式：RPS = (1 - 排名 / 总板块数) × 100。数值越高，表示该指数在同组指数中的相对强度越靠前。
+          </p>
+        </div>
         
         <el-table
           :data="paginatedRpsData"
@@ -263,14 +283,26 @@
 
 <script setup lang="ts">
  import { ref, computed, onMounted, watch, defineComponent, h } from 'vue'
- import { useRouter } from 'vue-router'
+ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
 import { Refresh, InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getIndexRps } from '@/services/strategyApi'
-import type { IndexRpsItem } from '@/services/strategyApi'
-import { isAuthenticated } from '@/services/auth'
-import { getPersonalHoldings, type PersonalHoldingsListResponse } from '@/services/personalHoldingsApi'
+import type { DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
+
+const industryLevelOptions: DcIndustryLevel[] = ['东财一级行业', '东财二级行业', '东财三级行业']
+
+interface Props {
+  level?: DcIndustryLevel
+}
+
+const props = defineProps<Props>()
+
+function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
+  return industryLevelOptions.includes(value as DcIndustryLevel)
+    ? value as DcIndustryLevel
+    : '东财一级行业'
+}
 
 /**
  * 组件：指数RPS强度排名视图（IndexRpsView）
@@ -287,7 +319,6 @@ import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi
  *  - 点击指数简称触发路由跳转到股票列表并携带概念名
  *  - 表格排序、分页变化重排/翻页
  *  - 修改板块类型触发数据刷新
- *  - 切换“仅看我的”时，若板块类型为行业板块，则根据个人持有/关注的行业白名单进行筛选
  */
 
 // 数据加载状态
@@ -295,6 +326,7 @@ const loading = ref(false)
 
 // 路由
 const router = useRouter()
+const route = useRoute()
 
 // RPS数据
 const rpsData = ref<IndexRpsItem[]>([])
@@ -304,26 +336,10 @@ const queryTime = ref('')
 const searchKeyword = ref('')
 
 // 板块类型（默认：行业板块）
-const idxType = ref<'概念板块' | '行业板块' | '地域板块'>('行业板块')
+const idxType = ref<IndexRpsIdxType>('行业板块')
 
-/**
- * “仅看我的”筛选
- * 功能：当开启时，若当前板块类型为“行业板块”，从个人持有/关注列表中提取行业名称，形成白名单进行过滤
- * 参数：
- *  - onlyMine(boolean): 是否启用仅看我的
- *  - industryWhitelist(string[]): 行业名称白名单（来自个人持有/关注列表）
- * 返回值：无（通过计算属性影响表格数据）
- * 事件：
- *  - 切换开关时校验登录；未登录则提示并跳转登录
- *  - 成功启用后提示白名单数量；失败则回退状态
- */
-const onlyMine = ref(false)
-const industryWhitelist = ref<string[]>([])
-
-// 是否启用白名单过滤（仅在行业板块且白名单非空时）
-const whitelistEnabled = computed(() => {
-  return onlyMine.value && idxType.value === '行业板块' && industryWhitelist.value.length > 0
-})
+// 行业板块级别，支持通过组件 prop 或 URL query: level 传入初始值
+const industryLevel = ref<DcIndustryLevel>(normalizeIndustryLevel(props.level || route.query.level))
 
 // 分页相关
 const currentPage = ref(1)
@@ -346,10 +362,6 @@ const formatPercent = (value: unknown): string => {
 // 过滤后的RPS数据
 const filteredRpsData = computed(() => {
   let result = rpsData.value
-  // 行业白名单过滤（仅看我的）
-  if (whitelistEnabled.value) {
-    result = result.filter(item => industryWhitelist.value.includes(item.name))
-  }
   if (searchKeyword.value) {
     result = result.filter(item => {
       return item.name.includes(searchKeyword.value)
@@ -563,7 +575,12 @@ const refreshData = async () => {
   loading.value = true
   try {
     const periodsStr = '5,20,60' // 固定周期参数
-    const response = await getIndexRps(periodsStr, false, idxType.value)
+    const response = await getIndexRps(
+      periodsStr,
+      false,
+      idxType.value,
+      idxType.value === '行业板块' ? industryLevel.value : undefined
+    )
     
     // 由于在axiosConfig.ts中已经处理了非200状态码的情况
     // 这里直接使用返回的数据，不需要再次检查code
@@ -592,52 +609,22 @@ watch(searchKeyword, () => {
 watch(idxType, (newType) => {
   currentPage.value = 1
   refreshData()
-  // 如果开启了仅看我的，但当前并非行业板块，提示说明
-  if (onlyMine.value && newType !== '行业板块') {
-    ElMessage.info('“仅看我的”当前仅支持行业板块，其他类型暂不筛选')
+})
+
+// 监听行业级别变化，刷新行业板块数据
+watch(industryLevel, () => {
+  currentPage.value = 1
+  if (idxType.value === '行业板块') {
+    refreshData()
   }
 })
 
-/**
- * 切换“仅看我的”
- * 功能：开启时校验登录并拉取个人持有/关注列表，提取行业名称白名单；关闭时清空白名单
- * 参数：无
- * 返回值：Promise<void>
- * 事件：可能触发登录跳转与提示信息
- */
-const handleOnlyMineChange = async () => {
-  if (onlyMine.value) {
-    if (!isAuthenticated()) {
-      ElMessage.error('请先登录后再启用“仅看我的”')
-      onlyMine.value = false
-      router.push('/login')
-      return
-    }
-    try {
-      const res: PersonalHoldingsListResponse = await getPersonalHoldings()
-      const industries = Array.from(new Set((res.data?.list || [])
-        .map(item => (item.industry || '').trim())
-        .filter(name => !!name)))
-      industryWhitelist.value = industries
-      if (idxType.value !== '行业板块') {
-        // 非行业板块类型时不生效，仅提示说明
-        ElMessage.info('“仅看我的”在当前板块类型下暂不生效（仅支持行业板块）')
-      }
-      if (industries.length === 0) {
-        ElMessage.warning('您的持有/关注列表为空，当前无可筛选的行业')
-      } else {
-        ElMessage.success(`已启用，仅展示 ${industries.length} 个相关行业`)
-      }
-    } catch (error) {
-      console.error('获取个人持有/关注列表失败:', error)
-      ElMessage.error('获取个人行业列表失败，请稍后重试')
-      onlyMine.value = false
-      industryWhitelist.value = []
-    }
-  } else {
-    industryWhitelist.value = []
+watch(() => route.query.level, (level) => {
+  const nextLevel = normalizeIndustryLevel(level)
+  if (nextLevel !== industryLevel.value) {
+    industryLevel.value = nextLevel
   }
-}
+})
 </script>
 
 <style scoped>
@@ -657,6 +644,25 @@ const handleOnlyMineChange = async () => {
 
 .rps-data-section {
   margin-bottom: 20px;
+}
+
+.methodology {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #f7f8fa;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.methodology p {
+  margin: 0;
+}
+
+.methodology p + p {
+  margin-top: 6px;
 }
 
 /* 表格样式 */

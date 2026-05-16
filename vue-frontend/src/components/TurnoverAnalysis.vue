@@ -13,7 +13,7 @@
     <div class="chart-container">
       <!-- 换手率热力图 -->
       <TurnoverHeatmap 
-        :industries="displayedIndustries"
+        :industries="allIndustries"
         :dates="allDates"
         :sort-metric="sortMetric as 'turnover' | 'amount'"
         :sort-ascending="sortAscending"
@@ -27,13 +27,11 @@
 <script setup lang="ts">
 /**
  * 成交金额占比分位数分析组件
- * 功能：显示行业成交金额占比分位数热力图，并支持行业白名单过滤（用于“仅看我的”）
- * 参数：
- * - industryWhitelist?: string[] 行业白名单，传入后仅显示该列表中的行业
+ * 功能：显示行业成交金额占比分位数热力图
  * 返回值：无
  * 事件：chart-ready, chart-click
  */
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryTurnoverPercentile } from '@/services/industry-turnover-percentile'
@@ -52,14 +50,6 @@ interface IndustryData {
   data: CongestionData[]
 }
 
-interface Props {
-  industryWhitelist?: string[]
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  industryWhitelist: () => []
-})
-
 // 响应式变量
 const router = useRouter()
 const sortMetric = ref('amount')
@@ -70,15 +60,6 @@ const loading = ref(false)
 // 数据存储
 const allIndustries = ref<IndustryData[]>([])
 const allDates = ref<string[]>([])
-
-// 根据白名单过滤后的行业
-const displayedIndustries = computed<IndustryData[]>(() => {
-  if (!props.industryWhitelist || props.industryWhitelist.length === 0) {
-    return allIndustries.value
-  }
-  const set = new Set(props.industryWhitelist.map(s => s.trim().toLowerCase()))
-  return allIndustries.value.filter(ind => set.has(ind.name.trim().toLowerCase()))
-})
 
 // 获取换手率数据
 const fetchTurnoverData = async () => {

@@ -461,9 +461,8 @@ const etfIndexMegaMenuSections = [
     title: '行业热点',
     items: [
       { title: '成交金额占比分位数', path: '/analysis/congestion/turnover' },
-      { title: '行业业绩指标', path: '/analysis/congestion/performance' },
-      { title: '行业资金流', path: '/analysis/congestion/fundflow' },
-      { title: '行业宽度热力图', path: '/analysis/congestion/breadth' },
+      { title: '行业流入资金分析', path: '/analysis/congestion/fundflow' },
+      { title: '行业宽度分析', path: '/analysis/congestion/breadth' },
       { title: '行业规模宽度', path: '/analysis/congestion/scale-breadth' },
       { title: '行业产出营收', path: '/analysis/congestion/output-scale' },
       { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
@@ -472,7 +471,7 @@ const etfIndexMegaMenuSections = [
   {
     title: '行业洞察',
     items: [
-      { title: 'ETF分类树状图', path: '/analysis/etf-tree' },
+      { title: 'ETF全面分析', path: '/analysis/etf-tree' },
     ],
   },
 ]

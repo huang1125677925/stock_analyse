@@ -8,7 +8,7 @@
               <span v-if="panelType === 'breadth'">行业规模宽度指标</span>
               <span v-else>行业产出与营收（亿元）</span>
               <div class="header-actions">
-                <span class="tips" v-if="panelType === 'breadth'">展示：market_cap_ratio、company_ratio、scale_breadth（全行业）</span>
+                <span class="tips" v-if="panelType === 'breadth'">按排序指标展示重点行业，可拖动右侧缩放条查看更多</span>
                 <span class="tips" v-else>展示：top_n_revenue_sum、estimated_industry_output（全行业）</span>
                 <el-select v-if="panelType === 'breadth'" v-model="breadthSortMetric" size="small" class="sort-select" @change="onBreadthSortChange">
                   <el-option label="按规模宽度" value="scale_breadth" />
@@ -38,19 +38,15 @@
  * - 在各自视图内支持选择排序指标，默认降序（从大到小）
  * - 监听窗口 resize 事件，确保在 Tab 切换后图表自适应尺寸
  * 
- * 参数（Props）：
- * - industryWhitelist?: string[] 行业白名单（非空时仅展示白名单行业）
- * - panelType?: 'breadth' | 'output' 视图类型（默认 breadth）
- * 
  * 返回值：无
  * 事件：无
  */
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import { fetchIndustryScaleBreadth, fetchIndustryActualOutput, type IndustryScaleBreadthItem, type IndustryActualOutputItem } from '@/services/strategyBreadthApi'
 
-interface Props { industryWhitelist?: string[]; panelType?: 'breadth' | 'output' }
-const props = withDefaults(defineProps<Props>(), { industryWhitelist: () => [], panelType: 'breadth' })
+interface Props { panelType?: 'breadth' | 'output' }
+const props = withDefaults(defineProps<Props>(), { panelType: 'breadth' })
 
 const panelType = props.panelType
 
@@ -84,18 +80,17 @@ function getOutputMetricValue(item: IndustryActualOutputItem | undefined, key: O
 }
 
 function getSortedItemsForBreadth(): IndustryScaleBreadthItem[] {
-  const list = getFilteredScaleItems()
+  const list = scaleItems.value
   const key = breadthSortMetric.value
   // 明确使用降序（从大到小）
   return [...list].sort((a, b) => getBreadthMetricValue(b, key) - getBreadthMetricValue(a, key))
 }
 
-function getSortedItemsForOutput(): IndustryScaleBreadthItem[] {
-  const list = getFilteredScaleItems()
-  const outputMap = new Map(outputItems.value.map(it => [it.sector_code, it]))
+function getSortedItemsForOutput(): IndustryActualOutputItem[] {
+  const list = outputItems.value
   const key = outputSortMetric.value
   // 明确使用降序（从大到小）
-  return [...list].sort((a, b) => getOutputMetricValue(outputMap.get(b.sector_code), key) - getOutputMetricValue(outputMap.get(a.sector_code), key))
+  return [...list].sort((a, b) => getOutputMetricValue(b, key) - getOutputMetricValue(a, key))
 }
 
 function initCharts() {
@@ -112,16 +107,15 @@ function initCharts() {
   }
 }
 
-function getFilteredScaleItems(): IndustryScaleBreadthItem[] {
-  return props.industryWhitelist && props.industryWhitelist.length > 0
-    ? scaleItems.value.filter(i => props.industryWhitelist!.includes(i.sector_name))
-    : scaleItems.value
-}
-
 // 动态计算图表高度
 function calculateChartHeight(itemCount: number): number {
   // 参考HeatmapChart的计算方式：最小高度500px，每个行业22px高度，加上120px的边距
   return Math.max(500, itemCount * 22 + 120)
+}
+
+function calculateCompactChartHeight(): number {
+  if (typeof window === 'undefined') return 560
+  return Math.max(480, Math.min(620, window.innerHeight - 260))
 }
 
 function renderBreadthChart() {
@@ -132,24 +126,69 @@ function renderBreadthChart() {
   const companyRatioSeries = items.map(i => i.company_ratio)
   const scaleBreadthSeries = items.map(i => i.scale_breadth)
   
-  // 动态调整图表容器高度
-  const chartHeight = calculateChartHeight(items.length)
+  const chartHeight = calculateCompactChartHeight()
   if (breadthChartRef.value) {
     breadthChartRef.value.style.height = `${chartHeight}px`
   }
+
+  const visibleCount = Math.min(32, items.length)
+  const endPercent = items.length > 0 ? Math.min(100, (visibleCount / items.length) * 100) : 100
   
   const option: echarts.EChartsOption = {
+    legend: {
+      top: 0,
+      left: 0,
+      itemWidth: 10,
+      itemHeight: 8,
+      textStyle: { fontSize: 12 }
+    },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => {
       const lines = p.map((x: any) => `${x.seriesName}: ${(x.value * 100).toFixed(2)}%`)
       return `${p[0].name}<br/>${lines.join('<br/>')}`
     } },
-    grid: { left: 100, right: 10, top: 12, bottom: 20 },
-    xAxis: { type: 'value', boundaryGap: [0, 0.01], axisLabel: { formatter: (v: number) => `${(v * 100).toFixed(0)}%` } },
-    yAxis: { type: 'category', data: categories, inverse: true },
+    grid: { left: 96, right: 42, top: 36, bottom: 28, containLabel: true },
+    xAxis: {
+      type: 'value',
+      boundaryGap: [0, 0.01],
+      axisLabel: { formatter: (v: number) => `${(v * 100).toFixed(0)}%`, fontSize: 11 },
+      splitLine: { lineStyle: { type: 'dashed', color: '#ebeef5' } }
+    },
+    yAxis: {
+      type: 'category',
+      data: categories,
+      inverse: true,
+      axisTick: { show: false },
+      axisLabel: {
+        fontSize: 11,
+        width: 86,
+        overflow: 'truncate'
+      }
+    },
+    dataZoom: [
+      {
+        type: 'inside',
+        yAxisIndex: 0,
+        start: 0,
+        end: endPercent,
+        zoomOnMouseWheel: false,
+        moveOnMouseWheel: true,
+        moveOnMouseMove: true
+      },
+      {
+        type: 'slider',
+        yAxisIndex: 0,
+        right: 4,
+        width: 14,
+        start: 0,
+        end: endPercent,
+        brushSelect: false,
+        showDetail: false
+      }
+    ],
     series: [
-      { name: 'market_cap_ratio', type: 'bar', data: marketCapSeries, barWidth: 6 },
-      { name: 'company_ratio', type: 'bar', data: companyRatioSeries, barWidth: 6 },
-      { name: 'scale_breadth', type: 'bar', data: scaleBreadthSeries, barWidth: 6 }
+      { name: '总市值占比', type: 'bar', data: marketCapSeries, barWidth: 7, barGap: '35%' },
+      { name: '公司数占比', type: 'bar', data: companyRatioSeries, barWidth: 7, barGap: '35%' },
+      { name: '规模宽度', type: 'bar', data: scaleBreadthSeries, barWidth: 7, barGap: '35%' }
     ]
   }
   breadthChart.setOption(option)
@@ -160,9 +199,8 @@ function renderOutputChart() {
   if (!barChart) return
   const items = getSortedItemsForOutput()
   const categories = items.map(i => i.sector_name)
-  const outputMap = new Map(outputItems.value.map(it => [it.sector_code, it]))
-  const revenueSeries = items.map(i => (outputMap.get(i.sector_code)?.top_n_revenue_sum || 0) / 1e8)
-  const estimatedOutputSeries = items.map(i => (outputMap.get(i.sector_code)?.estimated_industry_output || 0) / 1e8)
+  const revenueSeries = items.map(i => (i.top_n_revenue_sum || 0) / 1e8)
+  const estimatedOutputSeries = items.map(i => (i.estimated_industry_output || 0) / 1e8)
   
   // 动态调整图表容器高度
   const chartHeight = calculateChartHeight(items.length)
@@ -199,6 +237,9 @@ function onOutputSortChange() {
 
 // 处理窗口尺寸变化
 function handleResize() {
+  if (panelType === 'breadth') {
+    renderBreadthChart()
+  }
   breadthChart?.resize()
   barChart?.resize()
 }
@@ -206,12 +247,14 @@ function handleResize() {
 async function loadData() {
   loading.value = true
   try {
-    const [scaleRes, outputRes] = await Promise.all([
-      fetchIndustryScaleBreadth(),
-      fetchIndustryActualOutput(undefined, 3)
-    ])
-    scaleItems.value = scaleRes.data || []
-    outputItems.value = outputRes.data || []
+    if (panelType === 'breadth') {
+      const scaleRes = await fetchIndustryScaleBreadth()
+      console.log(scaleRes)
+      scaleItems.value = Array.isArray(scaleRes.data) ? scaleRes.data : []
+    } else {
+      const outputRes = await fetchIndustryActualOutput(undefined, 3)
+      outputItems.value = Array.isArray(outputRes.data) ? outputRes.data : []
+    }
     if (panelType === 'breadth') {
       renderBreadthChart()
     } else {
@@ -234,16 +277,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
-
-// 行业白名单变化时重新渲染
-watch(() => props.industryWhitelist, () => {
-  if (panelType === 'breadth') {
-    renderBreadthChart()
-  } else {
-    renderOutputChart()
-  }
-  handleResize()
-}, { deep: true })
 </script>
 
 <style scoped lang="scss">

@@ -11,6 +11,10 @@ export interface IndexRpsItem {
   return_60: number
   RPS_60: number  
 }
+
+export type DcIndustryLevel = '东财一级行业' | '东财二级行业' | '东财三级行业'
+export type IndexRpsIdxType = '概念板块' | '行业板块' | '地域板块'
+
 // 独立出来的IndexRps数据结构
 export interface IndexRpsData {
   total: number
@@ -62,7 +66,8 @@ export interface HistoricalRpsResponse {
 export async function getIndexRps(
   periods: string = "5,20,60",
   save: boolean = false,
-  idx_type: '概念板块' | '行业板块' | '地域板块' = '行业板块'
+  idx_type: IndexRpsIdxType = '行业板块',
+  level?: DcIndustryLevel
 ): Promise<IndexRpsData> {
   try {
     const response = await axios.get<IndexRpsData>(
@@ -71,7 +76,8 @@ export async function getIndexRps(
         params: {
           periods,
           save,
-          idx_type
+          idx_type,
+          ...(level ? { level } : {})
         }
       }
     )

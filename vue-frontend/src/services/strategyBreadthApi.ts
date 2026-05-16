@@ -2,6 +2,44 @@
 // 说明：封装行业MA宽度、行业规模宽度与行业实际产出估算三个接口，统一使用 axiosConfig，并返回 data 字段中的业务数据
 import axios from './axiosConfig'
 
+interface ApiResponse<T> {
+  code: number
+  message: string
+  timestamp?: string
+  data: T
+}
+
+interface AxiosLikeResponse<T> {
+  status?: number
+  statusText?: string
+  data: T
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object'
+}
+
+function unwrapBusinessData<T>(
+  payload: ApiResponse<T> | AxiosLikeResponse<ApiResponse<T> | T> | T
+): T {
+  if (
+    isRecord(payload) &&
+    'status' in payload &&
+    'data' in payload
+  ) {
+    return unwrapBusinessData((payload as unknown as AxiosLikeResponse<ApiResponse<T> | T>).data)
+  }
+
+  if (
+    isRecord(payload) &&
+    'code' in payload &&
+    'data' in payload
+  ) {
+    return (payload as unknown as ApiResponse<T>).data
+  }
+  return payload as T
+}
+
 /**
  * 行业MA宽度数据项
  */
@@ -47,11 +85,14 @@ export async function fetchIndustryMaBreadth(
   if (maWindow) params.ma_window = maWindow
   if (sectorCodes && sectorCodes.length > 0) params.sector_codes = sectorCodes.join(',')
 
-  const res = await axios.get<IndustryMaBreadthData>(
+  const res = await axios.get<
+    ApiResponse<IndustryMaBreadthData> | IndustryMaBreadthData,
+    ApiResponse<IndustryMaBreadthData> | AxiosLikeResponse<ApiResponse<IndustryMaBreadthData> | IndustryMaBreadthData> | IndustryMaBreadthData
+  >(
     '/django/api/strategy/industry-ma-breadth/',
     { params }
   )
-  return res.data
+  return unwrapBusinessData(res)
 }
 
 /**
@@ -90,11 +131,14 @@ export async function fetchIndustryScaleBreadth(
   const params: Record<string, any> = {}
   if (sectorCodes && sectorCodes.length > 0) params.sector_codes = sectorCodes.join(',')
 
-  const res = await axios.get<IndustryScaleBreadthData>(
+  const res = await axios.get<
+    ApiResponse<IndustryScaleBreadthData> | IndustryScaleBreadthData,
+    ApiResponse<IndustryScaleBreadthData> | AxiosLikeResponse<ApiResponse<IndustryScaleBreadthData> | IndustryScaleBreadthData> | IndustryScaleBreadthData
+  >(
     '/django/api/strategy/industry-scale-breadth/',
     { params }
   )
-  return res.data
+  return unwrapBusinessData(res)
 }
 
 /**
@@ -120,7 +164,7 @@ export interface IndustryActualOutputData {
   data: IndustryActualOutputItem[]
   sector_codes: string[]
   top_n: number
-  report_date: string
+  report_date: string | null
   query_time: string
 }
 
@@ -140,9 +184,12 @@ export async function fetchIndustryActualOutput(
   if (sectorCodes && sectorCodes.length > 0) params.sector_codes = sectorCodes.join(',')
   if (reportDate) params.report_date = reportDate
 
-  const res = await axios.get<IndustryActualOutputData>(
+  const res = await axios.get<
+    ApiResponse<IndustryActualOutputData> | IndustryActualOutputData,
+    ApiResponse<IndustryActualOutputData> | AxiosLikeResponse<ApiResponse<IndustryActualOutputData> | IndustryActualOutputData> | IndustryActualOutputData
+  >(
     '/django/api/strategy/industry-actual-output/',
     { params }
   )
-  return res.data
+  return unwrapBusinessData(res)
 }
