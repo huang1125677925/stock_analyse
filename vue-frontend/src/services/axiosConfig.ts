@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
+import { API_BASE_URL } from '@/config/api';
 
 // 创建axios实例
 const instance = axios.create({
+  baseURL: API_BASE_URL || undefined,
   timeout: 10000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json'

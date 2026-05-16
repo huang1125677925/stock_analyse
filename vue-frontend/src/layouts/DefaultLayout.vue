@@ -32,8 +32,8 @@
                 </template>
                 <div class="mega-menu-container">
                   <div class="mega-menu-content">
-                    <div v-for="section in getMegaMenuSections(item.path)" :key="section.title" class="mega-column">
-                      <div class="mega-column-title">{{ section.title }}</div>
+                    <div v-for="section in getMegaMenuSections(item.path)" :key="section.title || section.items.map(link => link.title).join('-')" class="mega-column">
+                      <div v-if="section.title" class="mega-column-title">{{ section.title }}</div>
                       <ul class="mega-column-list">
                         <li v-for="link in section.items" :key="link.title">
                           <el-link 
@@ -417,19 +417,24 @@ interface MenuItem {
 const menuItems = computed(() => {
   const baseMenuItems: MenuItem[] = [
     {
-      path: '/market-fundamentals',
-      title: '股市基本面',
+      path: '/',
+      title: '大盘估值',
       icon: 'DataAnalysis',
     },
     {
       path: '/etf',
-      title: '行业/指数/ETF',
+      title: '行业跟踪',
       icon: 'DataLine',
     },
     {
       path: '/stock-picker',
-      title: '股票综合',
+      title: '股票实战',
       icon: 'MagicStick',
+    },
+    {
+      path: '/technical-learning',
+      title: '技术学习',
+      icon: 'Document',
     },
     {
       path: '/quant',
@@ -443,43 +448,21 @@ const menuItems = computed(() => {
   return baseMenuItems
 })
 
-// 股市基本面大导航结构（悬停展开的 mega menu）
-const fundamentalsMegaMenuSections = [
-  {
-    title: '大盘分析',
-    items: [
-      { title: '大盘涨跌', path: '/analysis/market-change' },
-      { title: '大盘分析', path: '/analysis/market' },
-      { title: '大盘估值', path: '/analysis/index-dailybasic' },
-    ],
-  },
-  {
-    title: '新闻与舆情',
-    items: [
-      { title: 'CCTV新闻', path: '/analysis/news-list' },
-      { title: '新闻热力图', path: '/analysis/news-wordcloud' },
-    ],
-  },
-  {
-    title: '互动问答',
-    items: [
-      { title: '上证E互动问答', path: '/analysis/irm-qa-sh' },
-      { title: '深证互动易问答', path: '/analysis/irm-qa-sz' },
-    ],
-  },
-]
-
 // ETF/指数大导航结构（悬停展开的 mega menu）
 const etfIndexMegaMenuSections = [
   {
-    title: '行业分析',
+    title: '行业估值',
     items: [
-      { title: '行业整体分析', path: '/analysis/congestion' },
-      { title: '单一行业分析', path: '/industries' },
+      // { title: '申万行业指数日线行情', path: '/analysis/sw-industry-daily' },
+      { title: '申万行业估值分析', path: '/analysis/sw-industry-valuation' },
+    ],
+  },
+  {
+    title: '行业热点',
+    items: [
       { title: '成交金额占比分位数', path: '/analysis/congestion/turnover' },
       { title: '行业业绩指标', path: '/analysis/congestion/performance' },
       { title: '行业资金流', path: '/analysis/congestion/fundflow' },
-      { title: '行业矩形树图', path: '/analysis/congestion/treemap' },
       { title: '行业宽度热力图', path: '/analysis/congestion/breadth' },
       { title: '行业规模宽度', path: '/analysis/congestion/scale-breadth' },
       { title: '行业产出营收', path: '/analysis/congestion/output-scale' },
@@ -487,30 +470,9 @@ const etfIndexMegaMenuSections = [
     ],
   },
   {
-    title: '指数分析',
+    title: '行业洞察',
     items: [
-      { title: '指数列表', path: '/analysis/index-list' },
-      { title: '指数分类树状图', path: '/analysis/index-tree' },
-      { title: '指数趋势图', path: '/analysis/index-analysis' },
-      { title: '申万行业指数分类', path: '/analysis/sw-index-classify' },
-      { title: '申万行业分类树状图', path: '/analysis/sw-industry-tree' },
-      { title: '申万指数图谱', path: '/analysis/sw-index-graph'},
-      { title: '申万行业指数成分构成', path: '/analysis/sw-index-member-all' },
-      { title: '指数基金图谱说明', path: '/analysis/index-fund-atlas' },
-      // { title: '申万行业指数日线行情', path: '/analysis/sw-industry-daily' },
-      { title: '申万行业估值分析', path: '/analysis/sw-industry-valuation' },
-    ],
-  },
-  {
-    title: 'ETF分析',
-    items: [
-      { title: 'ETF基本信息', path: '/analysis/etf-basic' },
-      { title: 'ETF数据统计分析', path: '/analysis/etf-analysis' },
-      { title: 'ETF日线行情', path: '/analysis/etf-daily' },
-      { title: 'ETF实时行情', path: '/analysis/etf-realtime' },
       { title: 'ETF分类树状图', path: '/analysis/etf-tree' },
-      { title: 'ETF相关性分析', path: '/analysis/etf-correlation' },
-      { title: 'ETF波动性列表', path: '/analysis/etf-volatility' },
     ],
   },
 ]
@@ -518,39 +480,11 @@ const etfIndexMegaMenuSections = [
 // 智能选股大导航结构（悬停展开的 mega menu）
 const stockPickerMegaMenuSections = [
   {
-    title: '基础数据',
+    title: '',
     items: [
-      { title: '股票列表', path: '/stock-list' },
-      { title: '个股分析', path: '/stock-history' },
-      { title: '股票相关性分析', path: '/stock-correlation' },
-      { title: '股票波动率分析', path: '/stock-volatility' },
-    ],
-  },
-  {
-    title: '选股工具',
-    items: [
-      { title: '因子选股', path: '/analysis/factor-stock-picker' },
-      { title: '策略选股', path: '/strategy-results' },
-      { title: '连板天梯', path: '/stock-limit-step' },
-    ],
-  },
-  {
-    title: '资金分析',
-    items: [
-      { title: '游资每日明细', path: '/stock-hm-detail' },
-      { title: '每日筹码及胜率', path: '/stock-cyq-perf' },
-      { title: '券商推荐评级', path: '/stock-broker-recommend' },
-      { title: 'AH溢价对比', path: '/stock-ah-comparison' },
-    ],
-  },
-  {
-    title: '沪深港通/中结',
-    items: [
-      { title: '中结持股汇总', path: '/stock-ccass-hold' },
-      { title: '中结持股明细', path: '/stock-ccass-hold-detail' },
-      { title: '沪深港股通持股明细', path: '/stock-hk-hold-detail' },
-      { title: '沪深股通十大成交股', path: '/stock-hsgt-top10' },
-      { title: '沪深港通股票列表', path: '/stock-hsgt-list' },
+      { title: '打板', path: '/stock-limit-board-analysis' },
+      { title: '价值', path: '/stock-value-practice' },
+      { title: '波段', path: '/stock-swing-practice' },
     ],
   },
 ]
@@ -585,13 +519,11 @@ function goPath(path?: string) {
 }
 
 function hasMegaMenu(path: string) {
-  return ['/analysis', '/market-fundamentals', '/stock-picker', '/etf', '/quant'].includes(path)
+  return ['/analysis', '/stock-picker', '/etf', '/quant'].includes(path)
 }
 
 function getMegaMenuSections(path: string) {
   switch (path) {
-    case '/market-fundamentals':
-      return fundamentalsMegaMenuSections
     case '/stock-picker':
       return stockPickerMegaMenuSections
     case '/etf':
@@ -650,6 +582,7 @@ watch(
 .topbar-left {
   display: flex;
   align-items: center;
+  margin-right: 32px;
 }
 
 .app-title {

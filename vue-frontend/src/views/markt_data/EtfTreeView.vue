@@ -1,61 +1,96 @@
 <template>
   <div class="etf-tree-view">
-    <div class="main-container">
-      <el-card class="left-panel">
-        <template #header>
-          <div class="card-header">
-            <span>ETF分类树状图</span>
+    <el-card class="left-panel">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <div class="panel-title">基金管理人</div>
+            <div class="panel-subtitle">先选 ETF 类型，再从管理人卡片下钻</div>
           </div>
-        </template>
-        <div class="tree-wrapper">
-          <div class="tree-search">
-            <el-input v-model="filterText" clearable size="small" placeholder="筛选节点（模糊匹配名称/代码/管理人）" />
-          </div>
-          <el-tree
-            ref="treeRef"
-            :props="defaultProps"
-            :load="loadNode"
-            lazy
-            node-key="key"
-            highlight-current
-            :filter-node-method="filterNode"
-            @node-click="handleNodeClick"
-            @node-expand="handleNodeExpand"
-          >
-            <template #default="{ node, data }">
-              <span class="custom-tree-node">
-                <span class="node-label">{{ node.label }}</span>
-                <span class="node-info">
-                  <el-tag v-if="data.nodeType === 'TYPE'" size="small" type="primary" effect="plain">
-                    {{ data.etf_type }}
-                  </el-tag>
-                  <el-tag v-else-if="data.nodeType === 'INDEX'" size="small" type="warning" effect="plain">
-                    指数
-                  </el-tag>
-                  <el-tag v-else-if="data.nodeType === 'CAT'" size="small" type="info" effect="plain">
-                    指数类别
-                  </el-tag>
-                  <el-tag v-else-if="data.nodeType === 'MGR'" size="small" type="info" effect="plain">
-                    基金管理人
-                  </el-tag>
-                  <el-tag v-else-if="data.nodeType === 'ETF'" size="small" type="success" effect="plain">
-                    ETF
-                  </el-tag>
-                </span>
-              </span>
-            </template>
-          </el-tree>
         </div>
-      </el-card>
+      </template>
 
-      <el-card class="right-panel">
-        <template #header>
-          <div class="card-header">
-            <span>详情信息</span>
+      <div class="manager-panel" v-loading="etfBasicLoading">
+        <div class="manager-toolbar">
+          <el-button-group>
+            <el-button
+              v-for="type in etfTypes"
+              :key="type"
+              :type="selectedEtfType === type ? 'primary' : 'default'"
+              size="small"
+              @click="selectEtfType(type)"
+            >
+              {{ type }}
+            </el-button>
+          </el-button-group>
+          <el-input
+            v-model="managerKeyword"
+            clearable
+            size="small"
+            placeholder="筛选管理人"
+            class="manager-search"
+          />
+        </div>
+
+        <div class="manager-summary">
+          <span>管理人 {{ filteredManagerCards.length }} 家</span>
+          <span>ETF {{ currentTypeItems.length }} 只</span>
+        </div>
+
+        <div class="manager-card-grid">
+          <button
+            v-for="card in filteredManagerCards"
+            :key="card.key"
+            type="button"
+            class="manager-card"
+            :class="{ active: detailDialogVisible && currentData?.key === card.key }"
+            @click="selectManager(card)"
+          >
+            <div class="manager-card-name">{{ card.mgr_name }}</div>
+            <div class="manager-card-meta">
+              <span>{{ card.count }} 只 ETF</span>
+              <span>{{ card.indexCount }} 个指数</span>
+            </div>
+            <div class="manager-card-stats">
+              <span class="rise-text">涨 {{ card.upCount }}</span>
+              <span class="fall-text">跌 {{ card.downCount }}</span>
+              <span :class="pctClass(card.avgPctChg)">均涨幅 {{ formatPctChg(card.avgPctChg) }}</span>
+            </div>
+            <div class="manager-card-tags">
+              <el-tag size="small" type="info" effect="plain">{{ card.categoryCount }} 个类别</el-tag>
+              <el-tag size="small" type="success" effect="plain">{{ card.etf_type }}</el-tag>
+            </div>
+          </button>
+        </div>
+      </div>
+    </el-card>
+
+    <el-dialog
+      v-model="detailDialogVisible"
+      width="72vw"
+      top="4vh"
+      class="detail-dialog"
+      destroy-on-close
+    >
+      <template #header>
+        <div class="card-header detail-header">
+          <div>
+            <div class="panel-title">详情信息</div>
+            <div v-if="currentData" class="breadcrumb-line">
+              <el-breadcrumb separator="/">
+                <el-breadcrumb-item
+                  v-for="crumb in currentPath"
+                  :key="crumb.key"
+                >
+                  <a href="#" @click.prevent="selectPathNode(crumb)">{{ crumb.label }}</a>
+                </el-breadcrumb-item>
+              </el-breadcrumb>
+            </div>
           </div>
-        </template>
+        </div>
+      </template>
 
-        <div v-if="currentData" class="detail-content">
+      <div v-if="currentData" class="detail-content">
           <el-tabs v-model="activeTab" class="detail-tabs">
             <el-tab-pane label="基本信息" name="basic">
               <div class="tab-content">
@@ -66,7 +101,6 @@
                     <el-tag v-else-if="currentData.nodeType === 'CAT'" type="info">指数类别</el-tag>
                     <el-tag v-else-if="currentData.nodeType === 'MGR'" type="info">基金管理人</el-tag>
                     <el-tag v-else-if="currentData.nodeType === 'ETF'" type="success">ETF</el-tag>
-                    <el-tag v-else type="info">根</el-tag>
                   </el-descriptions-item>
                   <el-descriptions-item label="名称">
                     <span class="detail-title">{{ currentData.label }}</span>
@@ -93,9 +127,6 @@
                     <el-descriptions-item label="交易所">
                       {{ currentData.item.exchange }}
                     </el-descriptions-item>
-                    <el-descriptions-item label="管理人">
-                      {{ currentData.item.mgr_name }}
-                    </el-descriptions-item>
                     <el-descriptions-item label="上市状态">
                       {{ currentData.item.list_status }}
                     </el-descriptions-item>
@@ -110,32 +141,35 @@
                     <span>下级列表 ({{ currentChildren.length }})</span>
                   </div>
 
-                  <template v-if="currentData.nodeType === 'TYPE'">
-                    <el-table 
-                      :data="typeManagerSummaryTable" 
-                      style="width: 100%" 
-                      height="300" 
-                      border 
-                      stripe 
+                  <template v-if="currentData.nodeType === 'MGR'">
+                    <el-table
+                      :data="managerIndexSummaryTable"
+                      style="width: 100%"
+                      height="280"
+                      border
+                      stripe
                       size="small"
+                      @row-click="openManagerCategory"
                     >
-                      <el-table-column prop="mgr_name" label="基金管理人" min-width="220" show-overflow-tooltip />
+                      <el-table-column prop="category" label="指数类别" min-width="180" />
                       <el-table-column prop="count" label="ETF数量" width="100" align="center" />
-                    </el-table>
-                  </template>
-
-                  <template v-else-if="currentData.nodeType === 'MGR'">
-                    <el-table 
-                      :data="managerIndexSummaryTable" 
-                      style="width: 100%" 
-                      height="300" 
-                      border 
-                      stripe 
-                      size="small"
-                    >
-                      <el-table-column prop="index_code" label="指数代码" width="160" />
-                      <el-table-column prop="index_name" label="指数名称" min-width="220" show-overflow-tooltip />
-                      <el-table-column prop="count" label="ETF数量" width="100" align="center" />
+                      <el-table-column prop="upCount" label="上涨" width="80" align="center" />
+                      <el-table-column prop="downCount" label="下跌" width="80" align="center" />
+                      <el-table-column label="平均涨幅" width="110" align="right">
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.avgPctChg)">{{ formatPctChg(scope.row.avgPctChg) }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="最大上涨ETF" min-width="180" show-overflow-tooltip>
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.maxUpPctChg)">{{ formatSummaryEtf(scope.row.maxUpName, scope.row.maxUpPctChg) }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="最大下跌ETF" min-width="180" show-overflow-tooltip>
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.maxDownPctChg)">{{ formatSummaryEtf(scope.row.maxDownName, scope.row.maxDownPctChg) }}</span>
+                        </template>
+                      </el-table-column>
                     </el-table>
                     <div class="section-header">指数类别分布</div>
                     <el-row :gutter="20" class="mt-10">
@@ -143,44 +177,66 @@
                         <el-table
                           :data="managerIndexCategorySummary"
                           style="width: 100%"
-                          height="260"
+                          height="240"
                           border
                           stripe
                           size="small"
+                          @row-click="openManagerCategory"
                         >
                           <el-table-column prop="category" label="类别" min-width="160" show-overflow-tooltip />
                           <el-table-column prop="count" label="数量" width="100" align="center" />
+                          <el-table-column prop="upCount" label="涨" width="70" align="center" />
+                          <el-table-column prop="downCount" label="跌" width="70" align="center" />
                         </el-table>
                       </el-col>
                       <el-col :span="14">
-                        <div ref="categoryChartRef" style="width: 100%; height: 280px;"></div>
+                        <div ref="categoryChartRef" class="category-chart"></div>
                       </el-col>
                     </el-row>
                   </template>
 
                   <template v-else-if="currentData.nodeType === 'CAT'">
-                    <el-table 
-                      :data="categoryIndexSummaryTable" 
-                      style="width: 100%" 
-                      height="300" 
-                      border 
-                      stripe 
+                    <el-table
+                      :data="categoryIndexSummaryTable"
+                      style="width: 100%"
+                      height="300"
+                      border
+                      stripe
                       size="small"
+                      @row-click="openCategoryIndex"
                     >
                       <el-table-column prop="index_code" label="指数代码" width="160" />
                       <el-table-column prop="index_name" label="指数名称" min-width="220" show-overflow-tooltip />
                       <el-table-column prop="count" label="ETF数量" width="100" align="center" />
+                      <el-table-column prop="upCount" label="上涨" width="80" align="center" />
+                      <el-table-column prop="downCount" label="下跌" width="80" align="center" />
+                      <el-table-column label="平均涨幅" width="110" align="right">
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.avgPctChg)">{{ formatPctChg(scope.row.avgPctChg) }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="最大上涨ETF" min-width="180" show-overflow-tooltip>
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.maxUpPctChg)">{{ formatSummaryEtf(scope.row.maxUpName, scope.row.maxUpPctChg) }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="最大下跌ETF" min-width="180" show-overflow-tooltip>
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.maxDownPctChg)">{{ formatSummaryEtf(scope.row.maxDownName, scope.row.maxDownPctChg) }}</span>
+                        </template>
+                      </el-table-column>
                     </el-table>
                   </template>
 
                   <template v-else-if="currentData.nodeType === 'INDEX'">
-                    <el-table 
-                      :data="etfListTable" 
-                      style="width: 100%" 
-                      height="360" 
-                      border 
-                      stripe 
+                    <el-table
+                      :data="etfListTable"
+                      style="width: 100%"
+                      height="360"
+                      border
+                      stripe
                       size="small"
+                      @row-click="openEtfDetail"
                     >
                       <el-table-column prop="ts_code" label="交易代码" width="140" align="center" />
                       <el-table-column prop="csname" label="ETF简称" min-width="220" show-overflow-tooltip />
@@ -188,27 +244,131 @@
                       <el-table-column prop="exchange" label="交易所" width="100" align="center" />
                       <el-table-column prop="mgr_name" label="管理人" min-width="160" show-overflow-tooltip />
                       <el-table-column prop="list_status" label="上市状态" width="100" align="center" />
+                      <el-table-column label="涨跌幅" width="100" align="right">
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.latest_pct_chg)">{{ formatPctChg(scope.row.latest_pct_chg) }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="涨跌额" width="100" align="right">
+                        <template #default="scope">
+                          <span :class="pctClass(scope.row.latest_change)">{{ formatChange(scope.row.latest_change) }}</span>
+                        </template>
+                      </el-table-column>
                       <el-table-column prop="list_date" label="上市日期" width="120" align="center" />
                     </el-table>
                   </template>
                 </div>
+              </div>
+            </el-tab-pane>
 
-                <div v-else-if="currentData.nodeType !== 'ETF'" class="no-children-tip">
-                  <el-text type="info">暂无已展开的下级节点，请在左侧点击展开</el-text>
+            <el-tab-pane label="ETF总览" name="overview">
+              <div class="tab-content">
+                <el-card shadow="never" class="overview-filter-card">
+                  <el-form :model="overviewQuery" label-width="90px" label-position="left" inline>
+                    <el-form-item label="ETF代码">
+                      <el-select
+                        v-model="overviewQuery.ts_code"
+                        placeholder="搜索 ETF"
+                        filterable
+                        remote
+                        reserve-keyword
+                        clearable
+                        :remote-method="remoteSearchEtf"
+                        :loading="selectLoading"
+                        style="width: 220px"
+                      >
+                        <el-option
+                          v-for="item in etfOptions"
+                          :key="item.ts_code"
+                          :label="`${item.extname || item.csname || item.cname || ''}（${item.ts_code}）`"
+                          :value="item.ts_code"
+                        />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="指数代码">
+                      <el-input v-model="overviewQuery.index_code" clearable style="width: 180px" />
+                    </el-form-item>
+                    <el-form-item label="交易所">
+                      <el-select v-model="overviewQuery.exchange" clearable style="width: 120px">
+                        <el-option v-for="item in exchangeOptions" :key="item" :label="item" :value="item" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="上市状态">
+                      <el-select v-model="overviewQuery.list_status" clearable style="width: 120px">
+                        <el-option label="上市" value="L" />
+                        <el-option label="退市" value="D" />
+                        <el-option label="暂停" value="P" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="名称关键词">
+                      <el-input v-model="overviewQuery.name" clearable style="width: 180px" />
+                    </el-form-item>
+                    <el-form-item>
+                      <el-button type="primary" @click="resetOverviewPage">查询</el-button>
+                      <el-button @click="resetOverviewFilters">重置</el-button>
+                    </el-form-item>
+                  </el-form>
+                </el-card>
+
+                <el-table :data="overviewPaginatedItems" border stripe height="420" size="small" @row-click="openEtfDetail">
+                  <el-table-column prop="extname" label="ETF简称" min-width="160" />
+                  <el-table-column prop="ts_code" label="ETF代码" min-width="140" />
+                  <el-table-column prop="index_name" label="跟踪指数" min-width="160" />
+                  <el-table-column prop="index_code" label="指数代码" min-width="140" />
+                  <el-table-column prop="exchange" label="交易所" min-width="80" align="center" />
+                  <el-table-column prop="csname" label="基金简称" min-width="140" />
+                  <el-table-column prop="etf_type" label="ETF类型" min-width="120" align="center" />
+                  <el-table-column prop="mgt_fee" label="管理费率" min-width="100" align="center" />
+                  <el-table-column prop="list_date" label="上市日期" min-width="120" align="center" />
+                  <el-table-column prop="custod_name" label="托管人" min-width="180" />
+                </el-table>
+
+                <div class="pagination">
+                  <el-pagination
+                    background
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="overviewFilteredItems.length"
+                    :page-sizes="[10, 20, 50, 100]"
+                    v-model:page-size="overviewPagination.page_size"
+                    v-model:current-page="overviewPagination.page"
+                    @size-change="resetOverviewPage"
+                    @current-change="syncOverviewPage"
+                  />
                 </div>
               </div>
             </el-tab-pane>
+
+            <el-tab-pane
+              v-if="currentData.nodeType === 'MGR' || currentData.nodeType === 'CAT'"
+              label="相关性分析"
+              name="correlation"
+            >
+              <div class="tab-content">
+                <etf-correlation-tab :etf-codes="catEtfCodes" :code-name-map="catCodeNameMapObj" />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane
+              v-if="currentData.nodeType === 'MGR' || currentData.nodeType === 'CAT'"
+              label="波动性分析"
+              name="volatility"
+            >
+              <div class="tab-content">
+                <etf-category-volatility-tab :etf-codes="catEtfCodes" :code-name-map="catCodeNameMapObj" />
+              </div>
+            </el-tab-pane>
+
             <el-tab-pane v-if="currentData.nodeType === 'ETF'" label="趋势图" name="trend">
               <div class="tab-content">
-                <div style="margin-bottom: 10px; display: flex; justify-content: flex-end; gap: 8px;">
-                  <span style="align-self: center; color: #606266; font-size: 13px;">日期范围</span>
+                <div class="range-toolbar">
+                  <span class="toolbar-label">日期范围</span>
                   <el-button-group>
                     <el-button :type="etfTrendRange === '1y' ? 'primary' : 'default'" size="small" @click="etfTrendRange = '1y'">一年</el-button>
                     <el-button :type="etfTrendRange === '3y' ? 'primary' : 'default'" size="small" @click="etfTrendRange = '3y'">三年</el-button>
                     <el-button :type="etfTrendRange === '5y' ? 'primary' : 'default'" size="small" @click="etfTrendRange = '5y'">五年</el-button>
                   </el-button-group>
                 </div>
-                <div v-if="etfTrendLoading" style="padding: 20px;">
+                <div v-if="etfTrendLoading" class="loading-block">
                   <el-skeleton :rows="8" animated />
                 </div>
                 <div v-else>
@@ -223,6 +383,7 @@
                 </div>
               </div>
             </el-tab-pane>
+
             <el-tab-pane v-if="currentData.nodeType === 'INDEX'" label="成分与权重" name="weights">
               <div class="tab-content">
                 <el-table
@@ -252,18 +413,14 @@
                   </el-table-column>
                   <el-table-column prop="trade_date" label="交易日期" width="120" align="center" />
                 </el-table>
-                <div class="section-header" style="margin-top: 10px;">成分行业分布</div>
-                <div ref="industryChartRef" style="width: 100%; height: 280px;"></div>
+                <div class="section-header">成分行业分布</div>
+                <div ref="industryChartRef" class="industry-chart"></div>
               </div>
             </el-tab-pane>
-            <el-tab-pane v-if="currentData.nodeType === 'CAT'" label="波动性分析" name="cat-volatility">
-              <div class="tab-content">
-                <etf-category-volatility-tab :etf-codes="catEtfCodes" :code-name-map="catCodeNameMapObj" />
-              </div>
-            </el-tab-pane>
+
             <el-tab-pane v-if="currentData.nodeType === 'INDEX'" label="趋势图" name="index-trend">
               <div class="tab-content">
-                <div v-if="indexTrendLoading" style="padding: 20px;">
+                <div v-if="indexTrendLoading" class="loading-block">
                   <el-skeleton :rows="8" animated />
                 </div>
                 <div v-else>
@@ -279,29 +436,27 @@
               </div>
             </el-tab-pane>
           </el-tabs>
-        </div>
-        <div v-else class="empty-state">
-          <el-empty description="请选择左侧节点查看详情" />
-        </div>
-      </el-card>
-    </div>
+      </div>
+      <div v-else class="empty-state">
+        <el-empty description="请先从左侧选择基金管理人卡片" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import type Node from 'element-plus/es/components/tree/src/model/node'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getEtfBasic, type EtfBasicItem } from '@/services/etfApi'
+import { getEtfBasic, getEtfDailyLatest, type EtfBasicItem, getEtfDaily, type EtfDailyItem } from '@/services/etfApi'
 import * as echarts from 'echarts'
 import { fetchIndexBasicList, type IndexBasicItem, fetchIndexWeight, type IndexWeightItem } from '@/services/indexBasicApi'
-import { getEtfDaily, type EtfDailyItem } from '@/services/etfApi'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import EtfCategoryVolatilityTab from '@/components/EtfCategoryVolatilityTab.vue'
+import EtfCorrelationTab from '@/components/EtfCorrelationTab.vue'
 import { fetchIndexDailyKline, type IndexDailyKlineItem } from '@/services/indexDailyApi'
 import { getStockList } from '@/services/individualStockApi'
 
-type NodeType = 'ROOT' | 'TYPE' | 'MGR' | 'CAT' | 'INDEX' | 'ETF'
+type NodeType = 'TYPE' | 'MGR' | 'CAT' | 'INDEX' | 'ETF'
 
 interface TreeNodeData {
   key: string
@@ -314,14 +469,45 @@ interface TreeNodeData {
   category?: string
   item?: EtfBasicItem
 }
-const treeRef = ref()
-const filterText = ref('')
 
+interface ManagerCard {
+  key: string
+  mgr_name: string
+  etf_type: string
+  count: number
+  indexCount: number
+  categoryCount: number
+  upCount: number
+  downCount: number
+  flatCount: number
+  avgPctChg: number | null
+  maxUpName: string
+  maxUpPctChg: number | null
+  maxDownName: string
+  maxDownPctChg: number | null
+}
+
+interface RealtimeSummary {
+  upCount: number
+  downCount: number
+  flatCount: number
+  avgPctChg: number | null
+  maxUpName: string
+  maxUpPctChg: number | null
+  maxDownName: string
+  maxDownPctChg: number | null
+}
 
 const currentData = ref<TreeNodeData | null>(null)
-const currentNode = ref<Node | null>(null)
 const currentChildren = ref<TreeNodeData[]>([])
 const activeTab = ref('basic')
+const detailDialogVisible = ref(false)
+const managerKeyword = ref('')
+const selectedEtfType = ref('')
+const etfBasicLoading = ref(false)
+const selectLoading = ref(false)
+let etfBasicLoadPromise: Promise<void> | null = null
+
 const indexWeights = ref<IndexWeightItem[]>([])
 type DisplayIndexWeight = IndexWeightItem & { base_code: string; stock_name?: string; industry?: string }
 const displayIndexWeights = ref<DisplayIndexWeight[]>([])
@@ -331,6 +517,20 @@ const etfDailyItems = ref<EtfDailyItem[]>([])
 const indexTrendLoading = ref(false)
 const indexDailyItems = ref<IndexDailyKlineItem[]>([])
 const etfTrendRange = ref<'1y' | '3y' | '5y'>('1y')
+const latestRealtimeItems = ref<EtfDailyItem[]>([])
+const realtimeLoading = ref(false)
+
+const overviewQuery = reactive({
+  ts_code: '',
+  index_code: '',
+  exchange: '',
+  list_status: '',
+  name: ''
+})
+const overviewPagination = reactive({ page: 1, page_size: 20 })
+const etfOptions = ref<EtfBasicItem[]>([])
+const exchangeOptions = ref<string[]>([])
+
 const etfKlineData = computed(() =>
   (etfDailyItems.value || []).map(d => ({
     date: d.trade_date,
@@ -361,429 +561,518 @@ let categoryChart: echarts.ECharts | null = null
 const industryChartRef = ref<HTMLElement>()
 let industryChart: echarts.ECharts | null = null
 
-const etfTypes = [
-  { code: '纯境内', name: '纯境内' },
-  { code: 'QDII', name: 'QDII' }
-]
-
-const defaultProps = {
-  label: 'label',
-  isLeaf: (data: TreeNodeData, node: Node) => {
-    return data.nodeType === 'ETF'
+const etfTypes = computed(() => Array.from(typeCache.value.keys()).sort((a, b) => a.localeCompare(b, 'zh-CN')))
+const currentTypeItems = computed(() => typeCache.value.get(selectedEtfType.value) || [])
+const latestRealtimeMap = computed(() => {
+  const map = new Map<string, EtfDailyItem>()
+  for (const item of latestRealtimeItems.value) {
+    if (item.ts_code) map.set(item.ts_code, item)
   }
-}
-
-const filterNode = (value: string, data: TreeNodeData, node: Node) => {
-  if (!value) return true
-  const q = value.trim().toLowerCase()
-  const fields = [
-    data.label || '',
-    data.etf_type || '',
-    data.index_code || '',
-    data.index_name || '',
-    data.mgr_name || '',
-    data.category || '',
-    data.item?.ts_code || '',
-    data.item?.csname || '',
-    data.item?.extname || ''
-  ]
-  return fields.some(f => f.toLowerCase().includes(q))
-}
-
-watch(filterText, (val) => {
-  if (treeRef.value && typeof treeRef.value.filter === 'function') {
-    treeRef.value.filter(val)
-  }
+  return map
 })
 
-const updateCurrentChildren = (node: Node) => {
-  if (node && node.childNodes) {
-    currentChildren.value = node.childNodes.map(child => child.data as TreeNodeData)
-  } else {
-    currentChildren.value = []
+const getEtfDisplayName = (item: Partial<EtfBasicItem>) => item.extname || item.csname || item.cname || item.ts_code || '--'
+
+const emptyRealtimeSummary = (): RealtimeSummary => ({
+  upCount: 0,
+  downCount: 0,
+  flatCount: 0,
+  avgPctChg: null,
+  maxUpName: '--',
+  maxUpPctChg: null,
+  maxDownName: '--',
+  maxDownPctChg: null
+})
+
+const summarizeRealtime = (items: EtfBasicItem[]): RealtimeSummary => {
+  const summary = emptyRealtimeSummary()
+  const realtimeRows = items
+    .map(item => {
+      const latest = latestRealtimeMap.value.get(item.ts_code)
+      const pct = latest?.pct_chg
+      if (pct === null || pct === undefined || Number.isNaN(Number(pct))) return null
+      return {
+        name: getEtfDisplayName(item),
+        pct: Number(pct)
+      }
+    })
+    .filter((item): item is { name: string; pct: number } => item !== null)
+
+  if (realtimeRows.length === 0) return summary
+
+  let pctSum = 0
+  let maxUp: { name: string; pct: number } | null = null
+  let maxDown: { name: string; pct: number } | null = null
+
+  for (const row of realtimeRows) {
+    pctSum += row.pct
+    if (row.pct > 0) summary.upCount += 1
+    else if (row.pct < 0) summary.downCount += 1
+    else summary.flatCount += 1
+
+    if (!maxUp || row.pct > maxUp.pct) maxUp = row
+    if (!maxDown || row.pct < maxDown.pct) maxDown = row
   }
+
+  summary.avgPctChg = pctSum / realtimeRows.length
+  summary.maxUpName = maxUp?.name || '--'
+  summary.maxUpPctChg = maxUp?.pct ?? null
+  summary.maxDownName = maxDown?.name || '--'
+  summary.maxDownPctChg = maxDown?.pct ?? null
+  return summary
 }
 
-const waitForChildren = async (node: Node, timeout = 12000) => {
-  const start = Date.now()
-  while (Date.now() - start < timeout) {
-    await nextTick()
-    if (node.childNodes && node.childNodes.length > 0) return
-    await new Promise(r => setTimeout(r, 100))
+const managerCards = computed<ManagerCard[]>(() => {
+  const managerMap = new Map<string, EtfBasicItem[]>()
+  for (const item of currentTypeItems.value) {
+    const key = item.mgr_name || '未知管理人'
+    const list = managerMap.get(key) || []
+    list.push(item)
+    managerMap.set(key, list)
   }
-}
 
-const expandByKey = async (key: string) => {
-  const tree: any = treeRef.value
-  const node = tree?.getNode?.(key)
-  if (!node) return
-  if (typeof node.expand === 'function') {
-    node.expand()
-  } else if (typeof tree.setExpandedKeys === 'function') {
-    const expanded = typeof tree.getExpandedKeys === 'function' ? tree.getExpandedKeys() : []
-    tree.setExpandedKeys(Array.from(new Set([...(expanded || []), key])))
-  }
-  await waitForChildren(node)
-  return node as Node
-}
-
-const preloadTreeAll = async () => {
-  await nextTick()
-  const rootNode = await expandByKey('ROOT')
-  if (!rootNode) return
-  for (const typeNode of rootNode.childNodes || []) {
-    const type = await expandByKey(typeNode.key as string)
-    if (!type) continue
-    for (const mgrNode of type.childNodes || []) {
-      const mgr = await expandByKey(mgrNode.key as string)
-      if (!mgr) continue
-      for (const catNode of mgr.childNodes || []) {
-        const cat = await expandByKey(catNode.key as string)
-        if (!cat) continue
-        for (const indexNode of cat.childNodes || []) {
-          const idx = await expandByKey(indexNode.key as string)
-          if (!idx) continue
-          // 加载 ETF 叶子
-          for (const etfNode of idx.childNodes || []) {
-            // 叶子无需展开
-          }
-        }
+  return Array.from(managerMap.entries())
+    .map(([mgr_name, list]) => {
+      const indexCodes = new Set(list.map(item => item.index_code).filter(Boolean))
+      const categories = new Set(
+        list.map(item => indexBasicMap.value.get(item.index_code || '')?.category || '未知').filter(Boolean)
+      )
+      const realtimeSummary = summarizeRealtime(list)
+      return {
+        key: `MGR:${selectedEtfType.value}:${mgr_name}`,
+        mgr_name,
+        etf_type: selectedEtfType.value,
+        count: list.length,
+        indexCount: indexCodes.size,
+        categoryCount: categories.size,
+        ...realtimeSummary
       }
-    }
-  }
-}
-const fetchAllEtfBasic = async (etf_type: string): Promise<EtfBasicItem[]> => {
-  const cached = typeCache.value.get(etf_type)
-  if (cached) return cached
-  const pageSize = 2500
-  let page = 1
-  let totalPages = 1
-  const list: EtfBasicItem[] = []
-  try {
-    while (page <= totalPages) {
-      const res = await getEtfBasic({ etf_type, page, page_size: pageSize })
-      list.push(...(res.data || []))
-      totalPages = res.pages || 1
-      page += 1
-    }
-    typeCache.value.set(etf_type, list)
-    return list
-  } catch (e) {
-    ElMessage.error('加载ETF基础信息失败')
-    return []
-  }
-}
-
-const loadNode = async (node: Node, resolve: (data: TreeNodeData[]) => void) => {
-  try {
-    if (node.level === 0) {
-      resolve([{
-        key: 'ROOT',
-        label: 'ETF分类',
-        nodeType: 'ROOT'
-      }])
-      return
-    }
-
-    const parentData = node.data as TreeNodeData
-
-    if (parentData.nodeType === 'ROOT') {
-      const children: TreeNodeData[] = etfTypes.map(t => ({
-        key: `TYPE:${t.code}`,
-        label: `${t.name}`,
-        nodeType: 'TYPE',
-        etf_type: t.code
-      }))
-      resolve(children)
-      if (currentNode.value && currentNode.value.key === node.key) {
-        updateCurrentChildren(node)
-      }
-      return
-    }
-
-    if (parentData.nodeType === 'TYPE' && parentData.etf_type) {
-      const list = await fetchAllEtfBasic(parentData.etf_type)
-      const mgrSet = new Set(list.map(i => i.mgr_name || '').filter(x => !!x))
-      const children: TreeNodeData[] = Array.from(mgrSet).map(mn => ({
-        key: `MGR:${parentData.etf_type}:${mn}`,
-        label: mn,
-        nodeType: 'MGR',
-        etf_type: parentData.etf_type,
-        mgr_name: mn
-      }))
-      resolve(children)
-      if (currentNode.value && currentNode.value.key === node.key) {
-        updateCurrentChildren(node)
-      }
-      return
-    }
-
-    if (parentData.nodeType === 'MGR' && parentData.etf_type && parentData.mgr_name) {
-      await ensureIndexBasicLoaded()
-      const list = await fetchAllEtfBasic(parentData.etf_type)
-      const filtered = list.filter(i => i.mgr_name === parentData.mgr_name)
-      const catSet = new Set<string>()
-      for (const i of filtered) {
-        const code = i.index_code || ''
-        if (!code) continue
-        const basic = indexBasicMap.value.get(code)
-        catSet.add(basic?.category || '未知')
-      }
-      const children: TreeNodeData[] = Array.from(catSet.values()).map(cat => ({
-        key: `CAT:${parentData.etf_type}:${parentData.mgr_name}:${cat}`,
-        label: cat,
-        nodeType: 'CAT',
-        etf_type: parentData.etf_type,
-        mgr_name: parentData.mgr_name,
-        category: cat
-      }))
-      resolve(children)
-      if (currentNode.value && currentNode.value.key === node.key) {
-        updateCurrentChildren(node)
-      }
-      return
-    }
-
-    if (parentData.nodeType === 'CAT' && parentData.etf_type && parentData.mgr_name && parentData.category) {
-      await ensureIndexBasicLoaded()
-      const list = await fetchAllEtfBasic(parentData.etf_type)
-      const filtered = list.filter(i => i.mgr_name === parentData.mgr_name)
-      const indexMap = new Map<string, string>()
-      for (const i of filtered) {
-        const code = i.index_code || ''
-        if (!code) continue
-        const basic = indexBasicMap.value.get(code)
-        const cat = basic?.category || '未知'
-        if (cat !== parentData.category) continue
-        const name = i.index_name || ''
-        if (!indexMap.has(code)) indexMap.set(code, name)
-      }
-      const children: TreeNodeData[] = Array.from(indexMap.entries()).map(([code, name]) => ({
-        key: `INDEX:${parentData.etf_type}:${parentData.mgr_name}:${parentData.category}:${code}`,
-        label: name || code,
-        nodeType: 'INDEX',
-        etf_type: parentData.etf_type,
-        mgr_name: parentData.mgr_name,
-        index_code: code,
-        index_name: name,
-        category: parentData.category
-      }))
-      resolve(children)
-      if (currentNode.value && currentNode.value.key === node.key) {
-        updateCurrentChildren(node)
-      }
-      return
-    }
-
-    if (parentData.nodeType === 'INDEX' && parentData.etf_type && parentData.index_code && parentData.mgr_name) {
-      const list = await fetchAllEtfBasic(parentData.etf_type)
-      const filtered = list.filter(i => i.index_code === parentData.index_code && i.mgr_name === parentData.mgr_name)
-      const children: TreeNodeData[] = filtered.map(i => ({
-        key: `ETF:${i.ts_code}`,
-        label: `${i.csname || i.extname || i.ts_code}`,
-        nodeType: 'ETF',
-        etf_type: parentData.etf_type,
-        index_code: i.index_code || undefined,
-        index_name: i.index_name || undefined,
-        mgr_name: i.mgr_name || undefined,
-        category: parentData.category,
-        item: i
-      }))
-      resolve(children)
-      if (currentNode.value && currentNode.value.key === node.key) {
-        updateCurrentChildren(node)
-      }
-      return
-    }
-
-    resolve([])
-  } catch (error) {
-    ElMessage.error('加载ETF分类失败')
-    resolve([])
-  }
-}
-
-const handleNodeClick = (data: TreeNodeData, node: Node) => {
-  currentData.value = data
-  currentNode.value = node
-  updateCurrentChildren(node)
-}
-
-const handleNodeExpand = (data: TreeNodeData, node: Node) => {
-  if (currentNode.value && currentNode.value.key === node.key) {
-    updateCurrentChildren(node)
-  }
-}
-
-const typeManagerSummaryTable = computed(() => {
-  if (!currentData.value || currentData.value.nodeType !== 'TYPE') return []
-  const list = typeCache.value.get(currentData.value.etf_type || '') || []
-  const map = new Map<string, number>()
-  for (const i of list) {
-    const name = i.mgr_name || ''
-    if (!name) continue
-    map.set(name, (map.get(name) || 0) + 1)
-  }
-  return Array.from(map.entries())
-    .map(([mgr_name, count]) => ({ mgr_name, count }))
+    })
     .sort((a, b) => b.count - a.count)
+})
+
+const filteredManagerCards = computed(() => {
+  const kw = managerKeyword.value.trim().toLowerCase()
+  if (!kw) return managerCards.value
+  return managerCards.value.filter(card => card.mgr_name.toLowerCase().includes(kw))
+})
+
+const currentPath = computed(() => {
+  if (!currentData.value) return []
+  const parts: TreeNodeData[] = []
+  if (currentData.value.etf_type) {
+    parts.push({
+      key: `TYPE:${currentData.value.etf_type}`,
+      label: currentData.value.etf_type,
+      nodeType: 'TYPE',
+      etf_type: currentData.value.etf_type
+    })
+  }
+  if (currentData.value.mgr_name) {
+    parts.push({
+      key: `MGR:${currentData.value.etf_type}:${currentData.value.mgr_name}`,
+      label: currentData.value.mgr_name,
+      nodeType: 'MGR',
+      etf_type: currentData.value.etf_type,
+      mgr_name: currentData.value.mgr_name
+    })
+  }
+  if (currentData.value.category) {
+    parts.push({
+      key: `CAT:${currentData.value.etf_type}:${currentData.value.mgr_name}:${currentData.value.category}`,
+      label: currentData.value.category,
+      nodeType: 'CAT',
+      etf_type: currentData.value.etf_type,
+      mgr_name: currentData.value.mgr_name,
+      category: currentData.value.category
+    })
+  }
+  if (currentData.value.index_code && currentData.value.nodeType !== 'ETF') {
+    parts.push({
+      key: `INDEX:${currentData.value.etf_type}:${currentData.value.mgr_name}:${currentData.value.category}:${currentData.value.index_code}`,
+      label: currentData.value.index_name || currentData.value.index_code,
+      nodeType: 'INDEX',
+      etf_type: currentData.value.etf_type,
+      mgr_name: currentData.value.mgr_name,
+      category: currentData.value.category,
+      index_code: currentData.value.index_code,
+      index_name: currentData.value.index_name
+    })
+  }
+  if (currentData.value.nodeType === 'ETF' && currentData.value.item) {
+    parts.push(currentData.value)
+  }
+  return parts
+})
+
+const overviewBaseItems = computed(() => {
+  if (!currentData.value) return currentTypeItems.value
+  const list = currentTypeItems.value
+  if (currentData.value.nodeType === 'MGR') return list.filter(i => i.mgr_name === currentData.value?.mgr_name)
+  if (currentData.value.nodeType === 'CAT') {
+    return list.filter(i => i.mgr_name === currentData.value?.mgr_name && getIndexCategory(i.index_code) === currentData.value?.category)
+  }
+  if (currentData.value.nodeType === 'INDEX') {
+    return list.filter(i => i.mgr_name === currentData.value?.mgr_name && i.index_code === currentData.value?.index_code)
+  }
+  if (currentData.value.nodeType === 'ETF') {
+    return currentData.value.item ? [currentData.value.item] : []
+  }
+  return list
+})
+
+const overviewFilteredItems = computed(() => {
+  return overviewBaseItems.value.filter(item => {
+    if (overviewQuery.ts_code && item.ts_code !== overviewQuery.ts_code) return false
+    if (overviewQuery.index_code && !(item.index_code || '').includes(overviewQuery.index_code.trim())) return false
+    if (overviewQuery.exchange && item.exchange !== overviewQuery.exchange) return false
+    if (overviewQuery.list_status && item.list_status !== overviewQuery.list_status) return false
+    if (overviewQuery.name) {
+      const kw = overviewQuery.name.trim().toLowerCase()
+      const text = `${item.extname || ''} ${item.csname || ''} ${item.cname || ''}`.toLowerCase()
+      if (!text.includes(kw)) return false
+    }
+    return true
+  })
+})
+
+const overviewPaginatedItems = computed(() => {
+  const start = (overviewPagination.page - 1) * overviewPagination.page_size
+  return overviewFilteredItems.value.slice(start, start + overviewPagination.page_size)
 })
 
 const managerIndexSummaryTable = computed(() => {
   if (!currentData.value || currentData.value.nodeType !== 'MGR') return []
-  const list = typeCache.value.get(currentData.value.etf_type || '') || []
-  const filtered = list.filter(i => i.mgr_name === currentData.value?.mgr_name)
-  const map = new Map<string, { index_name: string; count: number }>()
-  for (const i of filtered) {
+  const list = overviewBaseItems.value
+  const map = new Map<string, EtfBasicItem[]>()
+  for (const i of list) {
+    const category = getIndexCategory(i.index_code)
+    const items = map.get(category) || []
+    items.push(i)
+    map.set(category, items)
+  }
+  return Array.from(map.entries())
+    .map(([category, items]) => ({
+      category,
+      count: items.length,
+      ...summarizeRealtime(items)
+    }))
+    .sort((a, b) => {
+      const avgDiff = Number(b.avgPctChg ?? -999) - Number(a.avgPctChg ?? -999)
+      if (avgDiff !== 0) return avgDiff
+      const upDiff = b.upCount - a.upCount
+      if (upDiff !== 0) return upDiff
+      return b.count - a.count
+    })
+})
+
+const managerIndexCategorySummary = managerIndexSummaryTable
+
+const categoryIndexSummaryTable = computed(() => {
+  if (!currentData.value || currentData.value.nodeType !== 'CAT') return []
+  const map = new Map<string, { index_name: string; items: EtfBasicItem[] }>()
+  for (const i of overviewBaseItems.value) {
     const code = i.index_code || ''
     if (!code) continue
-    const name = i.index_name || ''
-    const entry = map.get(code) || { index_name: name, count: 0 }
-    entry.count += 1
+    const entry = map.get(code) || { index_name: i.index_name || code, items: [] }
+    entry.items.push(i)
     map.set(code, entry)
   }
   return Array.from(map.entries())
-    .map(([index_code, v]) => ({ index_code, index_name: v.index_name, count: v.count }))
-    .sort((a, b) => b.count - a.count)
+    .map(([index_code, v]) => ({
+      index_code,
+      index_name: v.index_name,
+      count: v.items.length,
+      ...summarizeRealtime(v.items)
+    }))
+    .sort((a, b) => {
+      const avgDiff = Number(b.avgPctChg ?? -999) - Number(a.avgPctChg ?? -999)
+      if (avgDiff !== 0) return avgDiff
+      const upDiff = b.upCount - a.upCount
+      if (upDiff !== 0) return upDiff
+      return b.count - a.count
+    })
 })
+
+const etfListTable = computed(() => {
+  if (!currentData.value || currentData.value.nodeType !== 'INDEX') return []
+  return overviewBaseItems.value.map(item => {
+    const latest = latestRealtimeMap.value.get(item.ts_code)
+    return {
+      ...item,
+      latest_pct_chg: latest?.pct_chg ?? null,
+      latest_change: latest?.change ?? null
+    }
+  })
+})
+
+const catEtfCodes = computed(() => overviewBaseItems.value.map(item => item.ts_code).filter(Boolean))
+
+const catEtfNameMap = computed(() => {
+  const map = new Map<string, string>()
+  for (const it of overviewBaseItems.value) {
+    map.set(it.ts_code, it.extname || it.csname || it.cname || it.ts_code)
+  }
+  return map
+})
+
+const catCodeNameMapObj = computed(() => Object.fromEntries(catEtfNameMap.value as Map<string, string>))
+
+const ensureEtfBasicLoaded = async () => {
+  if (typeCache.value.size > 0) return
+  if (etfBasicLoadPromise) return etfBasicLoadPromise
+
+  etfBasicLoading.value = true
+  etfBasicLoadPromise = (async () => {
+    const pageSize = 5000
+    let page = 1
+    let totalPages = 1
+    const grouped = new Map<string, EtfBasicItem[]>()
+    const exchanges = new Set<string>()
+
+    while (page <= totalPages) {
+      const res = await getEtfBasic({ page, page_size: pageSize })
+      const records = res.data || []
+      for (const item of records) {
+        const type = item.etf_type || '未知'
+        const list = grouped.get(type) || []
+        list.push(item)
+        grouped.set(type, list)
+        if (item.exchange) exchanges.add(item.exchange)
+      }
+      totalPages = res.pages || 1
+      page += 1
+    }
+
+    typeCache.value = grouped
+    exchangeOptions.value = Array.from(exchanges).sort()
+  })()
+
+  try {
+    await etfBasicLoadPromise
+  } catch (e) {
+    ElMessage.error('加载ETF基础信息失败')
+    throw e
+  } finally {
+    etfBasicLoading.value = false
+    etfBasicLoadPromise = null
+  }
+}
 
 const ensureIndexBasicLoaded = async () => {
   if (indexBasicMap.value.size > 0) return
   try {
     const list = await fetchIndexBasicList({ fields: 'ts_code,name,market,publisher,category' })
     const m = new Map<string, IndexBasicItem>()
-    for (const it of list) {
-      m.set(it.ts_code, it)
-    }
+    for (const it of list) m.set(it.ts_code, it)
     indexBasicMap.value = m
   } catch {
     ElMessage.error('加载指数基础信息失败')
   }
 }
 
-const managerIndexCategorySummary = computed(() => {
-  if (!currentData.value || currentData.value.nodeType !== 'MGR') return []
-  const list = typeCache.value.get(currentData.value.etf_type || '') || []
-  const filtered = list.filter(i => i.mgr_name === currentData.value?.mgr_name)
-  const indexCodes = new Set<string>()
-  for (const i of filtered) {
-    const code = i.index_code || ''
-    if (code) indexCodes.add(code)
+const loadLatestRealtime = async () => {
+  realtimeLoading.value = true
+  try {
+    const res = await getEtfDailyLatest()
+    latestRealtimeItems.value = res.data || []
+  } catch {
+    latestRealtimeItems.value = []
+    ElMessage.error('加载ETF实时行情失败')
+  } finally {
+    realtimeLoading.value = false
   }
-  const catMap = new Map<string, number>()
-  for (const code of indexCodes) {
-    const basic = indexBasicMap.value.get(code)
-    const cat = basic?.category || '未知'
-    catMap.set(cat, (catMap.get(cat) || 0) + 1)
-  }
-  return Array.from(catMap.entries())
-    .map(([category, count]) => ({ category, count }))
-    .sort((a, b) => b.count - a.count)
-})
-
-const categoryIndexSummaryTable = computed(() => {
-  if (!currentData.value || currentData.value.nodeType !== 'CAT') return []
-  const list = typeCache.value.get(currentData.value.etf_type || '') || []
-  const filtered = list.filter(i => i.mgr_name === currentData.value?.mgr_name)
-  const map = new Map<string, { index_name: string; count: number }>()
-  for (const i of filtered) {
-    const code = i.index_code || ''
-    if (!code) continue
-    const basic = indexBasicMap.value.get(code)
-    const cat = basic?.category || '未知'
-    if (cat !== currentData.value.category) continue
-    const name = i.index_name || ''
-    const entry = map.get(code) || { index_name: name, count: 0 }
-    entry.count += 1
-    map.set(code, entry)
-  }
-  return Array.from(map.entries())
-    .map(([index_code, v]) => ({ index_code, index_name: v.index_name, count: v.count }))
-    .sort((a, b) => b.count - a.count)
-})
-
-const updateCategoryChart = () => {
-  if (!categoryChartRef.value) return
-  if (!categoryChart) {
-    categoryChart = echarts.init(categoryChartRef.value)
-  }
-  const data = managerIndexCategorySummary.value.map(d => ({ name: d.category, value: d.count }))
-  const option: echarts.EChartsOption = {
-    tooltip: { trigger: 'item' },
-    legend: { bottom: 0 },
-    series: [
-      {
-        type: 'pie',
-        radius: ['40%', '70%'],
-        avoidLabelOverlap: true,
-        label: { show: true, formatter: '{b}: {d}%' },
-        data
-      }
-    ]
-  }
-  categoryChart.setOption(option)
 }
 
-onMounted(() => {
-  preloadTreeAll()
-})
+const getIndexCategory = (indexCode?: string | null) => indexBasicMap.value.get(indexCode || '')?.category || '未知'
 
-onUnmounted(() => {
-  if (categoryChart) {
-    categoryChart.dispose()
-    categoryChart = null
+const selectEtfType = (type: string) => {
+  selectedEtfType.value = type
+  managerKeyword.value = ''
+  detailDialogVisible.value = false
+  const first = managerCards.value[0]
+  if (!first) {
+    currentData.value = null
+    currentChildren.value = []
   }
-  if (industryChart) {
-    industryChart.dispose()
-    industryChart = null
+}
+
+const selectManager = (card: ManagerCard) => {
+  currentData.value = {
+    key: card.key,
+    label: card.mgr_name,
+    nodeType: 'MGR',
+    etf_type: card.etf_type,
+    mgr_name: card.mgr_name
   }
-})
+  currentChildren.value = managerIndexSummaryTable.value.map(item => ({
+    key: `CAT:${card.etf_type}:${card.mgr_name}:${item.category}`,
+    label: item.category,
+    nodeType: 'CAT',
+    etf_type: card.etf_type,
+    mgr_name: card.mgr_name,
+    category: item.category
+  }))
+  detailDialogVisible.value = true
+}
 
-const etfListTable = computed(() => {
-  if (!currentData.value || currentData.value.nodeType !== 'INDEX') return []
-  const list = typeCache.value.get(currentData.value.etf_type || '') || []
-  return list.filter(i => i.index_code === currentData.value?.index_code && i.mgr_name === currentData.value?.mgr_name)
-})
-
-const catEtfCodes = computed(() => {
-  if (!currentData.value || currentData.value.nodeType !== 'CAT') return [] as string[]
-  const list = typeCache.value.get(currentData.value.etf_type || '') || []
-  const filtered = list.filter(i => i.mgr_name === currentData.value?.mgr_name)
-  const codes: string[] = []
-  for (const it of filtered) {
-    const code = it.index_code || ''
-    if (!code) continue
-    const basic = indexBasicMap.value.get(code)
-    const cat = basic?.category || '未知'
-    if (cat !== currentData.value.category) continue
-    if (it.ts_code) codes.push(it.ts_code)
+const openManagerCategory = (row: { category: string }) => {
+  if (!currentData.value?.mgr_name) return
+  currentData.value = {
+    key: `CAT:${selectedEtfType.value}:${currentData.value.mgr_name}:${row.category}`,
+    label: row.category,
+    nodeType: 'CAT',
+    etf_type: selectedEtfType.value,
+    mgr_name: currentData.value.mgr_name,
+    category: row.category
   }
-  return codes
-})
+  currentChildren.value = categoryIndexSummaryTable.value.map(item => ({
+    key: `INDEX:${selectedEtfType.value}:${currentData.value?.mgr_name}:${row.category}:${item.index_code}`,
+    label: item.index_name || item.index_code,
+    nodeType: 'INDEX',
+    etf_type: selectedEtfType.value,
+    mgr_name: currentData.value?.mgr_name,
+    category: row.category,
+    index_code: item.index_code,
+    index_name: item.index_name
+  }))
+  detailDialogVisible.value = true
+}
 
-const catEtfNameMap = computed(() => {
-  if (!currentData.value || currentData.value.nodeType !== 'CAT') return new Map<string, string>()
-  const list = typeCache.value.get(currentData.value.etf_type || '') || []
-  const filtered = list.filter(i => i.mgr_name === currentData.value?.mgr_name)
-  const map = new Map<string, string>()
-  for (const it of filtered) {
-    const code = it.index_code || ''
-    if (!code) continue
-    const basic = indexBasicMap.value.get(code)
-    const cat = basic?.category || '未知'
-    if (cat !== currentData.value.category) continue
-    const name = it.extname || it.csname || it.cname || it.ts_code || ''
-    if (it.ts_code) map.set(it.ts_code, name)
+const openCategoryIndex = (row: { index_code: string; index_name: string }) => {
+  if (!currentData.value?.mgr_name || !currentData.value?.category) return
+  currentData.value = {
+    key: `INDEX:${selectedEtfType.value}:${currentData.value.mgr_name}:${currentData.value.category}:${row.index_code}`,
+    label: row.index_name || row.index_code,
+    nodeType: 'INDEX',
+    etf_type: selectedEtfType.value,
+    mgr_name: currentData.value.mgr_name,
+    category: currentData.value.category,
+    index_code: row.index_code,
+    index_name: row.index_name
   }
-  return map
-})
-const catCodeNameMapObj = computed(() => Object.fromEntries(catEtfNameMap.value as Map<string, string>))
+  currentChildren.value = etfListTable.value.map(item => ({
+    key: `ETF:${item.ts_code}`,
+    label: item.csname || item.extname || item.ts_code,
+    nodeType: 'ETF',
+    etf_type: item.etf_type || selectedEtfType.value,
+    mgr_name: item.mgr_name || currentData.value?.mgr_name,
+    category: currentData.value?.category,
+    index_code: item.index_code || row.index_code,
+    index_name: item.index_name || row.index_name,
+    item
+  }))
+  detailDialogVisible.value = true
+}
 
-watch(currentChildren, () => {
+const openEtfDetail = (row: EtfBasicItem) => {
+  currentData.value = {
+    key: `ETF:${row.ts_code}`,
+    label: row.csname || row.extname || row.ts_code,
+    nodeType: 'ETF',
+    etf_type: row.etf_type || selectedEtfType.value,
+    mgr_name: row.mgr_name || undefined,
+    category: getIndexCategory(row.index_code),
+    index_code: row.index_code || undefined,
+    index_name: row.index_name || undefined,
+    item: row
+  }
+  currentChildren.value = []
   activeTab.value = 'basic'
-})
+  detailDialogVisible.value = true
+}
+
+const selectPathNode = (node: TreeNodeData) => {
+  if (node.nodeType === 'TYPE' && node.etf_type) {
+    selectEtfType(node.etf_type)
+    return
+  }
+  if (node.nodeType === 'MGR') {
+    selectManager({
+      key: node.key,
+      mgr_name: node.mgr_name || '',
+      etf_type: node.etf_type || selectedEtfType.value,
+      count: 0,
+      indexCount: 0,
+      categoryCount: 0,
+      ...emptyRealtimeSummary()
+    })
+    return
+  }
+  if (node.nodeType === 'CAT') {
+    currentData.value = node
+    currentChildren.value = categoryIndexSummaryTable.value.map(item => ({
+      key: `INDEX:${node.etf_type}:${node.mgr_name}:${node.category}:${item.index_code}`,
+      label: item.index_name || item.index_code,
+      nodeType: 'INDEX',
+      etf_type: node.etf_type,
+      mgr_name: node.mgr_name,
+      category: node.category,
+      index_code: item.index_code,
+      index_name: item.index_name
+    }))
+    return
+  }
+  if (node.nodeType === 'INDEX') {
+    currentData.value = node
+    currentChildren.value = etfListTable.value.map(item => ({
+      key: `ETF:${item.ts_code}`,
+      label: item.csname || item.extname || item.ts_code,
+      nodeType: 'ETF',
+      etf_type: item.etf_type || node.etf_type,
+      mgr_name: item.mgr_name || node.mgr_name,
+      category: node.category,
+      index_code: item.index_code || node.index_code,
+      index_name: item.index_name || node.index_name,
+      item
+    }))
+    return
+  }
+  currentData.value = node
+  currentChildren.value = []
+  detailDialogVisible.value = true
+}
+
+const resetOverviewFilters = () => {
+  overviewQuery.ts_code = ''
+  overviewQuery.index_code = ''
+  overviewQuery.exchange = ''
+  overviewQuery.list_status = ''
+  overviewQuery.name = ''
+  overviewPagination.page = 1
+}
+
+const resetOverviewPage = () => {
+  overviewPagination.page = 1
+}
+
+const syncOverviewPage = (page: number) => {
+  overviewPagination.page = page
+}
+
+const remoteSearchEtf = async (keyword: string) => {
+  const q = (keyword || '').trim()
+  if (!q) return
+  selectLoading.value = true
+  try {
+    const isTsCode = /^[0-9]{3,6}\.[A-Z]{2,3}$/.test(q)
+    const res = await getEtfBasic({
+      ts_code: isTsCode ? q : undefined,
+      name: !isTsCode ? q : undefined,
+      page: 1,
+      page_size: 20,
+    })
+    etfOptions.value = res.data || []
+  } catch (e: any) {
+    ElMessage.error(e?.message || 'ETF 基础列表搜索失败')
+  } finally {
+    selectLoading.value = false
+  }
+}
 
 watch(currentData, async () => {
+  activeTab.value = 'basic'
+  overviewPagination.page = 1
   if (currentData.value?.nodeType === 'MGR') {
     await ensureIndexBasicLoaded()
     await nextTick()
@@ -812,6 +1101,17 @@ watch(currentData, async () => {
   }
 })
 
+const updateCategoryChart = () => {
+  if (!categoryChartRef.value) return
+  if (!categoryChart) categoryChart = echarts.init(categoryChartRef.value)
+  const data = managerIndexCategorySummary.value.map(d => ({ name: d.category, value: d.count }))
+  categoryChart.setOption({
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0 },
+    series: [{ type: 'pie', radius: ['40%', '70%'], label: { show: true, formatter: '{b}: {d}%' }, data }]
+  })
+}
+
 const loadIndexWeights = async () => {
   if (!currentData.value || currentData.value.nodeType !== 'INDEX') return
   const code = currentData.value.index_code || ''
@@ -829,9 +1129,9 @@ const loadIndexWeights = async () => {
       if (d > latest) latest = d
     }
     const filtered = list.filter(it => norm(it.trade_date) === latest)
-    indexWeights.value = [...filtered].sort((a, b) => (Number(b.weight || 0) - Number(a.weight || 0)))
+    indexWeights.value = [...filtered].sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0))
     const stripSuffix = (c?: string) => (c || '').replace(/\.[A-Z]+$/i, '')
-    const baseCodes = Array.from(new Set(indexWeights.value.map((w: IndexWeightItem) => stripSuffix(w.con_code))))
+    const baseCodes = Array.from(new Set(indexWeights.value.map(w => stripSuffix(w.con_code))))
     let codeToName = new Map<string, string>()
     let codeToIndustry = new Map<string, string>()
     if (baseCodes.length > 0) {
@@ -842,11 +1142,14 @@ const loadIndexWeights = async () => {
         codeToIndustry = new Map<string, string>(list.map(it => [it.code, it.industry]))
       } catch {}
     }
-    displayIndexWeights.value = indexWeights.value.map((w: IndexWeightItem) => {
+    displayIndexWeights.value = indexWeights.value.map(w => {
       const base_code = stripSuffix(w.con_code)
-      const stock_name = base_code ? (codeToName.get(base_code) || undefined) : undefined
-      const industry = base_code ? (codeToIndustry.get(base_code) || undefined) : undefined
-      return { ...w, base_code, stock_name, industry }
+      return {
+        ...w,
+        base_code,
+        stock_name: base_code ? codeToName.get(base_code) || undefined : undefined,
+        industry: base_code ? codeToIndustry.get(base_code) || undefined : undefined
+      }
     })
   } catch {
     ElMessage.error('加载指数成分权重失败')
@@ -857,32 +1160,18 @@ const loadIndexWeights = async () => {
 
 const updateIndustryChart = () => {
   if (!industryChartRef.value) return
-  if (!industryChart) {
-    industryChart = echarts.init(industryChartRef.value)
-  }
+  if (!industryChart) industryChart = echarts.init(industryChartRef.value)
   const map = new Map<string, number>()
   for (const it of displayIndexWeights.value) {
     const key = it.industry || '未知'
     map.set(key, (map.get(key) || 0) + 1)
   }
-  const data = Array.from(map.entries())
-    .map(([name, count]) => ({ name, value: count }))
-    .sort((a, b) => b.value - a.value)
-  const option: echarts.EChartsOption = {
+  const data = Array.from(map.entries()).map(([name, value]) => ({ name, value }))
+  industryChart.setOption({
     tooltip: { trigger: 'item' },
     legend: { bottom: 0, type: 'scroll' },
-    series: [
-      {
-        type: 'pie',
-        center: ['50%', '45%'],
-        radius: ['40%', '70%'],
-        avoidLabelOverlap: true,
-        label: { show: true, formatter: '{b}: {d}%' },
-        data
-      }
-    ]
-  }
-  industryChart.setOption(option)
+    series: [{ type: 'pie', center: ['50%', '45%'], radius: ['40%', '70%'], label: { show: true, formatter: '{b}: {d}%' }, data }]
+  })
 }
 
 watch(activeTab, async (tab) => {
@@ -894,21 +1183,40 @@ watch(activeTab, async (tab) => {
     await loadEtfTrend()
   } else if (tab === 'index-trend') {
     await loadIndexTrend()
-  } else if (tab === 'cat-volatility') {
-    await ensureIndexBasicLoaded()
   }
 })
 
 watch(etfTrendRange, async () => {
-  if (activeTab.value === 'trend') {
-    await loadEtfTrend()
-  }
+  if (activeTab.value === 'trend') await loadEtfTrend()
 })
 
 const formatPercent = (val?: number) => {
   const num = Number(val || 0)
   if (Number.isNaN(num)) return '--'
   return (num * 100).toFixed(2)
+}
+
+const formatPctChg = (val?: number | null) => {
+  if (val === null || val === undefined || Number.isNaN(Number(val))) return '--'
+  const num = Number(val)
+  return `${num > 0 ? '+' : ''}${num.toFixed(2)}%`
+}
+
+const formatChange = (val?: number | null) => {
+  if (val === null || val === undefined || Number.isNaN(Number(val))) return '--'
+  const num = Number(val)
+  return `${num > 0 ? '+' : ''}${num.toFixed(3)}`
+}
+
+const pctClass = (val?: number | null) => {
+  if (val === null || val === undefined || Number(val) === 0 || Number.isNaN(Number(val))) return 'neutral-text'
+  return Number(val) > 0 ? 'rise-text' : 'fall-text'
+}
+
+const formatSummaryEtf = (name?: string, pct?: number | null) => {
+  if (!name || name === '--') return '--'
+  const pctText = formatPctChg(pct)
+  return pctText === '--' ? name : `${name} ${pctText}`
 }
 
 const formatDate = (d: Date) => {
@@ -928,12 +1236,11 @@ const loadEtfTrend = async () => {
     const start = new Date()
     const years = etfTrendRange.value === '1y' ? 1 : etfTrendRange.value === '3y' ? 3 : 5
     start.setFullYear(today.getFullYear() - years)
-    const items = await getEtfDaily({
+    etfDailyItems.value = await getEtfDaily({
       ts_code,
       start_date: formatDate(start),
       end_date: formatDate(today)
     })
-    etfDailyItems.value = items
   } catch {
     ElMessage.error('加载ETF趋势数据失败')
   } finally {
@@ -950,119 +1257,248 @@ const loadIndexTrend = async () => {
     const today = new Date()
     const start = new Date()
     start.setDate(today.getDate() - 180)
-    const items = await fetchIndexDailyKline(
+    indexDailyItems.value = await fetchIndexDailyKline(
       ts_code,
       formatDate(start).replace(/-/g, ''),
       formatDate(today).replace(/-/g, '')
     )
-    indexDailyItems.value = items
   } catch {
     ElMessage.error('加载指数趋势数据失败')
   } finally {
     indexTrendLoading.value = false
   }
 }
+
+onMounted(async () => {
+  try {
+    await Promise.all([ensureEtfBasicLoaded(), ensureIndexBasicLoaded(), loadLatestRealtime()])
+    const firstType = etfTypes.value[0]
+    if (firstType) selectEtfType(firstType)
+  } catch {
+    // handled above
+  }
+})
+
+onUnmounted(() => {
+  if (categoryChart) categoryChart.dispose()
+  if (industryChart) industryChart.dispose()
+})
 </script>
 
 <style scoped>
 .etf-tree-view {
   padding: 20px;
-  height: 100%;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.main-container {
-  display: flex;
-  gap: 20px;
-  height: 100%;
   overflow: hidden;
 }
 
 .left-panel {
-  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: calc(100vh - 140px);
 }
 
 .left-panel :deep(.el-card__body) {
   flex: 1;
   overflow: hidden;
-  padding: 10px;
   display: flex;
   flex-direction: column;
 }
 
-.right-panel {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+.left-panel :deep(.el-card__body) {
+  padding: 12px;
 }
 
-.right-panel :deep(.el-card__body) {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-}
-
-.tree-wrapper {
-  flex: 1;
-  overflow-y: auto;
-  height: 100%;
-}
-
-.custom-tree-node {
-  flex: 1;
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 14px;
-  padding-right: 8px;
+  gap: 12px;
 }
 
-.node-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.panel-subtitle,
+.breadcrumb-line {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.manager-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.manager-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manager-search {
+  width: 100%;
+}
+
+.manager-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.rise-text {
+  color: #dc2626;
+}
+
+.fall-text {
+  color: #16a34a;
+}
+
+.neutral-text {
+  color: #6b7280;
+}
+
+.manager-card-grid {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.manager-card {
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.manager-card:hover,
+.manager-card.active {
+  border-color: #409eff;
+  box-shadow: 0 10px 24px rgba(64, 158, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.manager-card-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.manager-card-meta {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.manager-card-stats {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.manager-card-tags {
+  margin-top: 4px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .detail-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-.detail-tabs {
-  width: 100%;
-}
+.detail-tabs,
 .tab-content {
   width: 100%;
 }
 
 .detail-title {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .children-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .section-header {
-  font-weight: bold;
+  font-weight: 700;
   font-size: 14px;
-  border-left: 4px solid #409EFF;
+  border-left: 4px solid #409eff;
   padding-left: 10px;
+  margin-top: 12px;
 }
 
-.no-children-tip {
-  margin-top: 20px;
-  text-align: center;
+.overview-filter-card {
+  margin-bottom: 12px;
+}
+
+.pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.range-toolbar {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.toolbar-label {
+  align-self: center;
+  color: #606266;
+  font-size: 13px;
+}
+
+.loading-block {
+  padding: 20px;
+}
+
+.category-chart,
+.industry-chart {
+  width: 100%;
+  height: 280px;
+}
+
+.detail-header a {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.detail-dialog :deep(.el-dialog__body) {
+  max-height: 78vh;
+  overflow-y: auto;
+  padding-top: 8px;
 }
 
 .empty-state {
@@ -1071,5 +1507,35 @@ const loadIndexTrend = async () => {
   align-items: center;
   height: 100%;
   color: #909399;
+}
+
+@media (max-width: 1200px) {
+  .manager-card-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-height: 360px;
+  }
+}
+
+@media (max-width: 768px) {
+  .etf-tree-view {
+    padding: 12px;
+  }
+
+  .left-panel {
+    min-height: calc(100vh - 120px);
+  }
+
+  .manager-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .manager-card-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-dialog {
+    width: 96vw !important;
+  }
 }
 </style>

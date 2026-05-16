@@ -99,6 +99,32 @@ export interface GetEtfDailyParams {
   end_date?: string // YYYY-MM-DD
 }
 
+export interface GetEtfDailyLatestParams {
+  index_publisher?: string
+  index_category?: string
+  group_by?: 'index_publisher' | 'index_category'
+}
+
+export interface EtfDailyLatestAnalysisItem {
+  group_value?: string
+  index_publisher?: string
+  index_category?: string
+  etf_count?: number
+  index_count?: number
+  avg_pct_chg?: number | null
+  up_count?: number
+  down_count?: number
+  flat_count?: number
+  total_amount?: number | null
+  [key: string]: any
+}
+
+export interface EtfDailyLatestPayload {
+  data: EtfDailyItem[]
+  filters?: Record<string, any>
+  analysis?: EtfDailyLatestAnalysisItem[]
+}
+
 // 获取 ETF 基本信息（分页）
 export async function getEtfBasic(
   params: GetEtfBasicParams
@@ -121,19 +147,30 @@ export async function getEtfDaily(
   return res.data
 }
 
-// 获取最近交易日所有ETF的日线行情（列表）
-export async function getEtfDailyLatest(): Promise<EtfDailyItem[]> {
+// 获取最近交易日所有ETF的日线行情（列表 + 筛选/分组统计）
+export async function getEtfDailyLatest(
+  params: GetEtfDailyLatestParams = {}
+): Promise<EtfDailyLatestPayload> {
   /**
    * 函数名称：getEtfDailyLatest
    * 功能：调用 `/django/api/etf/daily/latest/` 接口，获取数据库中最近交易日的所有ETF日线行情列表。
-   * 参数：无
-   * 返回值：`EtfDailyItem[]` 列表（统一响应结构中的 data 字段）
+   * 参数：index_publisher/index_category/group_by
+   * 返回值：列表 + filters 回显 + analysis 分组统计
    * 事件：无
    */
-  const res = await axios.get<ApiResponse<EtfDailyItem[]>, ApiResponse<EtfDailyItem[]>>(
-    '/django/api/etf/daily/latest/'
+  const res = await axios.get<ApiResponse<EtfDailyItem[] | EtfDailyLatestPayload>, ApiResponse<EtfDailyItem[] | EtfDailyLatestPayload>>(
+    '/django/api/etf/daily/latest/',
+    { params }
   )
-  return res.data
+  const payload = res.data as any
+  if (Array.isArray(payload)) {
+    return { data: payload, filters: params, analysis: [] }
+  }
+  return {
+    data: Array.isArray(payload?.data) ? payload.data : [],
+    filters: payload?.filters || params,
+    analysis: Array.isArray(payload?.analysis) ? payload.analysis : []
+  }
 }
 
 // ETF 收盘价相关性矩阵

@@ -1,5 +1,5 @@
 // 大盘数据API服务
-import axios from 'axios'
+import axios from './axiosConfig'
 
 // 上证A股指数历史数据接口类型定义
 export interface IndexHistData {

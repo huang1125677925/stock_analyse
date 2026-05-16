@@ -1,0 +1,1 @@
+import{x as e}from"./index-D32WHQ-h.js";async function o(){return await e.get("/django/api/personal/holdings/")}async function r(n){return await e.delete(`/django/api/personal/holdings/${n}/`)}export{r as d,o as g};

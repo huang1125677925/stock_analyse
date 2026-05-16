@@ -4,24 +4,10 @@
       <template #header>
         <div class="header-content">
           <h2>大盘指数估值</h2>
-          <div class="actions">
-            <el-button type="primary" :loading="loading" @click="handleSearch">查询</el-button>
-            <el-button @click="resetForm">重置</el-button>
-          </div>
         </div>
       </template>
       <div class="search-section">
-        <el-form :inline="true" :model="form" class="query-form">
-          <el-form-item label="指数代码">
-            <el-select v-model="form.tsCode" placeholder="请选择指数代码" style="width: 200px">
-              <el-option
-                v-for="item in indexOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
+        <el-form :inline="true" class="query-form">
           <el-form-item label="指标">
             <el-select v-model="selectedMetric" placeholder="请选择展示指标" style="width: 200px" @change="updateChart">
               <el-option
@@ -42,25 +28,29 @@
               value-format="YYYYMMDD"
               :shortcuts="dateShortcuts"
             />
+            <el-button-group class="range-buttons">
+              <el-button @click="setYearRange(1)">最近一年</el-button>
+              <el-button @click="setYearRange(3)">最近三年</el-button>
+              <el-button @click="setYearRange(5)">最近五年</el-button>
+            </el-button-group>
           </el-form-item>
         </el-form>
       </div>
     </el-card>
 
-    <div class="chart-section">
-      <el-card>
+    <div class="chart-section" v-loading="loading">
+      <el-card v-for="dataset in datasets" :key="dataset.value" class="index-card">
         <template #header>
           <div class="card-header">
             <div class="header-title">
-              <span>趋势图（{{ totalCount }} 条数据）</span>
-              <el-tag v-if="currentValuation" :type="currentValuation.type" effect="dark" class="valuation-tag">
-                当前{{ metricOptions.find(opt => opt.value === selectedMetric)?.label || selectedMetric }}分位: {{ currentValuation.percentile.toFixed(2) }}% - {{ currentValuation.status }}
+              <span>{{ dataset.label }}（{{ dataset.totalCount }} 条数据）</span>
+              <el-tag v-if="dataset.valuation" :type="dataset.valuation.type" effect="dark" class="valuation-tag">
+                当前{{ metricLabel }}分位: {{ dataset.valuation.percentile.toFixed(2) }}% - {{ dataset.valuation.status }}
               </el-tag>
             </div>
-            <el-button link @click="refreshData">刷新</el-button>
           </div>
         </template>
-        <div ref="chartRef" class="chart-container" style="width: 100%; height: 500px;"></div>
+        <div :ref="el => setChartRef(dataset.value, el)" class="chart-container"></div>
       </el-card>
     </div>
   </div>
@@ -71,14 +61,14 @@
  * 组件名称：IndexDailybasicView
  * 功能：
  * - 查询并展示 `/django/api/index/index-dailybasic/` 的指数每日基础指标数据
- * - 提供指数代码和日期范围筛选
+ * - 固定展示常用指数的估值趋势
  * - 使用 ECharts 展示数据趋势
  * 参数（props）：无
  * 返回值：无
  * 事件（emits）：
  * - loaded: 数据加载完成时触发，传递记录数
  */
-import { ref, reactive, onMounted, nextTick, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fetchIndexDailybasic, fetchMarketCombinedDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
 import * as echarts from 'echarts'
@@ -156,33 +146,40 @@ const dateShortcuts = [
   },
 ]
 
-// 表单状态与默认参数
-const form = reactive({
-  tsCode: 'all_market',
-  fields: '',
-})
-
 // 当前选中的指标
 const selectedMetric = ref('pe')
+const metricLabel = computed(() => metricOptions.find(opt => opt.value === selectedMetric.value)?.label || selectedMetric.value)
 
 // 日期范围：默认最近365天 (展示趋势通常需要较长时间跨度)
 const dateRange = ref<[string, string]>()
 
 // 数据
-const records = ref<IndexDailybasicItem[]>([])
 const totalCount = ref<number>(0)
-
-// ECharts 相关
-const chartRef = ref<HTMLElement | null>(null)
-let chartInstance: echarts.ECharts | null = null
-
-// 当前估值状态
-const currentValuation = ref<{
+interface IndexValuationStatus {
   value: number
   percentile: number
   status: string
   type: 'success' | 'warning' | 'danger' | 'info' | 'primary'
-} | null>(null)
+}
+
+interface IndexDataset {
+  label: string
+  value: string
+  records: IndexDailybasicItem[]
+  totalCount: number
+  valuation: IndexValuationStatus | null
+}
+
+const datasets = ref<IndexDataset[]>(indexOptions.map(item => ({
+  ...item,
+  records: [],
+  totalCount: 0,
+  valuation: null,
+})))
+
+// ECharts 相关
+const chartRefs = new Map<string, HTMLElement>()
+const chartInstances = new Map<string, echarts.ECharts>()
 
 // 计算分位值
 function calculatePercentileRank(values: number[], target: number): number {
@@ -194,10 +191,9 @@ function calculatePercentileRank(values: number[], target: number): number {
   return (rank / sorted.length) * 100
 }
 
-function updateValuationStatus(values: number[]) {
+function getValuationStatus(values: number[]): IndexValuationStatus | null {
   if (values.length === 0) {
-    currentValuation.value = null
-    return
+    return null
   }
 
   // 获取最新值（records已按日期排序，取最后一个）
@@ -223,7 +219,7 @@ function updateValuationStatus(values: number[]) {
     type = 'primary'
   }
 
-  currentValuation.value = {
+  return {
     value: latestValue,
     percentile,
     status,
@@ -238,56 +234,70 @@ function buildDefaultDateRange(days = 365): [string, string] {
   return [fmt(start), fmt(end)]
 }
 
+function buildYearDateRange(years: number): [string, string] {
+  const end = new Date()
+  const start = new Date()
+  start.setFullYear(end.getFullYear() - years)
+  const fmt = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  return [fmt(start), fmt(end)]
+}
+
+function setYearRange(years: number) {
+  dateRange.value = buildYearDateRange(years)
+}
+
 async function fetchData() {
   try {
     loading.value = true
-    if (chartInstance) {
-      chartInstance.showLoading()
-    }
+    chartInstances.forEach(chart => chart.showLoading())
     
     const [startDate, endDate] = dateRange.value || buildDefaultDateRange()
-    
-    let res;
-    if (form.tsCode === 'all_market') {
-      res = await fetchMarketCombinedDailybasic({
-        startDate,
-        endDate
+    const loaded = await Promise.all(indexOptions.map(async option => {
+      const res = option.value === 'all_market'
+        ? await fetchMarketCombinedDailybasic({ startDate, endDate })
+        : await fetchIndexDailybasic({ tsCode: option.value, startDate, endDate })
+
+      const records = (res.records || []).sort((a, b) => {
+        const dateA = String(a.trade_date || '')
+        const dateB = String(b.trade_date || '')
+        return dateA.localeCompare(dateB)
       })
-    } else {
-      res = await fetchIndexDailybasic({
-        tsCode: form.tsCode,
-        startDate,
-        endDate,
-        fields: form.fields || undefined,
-      })
-    }
-    
-    // 对数据按日期排序，确保图表展示正确
-    records.value = (res.records || []).sort((a, b) => {
-      const dateA = String(a.trade_date || '')
-      const dateB = String(b.trade_date || '')
-      return dateA.localeCompare(dateB)
-    })
-    
-    totalCount.value = res.count || records.value.length
+      const values = records.map(item => Number(item[selectedMetric.value])).filter(v => !isNaN(v))
+      return {
+        ...option,
+        records,
+        totalCount: res.count || records.length,
+        valuation: getValuationStatus(values)
+      }
+    }))
+
+    datasets.value = loaded
+    totalCount.value = loaded.reduce((sum, item) => sum + item.totalCount, 0)
     emit('loaded', totalCount.value)
-    
+    await nextTick()
+    initCharts()
     updateChart()
   } catch (e: any) {
     ElMessage.error(e?.message || '数据加载失败')
   } finally {
     loading.value = false
-    if (chartInstance) {
-      chartInstance.hideLoading()
-    }
+    chartInstances.forEach(chart => chart.hideLoading())
   }
 }
 
-function initChart() {
-  if (chartRef.value) {
-    chartInstance = echarts.init(chartRef.value)
-    window.addEventListener('resize', handleResize)
+function setChartRef(key: string, el: unknown) {
+  if (el instanceof HTMLElement) {
+    chartRefs.set(key, el)
   }
+}
+
+function initCharts() {
+  datasets.value.forEach(dataset => {
+    const el = chartRefs.get(dataset.value)
+    if (el && !chartInstances.has(dataset.value)) {
+      chartInstances.set(dataset.value, echarts.init(el))
+    }
+  })
 }
 
 function calculatePercentile(sortedValues: number[], p: number): number {
@@ -300,95 +310,93 @@ function calculatePercentile(sortedValues: number[], p: number): number {
 }
 
 function updateChart() {
-  if (!chartInstance) return
+  datasets.value = datasets.value.map(dataset => {
+    const values = dataset.records.map(item => Number(item[selectedMetric.value])).filter(v => !isNaN(v))
+    return {
+      ...dataset,
+      valuation: getValuationStatus(values)
+    }
+  })
 
-  const dates = records.value.map(item => item.trade_date)
-  const values = records.value.map(item => Number(item[selectedMetric.value]))
-  const metricLabel = metricOptions.find(opt => opt.value === selectedMetric.value)?.label || selectedMetric.value
+  datasets.value.forEach(dataset => {
+    const chartInstance = chartInstances.get(dataset.value)
+    if (!chartInstance) return
 
-  // 计算分位数
-  const validValues = values.filter(v => !isNaN(v)).sort((a, b) => a - b)
-  
-  // 更新估值状态
-  updateValuationStatus(values.filter(v => !isNaN(v)))
+    const dates = dataset.records.map(item => item.trade_date)
+    const values = dataset.records.map(item => Number(item[selectedMetric.value]))
 
-  const p10 = calculatePercentile(validValues, 10)
-  const p30 = calculatePercentile(validValues, 30)
-  const p50 = calculatePercentile(validValues, 50)
-  const p70 = calculatePercentile(validValues, 70)
-  const p90 = calculatePercentile(validValues, 90)
+    // 计算分位数
+    const validValues = values.filter(v => !isNaN(v)).sort((a, b) => a - b)
 
-  const option = {
-    title: {
-      text: `${indexOptions.find(i => i.value === form.tsCode)?.label || form.tsCode} - ${metricLabel} 趋势`,
-      left: 'center'
-    },
-    tooltip: {
-      trigger: 'axis'
-    },
-    grid: {
-      right: '15%' // 留出右侧空间显示 markLine 标签
-    },
-    xAxis: {
-      type: 'category',
-      data: dates
-    },
-    yAxis: {
-      type: 'value',
-      scale: true // 让坐标轴自适应数据范围，而不是从0开始
-    },
-    series: [
-      {
-        name: metricLabel,
-        type: 'line',
-        data: values,
-        smooth: true,
-        showSymbol: false,
-        markLine: {
-          symbol: 'none',
-          data: [
-            { yAxis: p90, name: '90%分位', label: { formatter: '90%: {c}' }, lineStyle: { color: '#FF4500', type: 'dashed' } },
-            { yAxis: p70, name: '70%分位', label: { formatter: '70%: {c}' }, lineStyle: { color: '#FFA500', type: 'dashed' } },
-            { yAxis: p50, name: '50%分位', label: { formatter: '50%: {c}' }, lineStyle: { color: '#32CD32', width: 2 } }, // 中位数加粗
-            { yAxis: p30, name: '30%分位', label: { formatter: '30%: {c}' }, lineStyle: { color: '#1E90FF', type: 'dashed' } },
-            { yAxis: p10, name: '10%分位', label: { formatter: '10%: {c}' }, lineStyle: { color: '#0000FF', type: 'dashed' } },
-          ]
+    const p10 = calculatePercentile(validValues, 10)
+    const p30 = calculatePercentile(validValues, 30)
+    const p50 = calculatePercentile(validValues, 50)
+    const p70 = calculatePercentile(validValues, 70)
+    const p90 = calculatePercentile(validValues, 90)
+
+    const option = {
+      title: {
+        text: `${dataset.label} - ${metricLabel.value} 趋势`,
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis'
+      },
+      grid: {
+        right: '15%' // 留出右侧空间显示 markLine 标签
+      },
+      xAxis: {
+        type: 'category',
+        data: dates
+      },
+      yAxis: {
+        type: 'value',
+        scale: true // 让坐标轴自适应数据范围，而不是从0开始
+      },
+      series: [
+        {
+          name: metricLabel.value,
+          type: 'line',
+          data: values,
+          smooth: true,
+          showSymbol: false,
+          markLine: {
+            symbol: 'none',
+            data: [
+              { yAxis: p90, name: '90%分位', label: { formatter: '90%: {c}' }, lineStyle: { color: '#FF4500', type: 'dashed' } },
+              { yAxis: p70, name: '70%分位', label: { formatter: '70%: {c}' }, lineStyle: { color: '#FFA500', type: 'dashed' } },
+              { yAxis: p50, name: '50%分位', label: { formatter: '50%: {c}' }, lineStyle: { color: '#32CD32', width: 2 } }, // 中位数加粗
+              { yAxis: p30, name: '30%分位', label: { formatter: '30%: {c}' }, lineStyle: { color: '#1E90FF', type: 'dashed' } },
+              { yAxis: p10, name: '10%分位', label: { formatter: '10%: {c}' }, lineStyle: { color: '#0000FF', type: 'dashed' } },
+            ]
+          }
         }
-      }
-    ]
-  }
+      ]
+    }
 
-  chartInstance.setOption(option)
+    chartInstance.setOption(option)
+  })
 }
 
 function handleResize() {
-  chartInstance?.resize()
+  chartInstances.forEach(chart => chart.resize())
 }
 
-function handleSearch() { fetchData() }
-function refreshData() { fetchData() }
-function resetForm() {
-  form.tsCode = '000001.SH'
-  form.fields = ''
-  selectedMetric.value = 'pe'
-  dateRange.value = buildDefaultDateRange()
-  fetchData()
-}
-
-// 监听指数代码和日期范围变化，自动刷新数据
-watch([() => form.tsCode, dateRange], () => {
+// 监听日期范围变化，自动刷新数据
+watch(dateRange, () => {
   fetchData()
 })
 
 onMounted(() => {
   dateRange.value = buildDefaultDateRange()
-  initChart()
+  window.addEventListener('resize', handleResize)
   fetchData()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
-  chartInstance?.dispose()
+  chartInstances.forEach(chart => chart.dispose())
+  chartInstances.clear()
 })
 </script>
 
@@ -399,4 +407,11 @@ onUnmounted(() => {
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .header-title { display: flex; align-items: center; gap: 10px; }
 .valuation-tag { margin-left: 10px; font-weight: bold; }
+.chart-section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.index-card { min-width: 0; }
+.chart-container { width: 100%; height: 420px; }
+.range-buttons { margin-left: 8px; }
+@media (max-width: 1200px) {
+  .chart-section { grid-template-columns: 1fr; }
+}
 </style>

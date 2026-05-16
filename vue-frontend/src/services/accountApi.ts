@@ -1,5 +1,5 @@
 // 股票账户数据API服务
-import axios from 'axios'
+import axios from './axiosConfig'
 
 // 股票账户统计数据接口类型定义
 export interface StockAccountData {
