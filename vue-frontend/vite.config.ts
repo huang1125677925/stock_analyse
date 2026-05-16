@@ -25,10 +25,12 @@ export default defineConfig(({ mode }) => {
         '/django': {
           target: proxyTarget,
           changeOrigin: true,
+          secure: false,
         },
         '/api': {
           target: proxyTarget,
           changeOrigin: true,
+          secure: false,
         },
       },
     },
