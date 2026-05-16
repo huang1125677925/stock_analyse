@@ -1,0 +1,1 @@
+import{d as o,c as t,e as c,i as a,o as s,_ as n}from"./index-A3YRvh0g.js";const _={class:"placeholder-page"},p=o({__name:"StockSwingPracticeView",setup(r){return(i,d)=>{const e=a("el-empty");return s(),t("div",_,[c(e,{description:"波段页面建设中"})])}}}),m=n(p,[["__scopeId","data-v-99af4016"]]);export{m as default};

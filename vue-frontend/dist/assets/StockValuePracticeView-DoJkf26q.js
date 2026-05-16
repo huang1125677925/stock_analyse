@@ -1,0 +1,1 @@
+import{d as o,c as t,e as c,i as a,o as s,_ as n}from"./index-A3YRvh0g.js";const _={class:"placeholder-page"},p=o({__name:"StockValuePracticeView",setup(r){return(i,l)=>{const e=a("el-empty");return s(),t("div",_,[c(e,{description:"价值页面建设中"})])}}}),m=n(p,[["__scopeId","data-v-5f409eae"]]);export{m as default};
