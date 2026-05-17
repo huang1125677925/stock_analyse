@@ -403,7 +403,7 @@ const isMobile = ref(false)
 const mobileMenuVisible = ref(false)
 
 const updateIsMobile = () => {
-  isMobile.value = window.innerWidth < 768
+  isMobile.value = window.innerWidth < 960
 }
 
 // 菜单项配置
@@ -563,9 +563,12 @@ watch(
 <style scoped>
 .layout-container {
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
+  max-width: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 .topbar {
@@ -575,6 +578,7 @@ watch(
   align-items: center;
   padding: 0 16px;
   height: 64px;
+  flex-shrink: 0;
   box-shadow: 0 2px 4px rgba(0, 21, 41, 0.08);
 }
 
@@ -732,17 +736,26 @@ watch(
 .mobile-menu-btn {
   color: #606266;
   margin-left: auto;
+  min-width: 40px;
+  height: 40px;
+  font-size: 20px;
 }
 
 .main-content {
   background-color: #f5f5f5;
   padding: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 /* 抽屉样式 */
 .mobile-drawer {
   padding: 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .mobile-drawer-header {
@@ -754,6 +767,14 @@ watch(
 
 .mobile-auth {
   margin-top: 12px;
+  flex-shrink: 0;
+}
+
+.mobile-menu {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: none;
 }
 
 .mobile-user-menu {
@@ -810,5 +831,27 @@ watch(
   flex-wrap: nowrap;
   gap: 16px;
   padding: 8px 16px;
+}
+
+@media (max-width: 959px) {
+  .topbar {
+    height: 56px;
+    padding: 0 12px;
+  }
+
+  .topbar-left {
+    margin-right: 12px;
+    min-width: 0;
+  }
+
+  .app-title {
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .main-content {
+    height: calc(100dvh - 56px);
+  }
 }
 </style>

@@ -20,11 +20,50 @@ body {
 
 #app {
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   font-weight: normal;
   overflow: hidden;
+}
+
+.el-main.main-content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.el-card,
+.el-tabs,
+.el-table,
+.el-form,
+.el-row,
+.el-col {
+  min-width: 0;
+}
+
+.el-table {
+  max-width: 100%;
+}
+
+.el-table__inner-wrapper,
+.el-table__body-wrapper,
+.el-table__header-wrapper,
+.el-table__footer-wrapper {
+  min-width: 0;
+}
+
+.el-date-editor,
+.el-select,
+.el-input,
+.el-input-number,
+.el-cascader {
+  max-width: 100%;
+}
+
+.el-pagination {
+  max-width: 100%;
 }
 
 /* 链接样式重置 */
@@ -48,5 +87,175 @@ a:hover {
     display: block;
     grid-template-columns: unset;
     padding: 0;
+  }
+}
+
+@media (max-width: 959px) {
+  .el-main.main-content > * {
+    padding: 12px !important;
+  }
+
+  .el-card__header {
+    padding: 12px 14px;
+  }
+
+  .el-card__body {
+    padding: 12px;
+  }
+
+  .el-form--inline {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .el-form--inline .el-form-item {
+    margin-right: 0;
+    margin-bottom: 0;
+    width: 100%;
+  }
+
+  .el-form-item {
+    margin-bottom: 14px;
+  }
+
+  .el-form-item__label {
+    line-height: 1.4;
+    padding-right: 8px;
+  }
+
+  .el-form-item__content {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .el-select,
+  .el-input,
+  .el-input-number,
+  .el-date-editor,
+  .el-cascader,
+  .el-button-group,
+  .el-radio-group {
+    width: 100% !important;
+  }
+
+  .el-date-editor.el-input,
+  .el-date-editor.el-input__wrapper,
+  .el-date-editor--daterange,
+  .el-date-editor--datetimerange {
+    width: 100% !important;
+  }
+
+  .el-button-group {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .el-button-group .el-button {
+    flex: 1 1 auto;
+  }
+
+  .el-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .el-radio-button {
+    flex: 1 1 auto;
+  }
+
+  .el-radio-button__inner {
+    width: 100%;
+    border-left: var(--el-border);
+    border-radius: var(--el-border-radius-base) !important;
+  }
+
+  .el-dialog {
+    width: 96vw !important;
+    max-width: 96vw;
+    margin: 2vh auto 0 !important;
+  }
+
+  .el-dialog__body {
+    max-height: calc(96dvh - 112px);
+    overflow: auto;
+    padding: 12px;
+  }
+
+  .el-drawer__body {
+    padding: 0;
+    min-width: 0;
+  }
+
+  .el-tabs__nav-wrap {
+    overflow: hidden;
+  }
+
+  .el-tabs__nav-scroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .el-tabs__nav-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .el-table {
+    font-size: 12px;
+  }
+
+  .el-table .cell {
+    padding: 0 6px;
+    line-height: 1.45;
+  }
+
+  .el-table th.el-table__cell,
+  .el-table td.el-table__cell {
+    padding: 7px 0;
+  }
+
+  .el-pagination {
+    justify-content: flex-start;
+    gap: 6px;
+    white-space: normal;
+  }
+
+  .el-pagination .el-pagination__sizes,
+  .el-pagination .el-pagination__jump {
+    margin-left: 0;
+  }
+
+  .el-descriptions__body .el-descriptions__table {
+    table-layout: fixed;
+  }
+
+  .el-descriptions__label,
+  .el-descriptions__content {
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 480px) {
+  .el-main.main-content > * {
+    padding: 10px !important;
+  }
+
+  .el-card__header,
+  .el-card__body {
+    padding: 10px;
+  }
+
+  .el-dialog {
+    width: 98vw !important;
+    max-width: 98vw;
+  }
+
+  .el-dialog__header {
+    padding: 12px 12px 0;
+  }
+
+  .el-dialog__body {
+    padding: 10px;
   }
 }
