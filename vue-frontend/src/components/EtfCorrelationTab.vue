@@ -107,6 +107,7 @@ const setDefaultDates = () => {
 }
 
 const codeToName = (code: string) => props.codeNameMap[code] || code
+const codeToDisplayLabel = (code: string) => `${codeToName(code)}\n${code}`
 
 const normalizeSelection = () => {
   const base = props.etfCodes.slice(0, defaultSelectionLimit)
@@ -154,11 +155,14 @@ const chartOption = computed((): echarts.EChartsOption => {
     }
   }
 
-  const xLabels = data.labels.map(codeToName)
-  const yLabels = data.labels.map(codeToName)
+  const xLabels = data.labels.map(codeToDisplayLabel)
+  const yLabels = data.labels.map(codeToDisplayLabel)
   const heatmapData: [number, number, number][] = []
   let minV = Infinity
   let maxV = -Infinity
+  const axisFontSize = xLabels.length > 12 ? 10 : 11
+  const leftPadding = Math.min(260, Math.max(110, ...yLabels.map(label => label.split('\n')[0].length * 14)))
+  const bottomPadding = xLabels.length > 10 ? 110 : 88
 
   for (let i = 0; i < yLabels.length; i++) {
     const row = data.matrix[i] || []
@@ -187,20 +191,29 @@ const chartOption = computed((): echarts.EChartsOption => {
         return `${yLabel} vs ${xLabel}<br/>相关系数：${value}`
       }
     },
-    grid: { left: '8%', right: '10%', top: '8%', bottom: '18%', containLabel: true },
+    grid: { left: leftPadding, right: 110, top: 72, bottom: bottomPadding, containLabel: false },
     xAxis: {
       type: 'category',
       data: xLabels,
       axisLabel: {
         rotate: 45,
-        fontSize: xLabels.length > 12 ? 10 : 11,
-        interval: 0
+        fontSize: axisFontSize,
+        interval: 0,
+        width: 110,
+        overflow: 'truncate',
+        lineHeight: 14
       }
     },
     yAxis: {
       type: 'category',
       data: yLabels,
-      axisLabel: { fontSize: yLabels.length > 12 ? 10 : 11, interval: 0 }
+      axisLabel: {
+        fontSize: axisFontSize,
+        interval: 0,
+        width: Math.max(100, leftPadding - 26),
+        overflow: 'truncate',
+        lineHeight: 14
+      }
     },
     visualMap: {
       min: Math.min(-1, Math.floor(minV * 10) / 10),

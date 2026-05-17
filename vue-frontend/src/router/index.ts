@@ -68,7 +68,7 @@ const router = createRouter({
           path: '/backtest-strategy',
           name: 'BacktestStrategy',
           component: () => import('@/views/quant/BacktestStrategyCreate.vue'),
-          meta: { title: '创建回测策略' }
+          meta: { title: '创建回测任务' }
         },
         {
           path: '/backtest-history',

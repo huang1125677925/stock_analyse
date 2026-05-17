@@ -1,10 +1,5 @@
 <template>
   <div class="backtest-strategy-view">
-    <div class="page-header">
-      <h1>创建回测任务</h1>
-      <p>选择策略并配置参数，创建回测任务</p>
-    </div>
-    
     <!-- 策略选择和配置 -->
     <div class="strategy-config-panel">
       <el-card>
@@ -74,43 +69,20 @@
           </el-row>
           
           <el-row :gutter="20">
-            <el-col :span="6">
-              <el-form-item label="开始日期" required>
-                <el-date-picker
-                  v-model="strategyForm.startDate"
-                  type="date"
-                  placeholder="选择开始日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                  class="full-width"
-                />
+            <el-col :span="12">
+              <el-form-item label="回测区间" required>
+                <el-radio-group v-model="dateRangeShortcut" class="date-range-shortcuts" @change="handleDateRangeShortcutChange">
+                  <el-radio-button label="1y">最近1年</el-radio-button>
+                  <el-radio-button label="3y">最近3年</el-radio-button>
+                  <el-radio-button label="5y">最近5年</el-radio-button>
+                </el-radio-group>
+                <span class="date-range-display">{{ strategyForm.startDate }} 至 {{ strategyForm.endDate }}</span>
               </el-form-item>
             </el-col>
-            
-            <el-col :span="6">
-              <el-form-item label="结束日期" required>
-                <el-date-picker
-                  v-model="strategyForm.endDate"
-                  type="date"
-                  placeholder="选择结束日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                  class="full-width"
-                />
-              </el-form-item>
-            </el-col>
-            
-            <!-- 新增：数据频率选择 -->
+
             <el-col :span="6">
               <el-form-item label="数据频率">
-                <el-select
-                  v-model="strategyForm.frequency"
-                  placeholder="选择数据频率"
-                  class="full-width"
-                >
-                  <el-option label="日频" value="daily" />
-                  <el-option label="周频" value="weekly" />
-                </el-select>
+                <el-tag type="info" size="large" class="frequency-tag">日频</el-tag>
               </el-form-item>
             </el-col>
 
@@ -169,6 +141,30 @@
         </el-form>
       </el-card>
     </div>
+
+    <div class="kline-preview-panel" v-if="strategyForm.symbol">
+      <el-card v-loading="klinePreviewLoading">
+        <template #header>
+          <div class="card-header">
+            <span>{{ klinePreviewTitle }}</span>
+            <span class="preview-range">{{ strategyForm.startDate }} 至 {{ strategyForm.endDate }}</span>
+          </div>
+        </template>
+
+        <StockKLineChart
+          v-if="klinePreviewData.length"
+          :stock-code="strategyForm.symbol"
+          :stock-name="strategyForm.stockName"
+          :kline-data="klinePreviewData"
+          height="420px"
+        />
+        <el-empty
+          v-else-if="!klinePreviewLoading"
+          :description="klinePreviewEmptyText"
+          :image-size="80"
+        />
+      </el-card>
+    </div>
     
     <!-- 策略说明 -->
     <div class="strategy-description" v-if="selectedStrategy">
@@ -204,31 +200,33 @@
  * 1. 策略选择和参数配置
  * 2. 创建回测任务
  * 3. 显示最近创建的任务
- * 4. 支持选择回测数据频率（daily/weekly），用于控制使用日级或周级数据
+ * 4. 使用固定日频数据创建回测任务
  * 
  * 参数：无
  * 返回值：无
  * 事件：无
  */
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import StockKLineChart from '@/components/StockKLineChart.vue'
 import { 
   getStrategies, 
   createBacktestTask as createBacktestTaskApi, 
   runBacktestTask as runBacktestTaskApi,
   type Strategy
 } from '@/services/quantBacktestApi'
-import { fetchStockList, type StockInfoItem } from '@/services/stockHistoryApi'
+import { fetchStockHistoryData } from '@/services/stockHistoryApi'
+import type { StockHistoryDataItem } from '@/services/stockHistoryApi'
 import { getStockList } from '@/services/individualStockApi'
 import type { StockListParams, StockInfo } from '@/services/individualStockApi'
-import { getEtfBasic, type EtfBasicItem, type EtfBasicListPayload } from '@/services/etfApi'
+import { getEtfBasic, getEtfDaily, type EtfBasicItem, type EtfDailyItem } from '@/services/etfApi'
 
 const router = useRouter()
 const route = useRoute()
 
-// 表单数据类型定义，约束 frequency 为联合类型
-type BacktestFrequency = 'daily' | 'weekly'
+// 表单数据类型定义，当前创建任务固定使用日频
+type BacktestFrequency = 'daily'
 type DataSourceType = 'stock' | 'etf'
 interface StrategyForm {
   strategyName: string
@@ -262,12 +260,18 @@ const strategyList = ref<Strategy[]>([])
 const stockList = ref<StockInfo[]>([])
 const selectedStrategy = ref<Strategy | null>(null)
 const loading = ref(false)
+const dateRangeShortcut = ref<'1y' | '3y' | '5y'>('1y')
 
 // 股票搜索相关状态
 const stockSearchKeyword = ref('')
 const stockSearchLoading = ref(false)
 // 输入最小长度：只有当输入长度达到该值时才触发远程搜索
 const MIN_SEARCH_LENGTH = 2
+
+const klinePreviewData = ref<StockHistoryDataItem[]>([])
+const klinePreviewLoading = ref(false)
+const klinePreviewError = ref('')
+let klinePreviewRequestId = 0
 
 // 计算属性：是否可以创建回测任务
 const canCreateBacktest = computed(() => {
@@ -280,6 +284,33 @@ const canCreateBacktest = computed(() => {
 // 计算属性：根据数据源动态展示代码字段标签与占位
 const symbolLabel = computed(() => strategyForm.dataSource === 'etf' ? 'ETF代码' : '股票代码')
 const symbolPlaceholder = computed(() => strategyForm.dataSource === 'etf' ? '请选择ETF代码' : '请选择股票代码')
+const klinePreviewTitle = computed(() => {
+  const sourceName = strategyForm.dataSource === 'etf' ? 'ETF' : '股票'
+  const symbolName = strategyForm.stockName ? `${strategyForm.stockName}(${strategyForm.symbol})` : strategyForm.symbol
+  return `${sourceName}走势预览 - ${symbolName}`
+})
+const klinePreviewEmptyText = computed(() => klinePreviewError.value || '当前时间范围内暂无K线数据')
+
+const formatDateToYYYYMMDDWithDash = (date: Date): string => date.toISOString().split('T')[0]
+
+const applyDateRangeShortcut = (range: '1y' | '3y' | '5y') => {
+  const yearMap = {
+    '1y': 1,
+    '3y': 3,
+    '5y': 5
+  }
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+
+  strategyForm.endDate = formatDateToYYYYMMDDWithDash(endDate)
+  strategyForm.startDate = formatDateToYYYYMMDDWithDash(startDate)
+  strategyForm.frequency = 'daily'
+}
+
+const handleDateRangeShortcutChange = (range: '1y' | '3y' | '5y') => {
+  applyDateRangeShortcut(range)
+}
 
 /**
  * 搜索股票列表
@@ -418,6 +449,67 @@ const handleSymbolSelect = (code: string) => {
   strategyForm.stockName = item ? (item.name || '') : ''
 }
 
+const formatDateForStockApi = (date: string): string => date.replace(/-/g, '')
+
+const normalizeEtfDailyToKLine = (items: EtfDailyItem[]): StockHistoryDataItem[] => {
+  return items.map(item => ({
+    stock_code: item.ts_code,
+    stock_name: item.csname || strategyForm.stockName || item.ts_code,
+    date: item.trade_date,
+    open_price: item.open,
+    close_price: item.close,
+    high_price: item.high,
+    low_price: item.low,
+    change_percent: item.pct_chg ?? 0,
+    change_amount: item.change ?? 0,
+    volume: item.vol,
+    amount: item.amount,
+    amplitude: 0,
+    turnover_rate: 0,
+    created_at: item.created_at
+  }))
+}
+
+const loadKlinePreview = async () => {
+  const requestId = ++klinePreviewRequestId
+  klinePreviewError.value = ''
+
+  if (!strategyForm.symbol || !strategyForm.startDate || !strategyForm.endDate) {
+    klinePreviewData.value = []
+    return
+  }
+
+  klinePreviewLoading.value = true
+  try {
+    const data = strategyForm.dataSource === 'etf'
+      ? normalizeEtfDailyToKLine(await getEtfDaily({
+          ts_code: strategyForm.symbol,
+          start_date: strategyForm.startDate,
+          end_date: strategyForm.endDate
+        }))
+      : await fetchStockHistoryData(
+          strategyForm.symbol,
+          formatDateForStockApi(strategyForm.startDate),
+          formatDateForStockApi(strategyForm.endDate),
+          'qfq'
+        )
+
+    if (requestId !== klinePreviewRequestId) return
+    klinePreviewData.value = [...data].sort((a, b) => a.date.localeCompare(b.date))
+  } catch (error) {
+    if (requestId !== klinePreviewRequestId) return
+    console.error('加载K线预览失败:', error)
+    klinePreviewData.value = []
+    klinePreviewError.value = 'K线数据加载失败'
+  } finally {
+    if (requestId === klinePreviewRequestId) {
+      klinePreviewLoading.value = false
+    }
+  }
+}
+
+const debouncedLoadKlinePreview = debounce(loadKlinePreview, 300)
+
 /**
  * 加载ETF默认列表
  * 功能：加载第一页 ETF 基本信息并转换为通用选项结构
@@ -449,6 +541,8 @@ const loadEtfList = async () => {
 const handleDataSourceChange = (val: DataSourceType) => {
   strategyForm.symbol = ''
   stockList.value = []
+  klinePreviewData.value = []
+  klinePreviewError.value = ''
   if (val === 'etf') {
     loadEtfList()
   } else {
@@ -488,7 +582,7 @@ const createBacktest = async () => {
       stock_name: strategyForm.stockName,
       start_date: strategyForm.startDate,
       end_date: strategyForm.endDate,
-      // 传递数据频率到后端：daily 或 weekly
+      // 创建回测任务固定使用日频数据
       frequency: strategyForm.frequency,
       initial_cash: strategyForm.initialCash,
       strategy_params: strategyForm.strategyParams,
@@ -545,8 +639,8 @@ const resetForm = () => {
   strategyForm.strategyName = ''
   strategyForm.symbol = ''
   strategyForm.stockName = ''
-  strategyForm.startDate = ''
-  strategyForm.endDate = ''
+  dateRangeShortcut.value = '1y'
+  applyDateRangeShortcut('1y')
   strategyForm.frequency = 'daily'
   strategyForm.initialCash = 1000000
   strategyForm.strategyParams = {}
@@ -625,13 +719,7 @@ onMounted(async () => {
     loadStockList()
   ])
   
-  // 设置默认日期范围（最近一年）
-  const endDate = new Date()
-  const startDate = new Date()
-  startDate.setFullYear(endDate.getFullYear() - 1)
-  
-  strategyForm.endDate = endDate.toISOString().split('T')[0]
-  strategyForm.startDate = startDate.toISOString().split('T')[0]
+  applyDateRangeShortcut('1y')
   
   // 检查URL参数中是否有预选策略
   const strategyParam = route.query.strategy as string
@@ -674,12 +762,7 @@ onMounted(async () => {
         strategyForm.initialCash = Math.round(cashNum)
       }
     }
-    if (q.frequency) {
-      const freq = String(q.frequency)
-      if (freq === 'daily' || freq === 'weekly') {
-        strategyForm.frequency = freq as BacktestFrequency
-      }
-    }
+    strategyForm.frequency = 'daily'
     if (q.strategy_params) {
       try {
         const decoded = decodeURIComponent(String(q.strategy_params))
@@ -700,6 +783,13 @@ onMounted(async () => {
 
   applyPrefillFromQuery()
 })
+
+watch(
+  () => [strategyForm.dataSource, strategyForm.symbol, strategyForm.startDate, strategyForm.endDate],
+  () => {
+    debouncedLoadKlinePreview()
+  }
+)
 </script>
 
 <style scoped>
@@ -707,22 +797,17 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header h1 {
-  margin: 0 0 8px 0;
-  color: #303133;
-}
-
-.page-header p {
-  margin: 0;
-  color: #606266;
-}
-
 .strategy-config-panel {
   margin-bottom: 20px;
+}
+
+.kline-preview-panel {
+  margin-bottom: 20px;
+}
+
+.preview-range {
+  color: #909399;
+  font-size: 13px;
 }
 
 .card-header {
@@ -733,6 +818,20 @@ onMounted(async () => {
 
 .strategy-form .full-width {
   width: 100%;
+}
+
+.date-range-shortcuts {
+  margin-right: 12px;
+}
+
+.date-range-display {
+  color: #606266;
+  font-size: 13px;
+}
+
+.frequency-tag {
+  min-width: 64px;
+  justify-content: center;
 }
 
 .strategy-params {

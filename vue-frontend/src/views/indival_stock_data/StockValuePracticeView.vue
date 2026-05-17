@@ -1,5 +1,5 @@
 <template>
-  <div class="stock-value-practice-view" v-loading="loading" element-loading-text="正在加载高股息股票池...">
+  <div class="stock-value-practice-view" v-loading="loading" :element-loading-text="loadingText">
     <el-tabs v-model="activeTab" class="value-tabs">
       <el-tab-pane label="股息率分析" name="dividend">
         <el-card shadow="hover" class="analysis-card">
@@ -103,7 +103,7 @@
             <el-table-column label="股票" min-width="180" fixed="left">
               <template #default="{ row }">
                 <div class="stock-cell">
-                  <el-button type="primary" link @click="viewStock(row.code)">{{ row.name }}</el-button>
+                  <el-button type="primary" link @click="openDividendTrendPreview(row)">{{ row.name }}</el-button>
                   <span class="stock-code">{{ row.code }}</span>
                 </div>
               </template>
@@ -175,6 +175,143 @@
         </el-card>
       </el-tab-pane>
 
+      <el-tab-pane label="业绩优选" name="performance">
+        <el-card shadow="hover" class="analysis-card">
+          <template #header>
+            <div class="header-row">
+              <div>
+                <h2>业绩好股票筛选</h2>
+                <p>基于价值股选取策略接口，按营收增长、净利润、ROE 和毛利率筛选业绩持续向好的公司。</p>
+              </div>
+              <el-button type="primary" @click="loadPerformanceCandidates" :loading="loading">刷新</el-button>
+            </div>
+          </template>
+
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-label">候选股票</span>
+              <strong class="summary-value">{{ performanceSummary.total }}</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">平均营收增速</span>
+              <strong class="summary-value">{{ performanceSummary.avgRevenueGrowth }}</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">平均净利润</span>
+              <strong class="summary-value">{{ performanceSummary.avgNetProfit }}</strong>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">当前财报期</span>
+              <strong class="summary-value">{{ performanceReportPeriodDisplay }}</strong>
+            </div>
+          </div>
+
+          <div class="methodology">
+            <p>候选池来源：价值股选取策略接口 `GET /django/api/strategy/value-stocks/`。</p>
+            <p>分析口径：按营收同比增速和净利润筛选，再结合净利润同比、ROE、毛利率辅助判断经营质量。</p>
+          </div>
+
+          <div class="filter-bar performance-filter-bar">
+            <el-input-number v-model="performanceFilters.minRevenueGrowth" :step="5" :precision="1" class="filter-item" />
+            <el-input-number v-model="performanceFilters.minNetProfitYi" :min="0" :step="1" :precision="1" class="filter-item" />
+            <el-input-number v-model="performanceFilters.limit" :min="10" :max="20000" :step="10" :precision="0" class="filter-item" />
+            <el-input-number v-model="performanceFilters.lookbackPeriods" :min="1" :max="16" :step="1" :precision="0" class="filter-item" />
+            <el-input
+              v-model="performanceFilters.reportPeriod"
+              placeholder="财报期 YYYYMMDD，可留空"
+              clearable
+              class="filter-item"
+            />
+            <el-input v-model="performanceFilters.keyword" placeholder="搜索股票代码或名称" clearable class="filter-item keyword-input" />
+          </div>
+
+          <div class="filter-labels performance-filter-labels">
+            <span>最低营收增速(%)</span>
+            <span>最低净利润(亿)</span>
+            <span>返回数量</span>
+            <span>回看季度数</span>
+            <span>指定财报期</span>
+            <span>关键词</span>
+          </div>
+
+          <div class="filter-help-grid performance-help-grid">
+            <div class="filter-help-item">
+              <strong>最低营收增速</strong>
+              <span>用于筛出主营业务仍在扩张的股票。</span>
+            </div>
+            <div class="filter-help-item">
+              <strong>最低净利润</strong>
+              <span>按“亿”为单位输入，确保利润规模达到你的标准。</span>
+            </div>
+            <div class="filter-help-item">
+              <strong>财报期</strong>
+              <span>可指定 `YYYYMMDD`，留空时接口会自动回看最近可用财报期。</span>
+            </div>
+          </div>
+
+          <el-table :data="paginatedPerformanceRows" border stripe style="width: 100%" empty-text="暂无符合条件的业绩优选股票">
+            <el-table-column label="股票" min-width="180" fixed="left">
+              <template #default="{ row }">
+                <div class="stock-cell">
+                  <el-button type="primary" link @click="openPerformanceTrendPreview(row)">{{ row.stockName }}</el-button>
+                  <span class="stock-code">{{ row.stockCode }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="reportPeriod" label="财报期" min-width="100" />
+            <el-table-column label="营收增速" min-width="100">
+              <template #default="{ row }">
+                <span :class="row.revenueGrowthRate !== null && row.revenueGrowthRate >= 0 ? 'text-up' : 'text-down'">
+                  {{ formatSignedPercent(row.revenueGrowthRate) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="净利增速" min-width="100">
+              <template #default="{ row }">
+                <span :class="row.netProfitGrowthRate !== null && row.netProfitGrowthRate >= 0 ? 'text-up' : 'text-down'">
+                  {{ formatSignedPercent(row.netProfitGrowthRate) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="净利润" min-width="120">
+              <template #default="{ row }">
+                {{ formatYiNumber(row.netProfit) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="营业收入" min-width="120">
+              <template #default="{ row }">
+                {{ formatYiNumber(row.totalRevenue) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="ROE" min-width="90">
+              <template #default="{ row }">
+                {{ formatPercentValueNullable(row.roe) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="毛利率" min-width="90">
+              <template #default="{ row }">
+                {{ formatPercentValueNullable(row.grossProfitMargin) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="公告日" min-width="110">
+              <template #default="{ row }">
+                {{ row.annDate || '-' }}
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-row">
+            <el-pagination
+              v-model:current-page="performanceCurrentPage"
+              v-model:page-size="performancePageSize"
+              :total="filteredPerformanceRows.length"
+              :page-sizes="[10, 20, 30, 50]"
+              layout="total, sizes, prev, pager, next"
+            />
+          </div>
+        </el-card>
+      </el-tab-pane>
+
       <el-tab-pane label="选股思路" name="guide">
         <el-card shadow="hover" class="guide-card">
           <div class="guide-grid">
@@ -198,15 +335,58 @@
         </el-card>
       </el-tab-pane>
     </el-tabs>
+
+    <el-dialog
+      v-model="performanceTrendVisible"
+      width="88%"
+      top="6vh"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <template #header>
+        <div class="trend-dialog-header">
+          <div class="trend-dialog-title">{{ performanceTrendTitle }}</div>
+          <div class="trend-dialog-subtitle">{{ performanceTrendDateRange.start }} 至 {{ performanceTrendDateRange.end }}</div>
+        </div>
+      </template>
+
+      <div class="trend-dialog-body">
+        <div class="trend-shortcuts">
+          <el-radio-group v-model="performanceTrendShortcut" @change="handlePerformanceTrendShortcutChange">
+            <el-radio-button label="1y">最近1年</el-radio-button>
+            <el-radio-button label="3y">最近3年</el-radio-button>
+            <el-radio-button label="5y">最近5年</el-radio-button>
+          </el-radio-group>
+        </div>
+
+        <el-card class="trend-preview-card" v-loading="performanceTrendLoading">
+          <StockKLineChart
+            v-if="performanceTrendData.length"
+            :stock-code="performanceTrendStock.code"
+            :stock-name="performanceTrendStock.name"
+            :kline-data="performanceTrendData"
+            :event-lines="performanceTrendEventLines"
+            height="420px"
+          />
+          <el-empty
+            v-else-if="!performanceTrendLoading"
+            :description="performanceTrendEmptyText"
+            :image-size="80"
+          />
+        </el-card>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import StockKLineChart from '@/components/StockKLineChart.vue'
 import { getStockList, type StockInfo } from '@/services/individualStockApi'
 import { getStockDividendYieldList } from '@/services/stockDividendYieldApi'
+import { getValueStocks } from '@/services/strategyApi'
+import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 
 interface DividendCandidateRow {
   code: string
@@ -222,14 +402,53 @@ interface DividendCandidateRow {
   qualityScore: number
 }
 
-const router = useRouter()
+interface PerformanceCandidateRow {
+  tsCode: string
+  stockCode: string
+  stockName: string
+  reportPeriod: string
+  annDate: string | null
+  totalRevenue: number | null
+  netProfit: number | null
+  revenueGrowthRate: number | null
+  netProfitGrowthRate: number | null
+  roe: number | null
+  grossProfitMargin: number | null
+}
+
+interface PerformanceTrendEventLine {
+  date: string
+  label: string
+  color?: string
+}
+
 const activeTab = ref('dividend')
 const loading = ref(false)
+const loadingText = ref('正在加载高股息股票池...')
 const currentPage = ref(1)
 const pageSize = ref(20)
+const performanceCurrentPage = ref(1)
+const performancePageSize = ref(20)
+const performanceTrendVisible = ref(false)
+const performanceTrendLoading = ref(false)
+const performanceTrendShortcut = ref<'1y' | '3y' | '5y'>('1y')
 const sortField = ref<'dividendYield' | 'qualityScore' | 'totalMarketCap' | 'peRatio' | 'pbRatio'>('dividendYield')
 const onlyQuality = ref(false)
 const rows = ref<DividendCandidateRow[]>([])
+const performanceRows = ref<PerformanceCandidateRow[]>([])
+const performanceReportPeriod = ref('')
+const performanceTrendData = ref<StockHistoryDataItem[]>([])
+const performanceTrendError = ref('')
+const performanceTrendEventLines = ref<PerformanceTrendEventLine[]>([])
+const performanceTrendStock = reactive({
+  code: '',
+  name: ''
+})
+const performanceTrendDateRange = reactive({
+  start: '',
+  end: ''
+})
+let performanceTrendRequestId = 0
 
 const filters = reactive({
   keyword: '',
@@ -237,6 +456,15 @@ const filters = reactive({
   maxPeRatio: 25,
   maxPbRatio: 5,
   minMarketCapYi: 100
+})
+
+const performanceFilters = reactive({
+  keyword: '',
+  reportPeriod: '',
+  minRevenueGrowth: 10,
+  minNetProfitYi: 1,
+  limit: 50,
+  lookbackPeriods: 8
 })
 
 const normalizeNumber = (value: unknown): number | null => {
@@ -258,6 +486,10 @@ const formatNumber = (value: number | null) => value === null ? '-' : value.toFi
 const formatYi = (value: number) => value ? `${(value / 100000000).toFixed(0)}亿` : '-'
 const formatPercentValue = (value: number) => `${value.toFixed(2)}%`
 const formatSignedPercent = (value: number | null) => value === null ? '-' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
+const formatPercentValueNullable = (value: number | null) => value === null ? '-' : `${value.toFixed(2)}%`
+const formatYiNumber = (value: number | null) => value === null ? '-' : `${(value / 100000000).toFixed(2)}亿`
+const formatDateToYYYYMMDDWithDash = (date: Date): string => date.toISOString().split('T')[0]
+const formatDateForStockApi = (date: string): string => date.replace(/-/g, '')
 
 const isQualityCandidate = (row: DividendCandidateRow) => (
   row.dividendYield >= 3 &&
@@ -308,6 +540,38 @@ const summary = computed(() => {
   return { total, highDividend, quality, avgDividendYield: avg }
 })
 
+const filteredPerformanceRows = computed(() => {
+  const keyword = performanceFilters.keyword.trim().toLowerCase()
+  return performanceRows.value.filter(row => {
+    if (!keyword) return true
+    return row.stockCode.toLowerCase().includes(keyword) || row.stockName.toLowerCase().includes(keyword)
+  })
+})
+
+const paginatedPerformanceRows = computed(() => {
+  const start = (performanceCurrentPage.value - 1) * performancePageSize.value
+  return filteredPerformanceRows.value.slice(start, start + performancePageSize.value)
+})
+
+const performanceSummary = computed(() => {
+  const total = performanceRows.value.length
+  const avgRevenueGrowth = total
+    ? `${(performanceRows.value.reduce((sum, row) => sum + Number(row.revenueGrowthRate ?? 0), 0) / total).toFixed(2)}%`
+    : '-'
+  const validNetProfitRows = performanceRows.value.filter(row => row.netProfit !== null)
+  const avgNetProfit = validNetProfitRows.length
+    ? `${(validNetProfitRows.reduce((sum, row) => sum + Number(row.netProfit ?? 0), 0) / validNetProfitRows.length / 100000000).toFixed(2)}亿`
+    : '-'
+  return { total, avgRevenueGrowth, avgNetProfit }
+})
+
+const performanceReportPeriodDisplay = computed(() => performanceReportPeriod.value || '-')
+const performanceTrendTitle = computed(() => {
+  if (!performanceTrendStock.code) return '股票走势预览'
+  return `股票走势预览 - ${performanceTrendStock.name}(${performanceTrendStock.code})`
+})
+const performanceTrendEmptyText = computed(() => performanceTrendError.value || '当前时间范围内暂无K线数据')
+
 const buildQualityScore = (dividendYield: number, pbRatio: number | null, peRatio: number | null, totalMarketCap: number) => {
   const pbPenalty = pbRatio && pbRatio > 0 ? pbRatio : 1
   const pePenalty = peRatio && peRatio > 0 ? Math.min(peRatio / 15, 2) : 1.5
@@ -325,9 +589,10 @@ const chunk = <T>(items: T[], size: number) => {
 
 const loadDividendCandidates = async () => {
   loading.value = true
+  loadingText.value = '正在加载高股息股票池...'
   try {
     const dividendResponse = await getStockDividendYieldList({
-      limit: 500,
+      limit: 200,
       offset: 0,
       sort_by: 'dv_ttm',
       order: 'desc'
@@ -399,12 +664,122 @@ const loadDividendCandidates = async () => {
   }
 }
 
-const viewStock = (code: string) => {
-  router.push(`/analysis/stock/${code}`)
+const loadPerformanceCandidates = async () => {
+  loading.value = true
+  loadingText.value = '正在加载业绩优选股票...'
+  try {
+    const response = await getValueStocks({
+      report_period: performanceFilters.reportPeriod.trim() || undefined,
+      min_revenue_growth: performanceFilters.minRevenueGrowth,
+      min_net_profit: performanceFilters.minNetProfitYi * 100000000,
+      limit: performanceFilters.limit,
+      lookback_periods: performanceFilters.lookbackPeriods
+    })
+
+    performanceReportPeriod.value = response.report_period
+    performanceRows.value = (response.data || []).map(item => ({
+      tsCode: item.ts_code,
+      stockCode: item.stock_code,
+      stockName: item.stock_name || item.stock_code,
+      reportPeriod: item.report_period,
+      annDate: item.ann_date,
+      totalRevenue: item.total_revenue,
+      netProfit: item.net_profit,
+      revenueGrowthRate: item.revenue_growth_rate,
+      netProfitGrowthRate: item.net_profit_growth_rate,
+      roe: item.roe,
+      grossProfitMargin: item.gross_profit_margin
+    }))
+    performanceCurrentPage.value = 1
+
+    if (response.errors?.length) {
+      ElMessage.warning(`接口返回了 ${response.errors.length} 条警告，请关注后端财报数据权限或回看期设置`)
+    }
+  } catch (error) {
+    console.error('加载业绩优选股票失败:', error)
+    ElMessage.error('加载业绩优选股票失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+const applyPerformanceTrendShortcut = (range: '1y' | '3y' | '5y') => {
+  const yearMap = { '1y': 1, '3y': 3, '5y': 5 }
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+  performanceTrendDateRange.start = formatDateToYYYYMMDDWithDash(startDate)
+  performanceTrendDateRange.end = formatDateToYYYYMMDDWithDash(endDate)
+}
+
+const loadPerformanceTrendData = async () => {
+  const requestId = ++performanceTrendRequestId
+  performanceTrendError.value = ''
+
+  if (!performanceTrendStock.code || !performanceTrendDateRange.start || !performanceTrendDateRange.end) {
+    performanceTrendData.value = []
+    return
+  }
+
+  performanceTrendLoading.value = true
+  try {
+    const data = await fetchStockHistoryData(
+      performanceTrendStock.code,
+      formatDateForStockApi(performanceTrendDateRange.start),
+      formatDateForStockApi(performanceTrendDateRange.end),
+      'qfq'
+    )
+    if (requestId !== performanceTrendRequestId) return
+    performanceTrendData.value = [...data].sort((a, b) => a.date.localeCompare(b.date))
+  } catch (error) {
+    if (requestId !== performanceTrendRequestId) return
+    console.error('加载业绩优选股票走势失败:', error)
+    performanceTrendData.value = []
+    performanceTrendError.value = '股票走势数据加载失败'
+  } finally {
+    if (requestId === performanceTrendRequestId) {
+      performanceTrendLoading.value = false
+    }
+  }
+}
+
+const handlePerformanceTrendShortcutChange = (range: '1y' | '3y' | '5y') => {
+  applyPerformanceTrendShortcut(range)
+  loadPerformanceTrendData()
+}
+
+const openTrendPreview = (stockCode: string, stockName: string, annDate?: string | null) => {
+  performanceTrendStock.code = stockCode
+  performanceTrendStock.name = stockName
+  performanceTrendEventLines.value = annDate
+    ? [{ date: annDate, label: '公告日', color: '#dc2626' }]
+    : []
+  performanceTrendShortcut.value = '1y'
+  applyPerformanceTrendShortcut('1y')
+  performanceTrendVisible.value = true
+  loadPerformanceTrendData()
+}
+
+const openDividendTrendPreview = (row: DividendCandidateRow) => {
+  openTrendPreview(row.code, row.name)
+}
+
+const openPerformanceTrendPreview = (row: PerformanceCandidateRow) => {
+  openTrendPreview(row.stockCode, row.stockName, row.annDate)
 }
 
 watch([() => filters.keyword, () => filters.minDividendYield, () => filters.maxPeRatio, () => filters.maxPbRatio, () => filters.minMarketCapYi, onlyQuality, sortField], () => {
   currentPage.value = 1
+})
+
+watch([() => performanceFilters.keyword], () => {
+  performanceCurrentPage.value = 1
+})
+
+watch(activeTab, (tab) => {
+  if (tab === 'performance' && performanceRows.value.length === 0) {
+    loadPerformanceCandidates()
+  }
 })
 
 onMounted(() => {
@@ -420,6 +795,10 @@ onMounted(() => {
 .analysis-card,
 .guide-card {
   border-radius: 8px;
+}
+
+.value-tabs :deep(.el-tabs__header) {
+  margin-bottom: 16px;
 }
 
 .header-row {
@@ -518,6 +897,15 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
+.performance-filter-bar,
+.performance-filter-labels {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.performance-help-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .filter-help-item {
   padding: 10px 12px;
   border: 1px solid #ebeef5;
@@ -571,6 +959,38 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.trend-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trend-dialog-title {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.trend-dialog-subtitle {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.trend-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trend-shortcuts {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.trend-preview-card {
+  border-radius: 8px;
 }
 
 @media (max-width: 1200px) {

@@ -183,3 +183,157 @@ export async function getCandlestickPatterns(
     throw error
   }
 }
+
+export interface ValueStockItem {
+  ts_code: string
+  stock_code: string
+  stock_name: string | null
+  report_period: string
+  ann_date: string | null
+  f_ann_date: string | null
+  total_revenue: number | null
+  net_profit: number | null
+  revenue_growth_rate: number | null
+  net_profit_growth_rate: number | null
+  roe: number | null
+  gross_profit_margin: number | null
+}
+
+export interface ValueStockFilters {
+  min_revenue_growth: number
+  min_net_profit: number
+  limit: number
+  lookback_periods: number
+}
+
+export interface ValueStocksData {
+  report_period: string
+  total: number
+  matched_total: number
+  filters: ValueStockFilters
+  data: ValueStockItem[]
+  errors: string[]
+  query_time: string
+}
+
+export interface ValueStocksParams {
+  report_period?: string
+  min_revenue_growth?: number
+  min_net_profit?: number
+  limit?: number
+  lookback_periods?: number
+}
+
+export async function getValueStocks(
+  params: ValueStocksParams = {}
+): Promise<ValueStocksData> {
+  try {
+    const response = await axios.get<ValueStocksData>(
+      '/django/api/strategy/value-stocks/',
+      { params }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取价值股候选列表失败:', error)
+    throw error
+  }
+}
+
+export type SwingTargetType = 'stock' | 'etf'
+export type SwingAdjustType = '' | 'qfq' | 'hfq'
+
+export interface SwingAnalysisMa {
+  ma5: number | null
+  ma10: number | null
+  ma20: number | null
+  ma60: number | null
+}
+
+export interface SwingAnalysisMomentum {
+  momentum_5d_pct: number | null
+  momentum_20d_pct: number | null
+}
+
+export interface SwingAnalysisVolatility {
+  atr14: number | null
+  atr14_pct: number | null
+}
+
+export interface SwingAnalysisVolume {
+  latest_vol: number | null
+  avg_vol20: number | null
+  volume_ratio_20: number | null
+}
+
+export interface SwingAnalysisLevels {
+  support_20d: number | null
+  resistance_20d: number | null
+}
+
+export interface SwingDecisionHint {
+  bias: string
+  reasons: string[]
+  risk_flags: string[]
+}
+
+export interface SwingAnalysisSnapshot {
+  latest_trade_date: string
+  latest_close: number | null
+  period_return_pct: number | null
+  period_high: number | null
+  period_high_date: string | null
+  period_low: number | null
+  period_low_date: string | null
+  position_percentile: number | null
+  pullback_from_high_pct: number | null
+  rebound_from_low_pct: number | null
+  ma: SwingAnalysisMa
+  momentum: SwingAnalysisMomentum
+  volatility: SwingAnalysisVolatility
+  volume: SwingAnalysisVolume
+  levels: SwingAnalysisLevels
+  wave_stage: string
+  decision_hint: SwingDecisionHint
+}
+
+export interface SwingTheoryItem {
+  name: string
+  basis: string
+  related_fields: string[]
+}
+
+export interface SwingAnalysisData {
+  target_type: SwingTargetType
+  ts_code: string
+  start_date: string
+  end_date: string
+  adjust: SwingAdjustType | string
+  data_source: string
+  data_interface: string
+  data_points: number
+  analysis: SwingAnalysisSnapshot | null
+  theory: SwingTheoryItem[]
+}
+
+export interface SwingAnalysisParams {
+  target_type?: SwingTargetType
+  code: string
+  start_date?: string
+  end_date?: string
+  adjust?: SwingAdjustType
+}
+
+export async function getSwingAnalysis(
+  params: SwingAnalysisParams
+): Promise<SwingAnalysisData> {
+  try {
+    const response = await axios.get<SwingAnalysisData>(
+      '/django/api/strategy/swing-analysis/',
+      { params }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取波段分析数据失败:', error)
+    throw error
+  }
+}

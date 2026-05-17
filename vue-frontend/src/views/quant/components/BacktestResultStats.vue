@@ -85,6 +85,11 @@
               <div class="stat-value">
                 {{ backtestResult.performance.sharpe_ratio.toFixed(2) }}
               </div>
+              <div class="main-stat-description">
+                衡量单位风险获得的超额收益，数值越高风险调整后表现越好。
+                <br>
+                计算：夏普比率 = (年化收益率 - 无风险收益率) / 年化波动率。
+              </div>
             </div>
           </div>
         </div>

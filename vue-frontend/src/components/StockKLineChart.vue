@@ -30,12 +30,19 @@ interface TradeSignal {
   description?: string
 }
 
+interface EventLine {
+  date: string
+  label: string
+  color?: string
+}
+
 interface Props {
   title?: string
   stockCode: string
   stockName?: string
   klineData: KLineDataItem[]
   tradeSignals?: TradeSignal[]
+  eventLines?: EventLine[]
   height?: string
 }
 
@@ -43,6 +50,7 @@ const props = withDefaults(defineProps<Props>(), {
   title: '',
   stockName: '',
   tradeSignals: () => [],
+  eventLines: () => [],
   height: '600px'
 })
 
@@ -89,6 +97,47 @@ const updateChart = () => {
   dates.forEach((d, idx) => {
     dateIndexMap.set(normalizeDate(d), idx)
   })
+
+  const alignEventLineIndex = (eventDate: string) => {
+    const normalizedEventDate = normalizeDate(eventDate)
+    if (!normalizedEventDate) return undefined
+
+    const exactIndex = dateIndexMap.get(normalizedEventDate)
+    if (exactIndex !== undefined) return exactIndex
+
+    const nextTradingDayIndex = dates.findIndex((date) => normalizeDate(date) >= normalizedEventDate)
+    if (nextTradingDayIndex !== -1) return nextTradingDayIndex
+
+    return dates.length > 0 ? dates.length - 1 : undefined
+  }
+
+  const alignedEventLines = (props.eventLines || [])
+    .map((eventLine) => {
+      const index = alignEventLineIndex(eventLine.date)
+      if (index === undefined) return null
+      return {
+        xAxis: dates[index],
+        name: eventLine.label,
+        lineStyle: {
+          color: eventLine.color || '#dc2626',
+          width: 2,
+          type: 'solid'
+        },
+        label: {
+          show: true,
+          formatter: eventLine.label,
+          color: eventLine.color || '#dc2626',
+          fontSize: 12,
+          fontWeight: 'bold',
+          backgroundColor: '#fff',
+          padding: [3, 6],
+          borderColor: eventLine.color || '#dc2626',
+          borderWidth: 1,
+          borderRadius: 4
+        }
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
 
 // 生成交易信号标记
 const generateTradeSignals = (signals: TradeSignal[], type: 'buy' | 'sell') => {
@@ -250,6 +299,14 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
         name: 'K线',
         type: 'candlestick',
         data: data.map(item => [item[0], item[1], item[3], item[2]]), // 开盘、收盘、最高、最低
+        markLine: alignedEventLines.length
+          ? {
+              symbol: 'none',
+              silent: true,
+              animation: false,
+              data: alignedEventLines
+            }
+          : undefined,
         markPoint: {
           symbol: 'arrow',
           symbolSize: 50,
@@ -308,7 +365,7 @@ const handleResize = () => {
 
 // 监听属性变化
 watch(
-  [() => props.klineData, () => props.tradeSignals],
+  [() => props.klineData, () => props.tradeSignals, () => props.eventLines],
   () => {
     nextTick(() => {
       updateChart()
@@ -320,6 +377,16 @@ watch(
 // 专门监听交易信号变化
 watch(
   () => props.tradeSignals,
+  () => {
+    nextTick(() => {
+      updateChart()
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+watch(
+  () => props.eventLines,
   () => {
     nextTick(() => {
       updateChart()
