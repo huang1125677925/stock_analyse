@@ -307,7 +307,7 @@ const stockForm = reactive({
 // 策略选择表单
 const strategyForm = reactive({
   strategyName: '',
-  initialCash: 1000000,
+  initialCash: 100000,
   strategyParams: {} as Record<string, any>
 })
 

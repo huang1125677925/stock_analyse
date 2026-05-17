@@ -251,7 +251,7 @@ const strategyForm = reactive<StrategyForm>({
   endDate: '',
   // 新增：回测数据频率，默认日频
   frequency: 'daily',
-  initialCash: 1000000,
+  initialCash: 100000,
   strategyParams: {} as Record<string, any>,
   // 新增：数据源（stock/etf），默认股票
   dataSource: 'stock'

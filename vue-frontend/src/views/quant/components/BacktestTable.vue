@@ -2,17 +2,72 @@
   <div class="task-list">
     <el-card>
       <template #header>
-        <div class="card-header">
-          <span>回测任务列表</span>
-          <div class="header-actions">
-            <el-button type="primary" @click="$router.push('/backtest-strategy')">创建新任务</el-button>
+        <div class="table-header">
+          <div class="header-top">
+            <span class="header-title">回测任务列表</span>
+            <div class="header-actions">
+              <el-button @click="$emit('refresh')">刷新</el-button>
+              <el-button type="primary" @click="$router.push('/backtest-strategy')">创建新任务</el-button>
+            </div>
           </div>
+
+          <el-form :model="filterForm" inline class="filter-form" @submit.prevent>
+            <el-form-item label="策略名称">
+              <el-select
+                v-model="filterForm.strategyName"
+                placeholder="全部策略"
+                clearable
+                style="width: 180px"
+              >
+                <el-option
+                  v-for="item in strategyList"
+                  :key="item.name"
+                  :label="item.description"
+                  :value="item.name"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="股票代码">
+              <el-input
+                v-model="filterForm.symbol"
+                placeholder="请输入股票代码"
+                clearable
+                style="width: 160px"
+                @keyup.enter="$emit('search')"
+              />
+            </el-form-item>
+
+            <el-form-item label="状态">
+              <el-select
+                v-model="filterForm.status"
+                placeholder="全部状态"
+                clearable
+                style="width: 140px"
+              >
+                <el-option label="已创建" value="created" />
+                <el-option label="运行中" value="running" />
+                <el-option label="已完成" value="completed" />
+                <el-option label="执行失败" value="failed" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item class="filter-actions">
+              <el-button type="primary" @click="$emit('search')">查询</el-button>
+              <el-button @click="$emit('reset')">重置</el-button>
+            </el-form-item>
+          </el-form>
         </div>
       </template>
-      
-      <el-table 
-        :data="tasks" 
-        stripe 
+
+      <div class="table-summary">
+        <span>共 {{ pagination.total }} 条回测记录</span>
+        <span>点击行可直接进入回测结果详情</span>
+      </div>
+
+      <el-table
+        :data="tasks"
+        stripe
         style="width: 100%"
         v-loading="loading"
         @row-click="$emit('row-click', $event)"
@@ -79,36 +134,36 @@
         <el-table-column label="操作" width="100" fixed="right" align="center">
           <template #default="scope">
             <div class="operation-buttons">
-              <el-button 
+              <el-button
                 link
-                type="primary" 
-                size="small" 
+                type="primary"
+                size="small"
                 @click.stop="$emit('run-task', scope.row.task_id)"
                 :loading="runningTasks.has(scope.row.task_id)"
               >
                 运行
               </el-button>
-              <el-button 
+              <el-button
                 link
-                type="warning" 
-                size="small" 
+                type="warning"
+                size="small"
                 @click.stop="$emit('copy-config', scope.row)"
               >
                 复制配置
               </el-button>
-              <el-button 
+              <el-button
                 link
-                type="info" 
-                size="small" 
+                type="info"
+                size="small"
                 @click.stop="$emit('check-status', scope.row.task_id)"
                 :loading="checkingTasks.has(scope.row.task_id)"
               >
                  查询状态
               </el-button>
-              <el-button 
+              <el-button
                 link
-                type="success" 
-                size="small" 
+                type="success"
+                size="small"
                 @click.stop="$emit('view-result', scope.row.task_id)"
               >
                 查看结果
@@ -138,11 +193,12 @@
 import { defineProps, defineEmits } from 'vue'
 import JsonPreview from '@/components/JsonPreview.vue'
 import type { BacktestTask, Strategy } from '@/services/quantBacktestApi'
-import type { Pagination } from '../types'
+import type { FilterForm, Pagination } from '../types'
 
 const props = defineProps<{
   tasks: BacktestTask[]
   pagination: Pagination
+  filterForm: FilterForm
   loading: boolean
   runningTasks: Set<string>
   checkingTasks: Set<string>
@@ -155,6 +211,9 @@ defineEmits<{
   (e: 'copy-config', task: BacktestTask): void
   (e: 'check-status', taskId: string): void
   (e: 'view-result', taskId: string): void
+  (e: 'search'): void
+  (e: 'reset'): void
+  (e: 'refresh'): void
   (e: 'size-change', size: number): void
   (e: 'current-change', page: number): void
 }>()
@@ -202,15 +261,45 @@ const formatPercent = (value: number | undefined | null): string => {
   margin-bottom: 20px;
 }
 
-.card-header {
+.table-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .header-actions {
   display: flex;
   gap: 10px;
+}
+
+.filter-form {
+  margin: 0;
+}
+
+.filter-actions {
+  margin-left: auto;
+}
+
+.table-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #606266;
+  font-size: 13px;
 }
 
 .pagination-container {
@@ -258,5 +347,17 @@ const formatPercent = (value: number | undefined | null): string => {
   flex-direction: column;
   gap: 4px;
   align-items: center;
+}
+
+@media (max-width: 900px) {
+  .header-top,
+  .table-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+  }
 }
 </style>

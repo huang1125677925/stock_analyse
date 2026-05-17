@@ -3,6 +3,11 @@
     <BacktestResultHeader :task-info="taskInfo" @back="goBack" />
 
     <div v-loading="loading" class="content-container">
+      <BacktestStrategyInfo
+        :task-info="taskInfo"
+        :strategy-definition="strategyDefinition"
+      />
+
       <BacktestResultStats
         :task-info="taskInfo"
         :backtest-result="backtestResult"
@@ -46,6 +51,7 @@
  */
 import { onMounted } from 'vue'
 import BacktestResultHeader from './components/BacktestResultHeader.vue'
+import BacktestStrategyInfo from './components/BacktestStrategyInfo.vue'
 import BacktestResultStats from './components/BacktestResultStats.vue'
 import BacktestResultCharts from './components/BacktestResultCharts.vue'
 import BacktestResultTradeSummary from './components/BacktestResultTradeSummary.vue'
@@ -55,6 +61,7 @@ import { useBacktestResult } from './composables/useBacktestResult'
 const {
   loading,
   taskInfo,
+  strategyDefinition,
   backtestResult,
   observerData,
   rawIndicatorData,

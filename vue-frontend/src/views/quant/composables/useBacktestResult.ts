@@ -1,7 +1,12 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getBacktestResult, type BacktestResult as ApiBacktestResult } from '@/services/quantBacktestApi'
+import {
+  getBacktestResult,
+  getStrategies,
+  type BacktestResult as ApiBacktestResult,
+  type Strategy
+} from '@/services/quantBacktestApi'
 
 export interface TradeRecord {
   pnl?: number
@@ -147,6 +152,7 @@ export const useBacktestResult = () => {
   const observerData = ref<ObserverData | null>(null)
   const rawIndicatorData = ref<RawIndicatorData | null>(null)
   const taskInfo = ref<ApiBacktestResult['task_info'] | null>(null)
+  const strategyDefinition = ref<Strategy | null>(null)
 
   const filteredTrades = computed(() => backtestResult.value?.trades ?? [])
   const filteredTradesTotal = computed(() => filteredTrades.value.length)
@@ -183,6 +189,14 @@ export const useBacktestResult = () => {
     const result = await getBacktestResult(taskId.value)
     backtestResult.value = toViewData(result)
     taskInfo.value = result.task_info
+
+    try {
+      const strategies = await getStrategies()
+      strategyDefinition.value = strategies.find((strategy) => strategy.name === result.task_info.strategy_name) ?? null
+    } catch (error) {
+      console.error('获取策略定义失败:', error)
+      strategyDefinition.value = null
+    }
 
     const mergedResult = result as ApiBacktestResult & {
       observer_data?: ObserverData['observer_data']
@@ -228,6 +242,7 @@ export const useBacktestResult = () => {
   return {
     loading,
     taskInfo,
+    strategyDefinition,
     backtestResult,
     observerData,
     rawIndicatorData,

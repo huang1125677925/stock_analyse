@@ -1,4 +1,4 @@
-import { ref, reactive, nextTick, watch } from 'vue'
+import { ref, reactive, nextTick, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
@@ -38,6 +38,7 @@ export function useBacktestHistory() {
   const selectedTaskId = ref<string>('')
   const runningTasks = ref(new Set<string>())
   const checkingTasks = ref(new Set<string>())
+  const statsTaskList = ref<BacktestTask[]>([])
 
   // 使用 reactive 管理表格数据
   const tableData = reactive<{ tasks: BacktestTask[] }>({
@@ -50,17 +51,21 @@ export function useBacktestHistory() {
     return strategy ? strategy.description : strategyName
   }
 
+  const buildTaskQueryParams = (limit: number, offset: number = 0) => ({
+    offset,
+    limit,
+    ...(filterForm.strategyName && { strategy_name: filterForm.strategyName }),
+    ...(filterForm.symbol && { stock_code: filterForm.symbol }),
+    ...(filterForm.status && { status: filterForm.status })
+  })
+
   // 加载任务列表
   const loadTaskList = async () => {
     loading.value = true
     
     try {
       const params = {
-        offset: (pagination.page - 1) * pagination.pageSize,
-        limit: pagination.pageSize,
-        ...(filterForm.strategyName && { strategy_name: filterForm.strategyName }),
-        ...(filterForm.symbol && { stock_code: filterForm.symbol }),
-        ...(filterForm.status && { status: filterForm.status })
+        ...buildTaskQueryParams(pagination.pageSize, (pagination.page - 1) * pagination.pageSize)
       }
       
       const result = await getBacktestTasks(params)
@@ -71,11 +76,28 @@ export function useBacktestHistory() {
       await nextTick()
       
       pagination.total = result.total
+      await loadStatsTaskList()
     } catch (error) {
       console.error('加载任务列表失败:', error)
       ElMessage.error('加载任务列表失败')
     } finally {
       loading.value = false
+    }
+  }
+
+  const loadStatsTaskList = async () => {
+    try {
+      const total = pagination.total
+      if (!total) {
+        statsTaskList.value = []
+        return
+      }
+
+      const result = await getBacktestTasks(buildTaskQueryParams(total, 0))
+      statsTaskList.value = result.tasks || []
+    } catch (error) {
+      console.error('加载统计任务列表失败:', error)
+      statsTaskList.value = []
     }
   }
 
@@ -184,10 +206,9 @@ export function useBacktestHistory() {
     router.push(`/backtest-result/${taskId}`)
   }
 
-  // 处理行点击
+  // 处理行点击，直接进入回测结果详情页
   const handleRowClick = (row: BacktestTask) => {
-    selectedTask.value = row
-    detailDialogVisible.value = true
+    viewResult(row.task_id)
   }
 
   // 处理页面大小变化
@@ -269,6 +290,85 @@ export function useBacktestHistory() {
     return new Date(dateTime).toLocaleString('zh-CN')
   }
 
+  const tasksWithReturn = computed(() =>
+    statsTaskList.value.filter(task => task.result_summary?.total_return !== undefined && task.result_summary?.total_return !== null)
+  )
+
+  const averageReturn = computed(() => {
+    if (!tasksWithReturn.value.length) return null
+    const totalReturn = tasksWithReturn.value.reduce((sum, task) => sum + Number(task.result_summary?.total_return ?? 0), 0)
+    return totalReturn / tasksWithReturn.value.length
+  })
+
+  const highestReturnTask = computed(() => {
+    if (!tasksWithReturn.value.length) return null
+    return [...tasksWithReturn.value].sort((a, b) => Number(b.result_summary?.total_return ?? 0) - Number(a.result_summary?.total_return ?? 0))[0]
+  })
+
+  const lowestReturnTask = computed(() => {
+    if (!tasksWithReturn.value.length) return null
+    return [...tasksWithReturn.value].sort((a, b) => Number(a.result_summary?.total_return ?? 0) - Number(b.result_summary?.total_return ?? 0))[0]
+  })
+
+  const strategyDistribution = computed(() => {
+    const total = statsTaskList.value.length
+    if (!total) return []
+
+    const distributionMap = new Map<string, {
+      strategyName: string
+      displayName: string
+      count: number
+      returnSum: number
+      drawdownSum: number
+      returnCount: number
+      drawdownCount: number
+      maxReturn: number | null
+      minReturn: number | null
+    }>()
+
+    statsTaskList.value.forEach((task) => {
+      const key = task.strategy_name
+      const totalReturn = task.result_summary?.total_return
+      const maxDrawdown = task.result_summary?.max_drawdown
+      const existing = distributionMap.get(key)
+      if (existing) {
+        existing.count += 1
+        if (totalReturn !== undefined && totalReturn !== null) {
+          existing.returnSum += Number(totalReturn)
+          existing.returnCount += 1
+          existing.maxReturn = existing.maxReturn === null ? Number(totalReturn) : Math.max(existing.maxReturn, Number(totalReturn))
+          existing.minReturn = existing.minReturn === null ? Number(totalReturn) : Math.min(existing.minReturn, Number(totalReturn))
+        }
+        if (maxDrawdown !== undefined && maxDrawdown !== null) {
+          existing.drawdownSum += Number(maxDrawdown)
+          existing.drawdownCount += 1
+        }
+        return
+      }
+
+      distributionMap.set(key, {
+        strategyName: key,
+        displayName: getStrategyDescription(key),
+        count: 1,
+        returnSum: totalReturn !== undefined && totalReturn !== null ? Number(totalReturn) : 0,
+        drawdownSum: maxDrawdown !== undefined && maxDrawdown !== null ? Number(maxDrawdown) : 0,
+        returnCount: totalReturn !== undefined && totalReturn !== null ? 1 : 0,
+        drawdownCount: maxDrawdown !== undefined && maxDrawdown !== null ? 1 : 0,
+        maxReturn: totalReturn !== undefined && totalReturn !== null ? Number(totalReturn) : null,
+        minReturn: totalReturn !== undefined && totalReturn !== null ? Number(totalReturn) : null
+      })
+    })
+
+    return Array.from(distributionMap.values())
+      .map(item => ({
+        ...item,
+        percentage: Number(((item.count / total) * 100).toFixed(1)),
+        averageReturn: item.returnCount ? item.returnSum / item.returnCount : null,
+        averageDrawdown: item.drawdownCount ? item.drawdownSum / item.drawdownCount : null
+      }))
+      .sort((a, b) => b.count - a.count)
+  })
+
   // 监听器
   watch(taskList, (newList) => {
     console.log('taskList 发生变化，新长度:', newList.length)
@@ -282,6 +382,7 @@ export function useBacktestHistory() {
     filterForm,
     pagination,
     taskList,
+    statsTaskList,
     strategyList,
     selectedTask,
     loading,
@@ -293,6 +394,7 @@ export function useBacktestHistory() {
     tableData,
     getStrategyDescription,
     loadTaskList,
+    loadStatsTaskList,
     loadStrategyList,
     searchTasks,
     resetFilter,
@@ -308,6 +410,10 @@ export function useBacktestHistory() {
     getStatusText,
     getReturnClass,
     formatPercent,
-    formatDateTime
+    formatDateTime,
+    averageReturn,
+    highestReturnTask,
+    lowestReturnTask,
+    strategyDistribution
   }
 }

@@ -39,6 +39,19 @@ export interface PaginatedFactorStockTagData<T> {
   data: T[]
 }
 
+interface RawPaginatedFactorStockTagData<T> {
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+  has_next?: boolean
+  has_previous?: boolean
+  data?: T[]
+  results?: T[]
+}
+
+type StockTagListPayload<T> = ApiResponse<RawPaginatedFactorStockTagData<T>> | RawPaginatedFactorStockTagData<T>
+
 /** 股票标记实体（简化为页面展示常用字段） */
 export interface StockTag {
   id: number
@@ -145,7 +158,7 @@ const API_BASE_URL = '/django/api/individual_stock/stock-tags'
 export const getStockTagList = async (
   params: StockTagListParams = {}
 ): Promise<PaginatedFactorStockTagData<StockTag>> => {
-  const response = await axios.get<PaginatedFactorStockTagData<StockTag>>(`${API_BASE_URL}/`, {
+  const response = await axios.get<StockTagListPayload<StockTag>, StockTagListPayload<StockTag>>(`${API_BASE_URL}/`, {
     params: {
       page: params.page ?? 1,
       page_size: params.page_size ?? 20,
@@ -164,7 +177,27 @@ export const getStockTagList = async (
       end_date: params.end_date,
     }
   })
-  return response.data
+  const pageData = (
+    response &&
+    typeof response === 'object' &&
+    'code' in response &&
+    'data' in response &&
+    response.data &&
+    typeof response.data === 'object' &&
+    !Array.isArray(response.data)
+  )
+    ? response.data as RawPaginatedFactorStockTagData<StockTag>
+    : response as RawPaginatedFactorStockTagData<StockTag>
+
+  return {
+    total: pageData.total ?? 0,
+    page: pageData.page ?? 1,
+    page_size: pageData.page_size ?? (params.page_size ?? 20),
+    total_pages: pageData.total_pages ?? 1,
+    has_next: pageData.has_next,
+    has_previous: pageData.has_previous,
+    data: Array.isArray(pageData.data) ? pageData.data : Array.isArray(pageData.results) ? pageData.results : []
+  }
 }
 
 /** 获取枚举项choices，用于前端选项填充 */

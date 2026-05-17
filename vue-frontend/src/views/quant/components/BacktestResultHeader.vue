@@ -1,12 +1,16 @@
 <template>
   <div class="page-header">
-    <el-button type="primary" class="back-button" @click="$emit('back')">
-      <el-icon><ArrowLeft /></el-icon>
-      返回
-    </el-button>
-    <div class="header-content">
-      <h1>回测结果详情</h1>
-      <p v-if="taskInfo">{{ taskInfo.strategy_name }} - {{ taskInfo.stock_name }}({{ taskInfo.stock_code }})</p>
+    <div class="header-left">
+      <el-button type="primary" class="back-button" @click="$emit('back')">
+        <el-icon><ArrowLeft /></el-icon>
+        返回
+      </el-button>
+      <div class="header-content">
+        <h1>回测结果详情</h1>
+      </div>
+    </div>
+    <div v-if="taskInfo" class="header-right">
+      <div class="highlight-primary">{{ taskInfo.stock_name }} ({{ taskInfo.stock_code }})</div>
     </div>
   </div>
 </template>
@@ -38,6 +42,8 @@ defineEmits<{
 .page-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   margin-bottom: 20px;
   padding: 20px;
   background: white;
@@ -45,32 +51,64 @@ defineEmits<{
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
 .back-button {
-  margin-right: 20px;
+  flex-shrink: 0;
+}
+
+.header-content {
+  min-width: 0;
 }
 
 .header-content h1 {
-  margin: 0 0 8px 0;
+  margin: 0;
   color: #303133;
   font-size: 24px;
+  line-height: 1.2;
 }
 
-.header-content p {
-  margin: 0;
-  color: #606266;
-  font-size: 14px;
+.header-right {
+  margin-left: auto;
+  text-align: right;
+  flex-shrink: 0;
 }
 
-@media (max-width: 480px) {
+.highlight-primary {
+  margin-bottom: 0;
+  color: #1f2937;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+@media (max-width: 768px) {
   .page-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 16px;
   }
 
-  .back-button {
-    margin-right: 0;
-    margin-bottom: 10px;
+  .header-left {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header-right {
+    width: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .highlight-primary {
+    font-size: 24px;
   }
 }
 </style>

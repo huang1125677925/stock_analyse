@@ -1,23 +1,20 @@
 <template>
   <div class="backtest-history-view">
-    <div class="page-header">
-      <h1>回测历史</h1>
-      <p>查看历史回测任务，监控状态和查看结果</p>
-    </div>
-    
-    <!-- 筛选条件 -->
-    <BacktestFilter 
-      :filter-form="filterForm"
-      :strategy-list="strategyList"
-      @search="searchTasks"
-      @reset="resetFilter"
-      @refresh="refreshData"
+    <BacktestHistoryStats
+      :total-count="pagination.total"
+      :average-return="averageReturn"
+      :highest-return-task="highestReturnTask"
+      :lowest-return-task="lowestReturnTask"
+      :strategy-distribution="strategyDistribution"
+      :format-percent="formatPercent"
+      :get-return-class="getReturnClass"
+      @view-task="viewResult"
     />
-    
-    <!-- 任务列表 -->
-    <BacktestTable 
+
+    <BacktestTable
       :tasks="taskList"
       :pagination="pagination"
+      :filter-form="filterForm"
       :loading="loading"
       :running-tasks="runningTasks"
       :checking-tasks="checkingTasks"
@@ -27,6 +24,9 @@
       @copy-config="copyConfig"
       @check-status="checkStatus"
       @view-result="viewResult"
+      @search="searchTasks"
+      @reset="resetFilter"
+      @refresh="refreshData"
       @size-change="handleSizeChange"
       @current-change="handleCurrentChange"
     />
@@ -65,7 +65,7 @@
  */
 import { onMounted } from 'vue'
 import BacktestResultDialog from '@/components/BacktestResultDialog.vue'
-import BacktestFilter from './components/BacktestFilter.vue'
+import BacktestHistoryStats from './components/BacktestHistoryStats.vue'
 import BacktestTable from './components/BacktestTable.vue'
 import BacktestDetailDialog from './components/BacktestDetailDialog.vue'
 import { useBacktestHistory } from './composables/useBacktestHistory'
@@ -93,7 +93,13 @@ const {
   handleRowClick,
   handleSizeChange,
   handleCurrentChange,
-  copyConfig
+  copyConfig,
+  averageReturn,
+  highestReturnTask,
+  lowestReturnTask,
+  strategyDistribution,
+  getReturnClass,
+  formatPercent
 } = useBacktestHistory()
 
 // 页面初始化
@@ -108,19 +114,5 @@ onMounted(async () => {
 <style scoped>
 .backtest-history-view {
   padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header h1 {
-  margin: 0 0 8px 0;
-  color: #303133;
-}
-
-.page-header p {
-  margin: 0;
-  color: #606266;
 }
 </style>
