@@ -36,6 +36,27 @@ interface EventLine {
   color?: string
 }
 
+interface OverlayLinePoint {
+  date: string
+  value: number
+}
+
+interface OverlayLine {
+  name: string
+  points: OverlayLinePoint[]
+  color?: string
+  width?: number
+  type?: 'solid' | 'dashed' | 'dotted'
+  showSymbol?: boolean
+}
+
+interface PatternMarker {
+  date: string
+  label: string
+  direction?: 'bullish' | 'bearish' | 'neutral'
+  description?: string
+}
+
 interface Props {
   title?: string
   stockCode: string
@@ -43,6 +64,8 @@ interface Props {
   klineData: KLineDataItem[]
   tradeSignals?: TradeSignal[]
   eventLines?: EventLine[]
+  overlayLines?: OverlayLine[]
+  patternMarkers?: PatternMarker[]
   height?: string
 }
 
@@ -51,6 +74,8 @@ const props = withDefaults(defineProps<Props>(), {
   stockName: '',
   tradeSignals: () => [],
   eventLines: () => [],
+  overlayLines: () => [],
+  patternMarkers: () => [],
   height: '600px'
 })
 
@@ -138,6 +163,78 @@ const updateChart = () => {
       }
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
+
+  const patternEventLines = (props.patternMarkers || [])
+    .map((marker) => {
+      const index = alignEventLineIndex(marker.date)
+      if (index === undefined) return null
+      return {
+        xAxis: dates[index],
+        name: marker.label,
+        lineStyle: {
+          color: '#dc2626',
+          width: 1.5,
+          type: 'dashed',
+          opacity: 0.78
+        },
+        label: {
+          show: true,
+          formatter: marker.label,
+          color: '#dc2626',
+          fontSize: 10,
+          fontWeight: 'bold',
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          padding: [2, 4],
+          borderColor: '#dc2626',
+          borderWidth: 1,
+          borderRadius: 4,
+          position: 'insideEndTop'
+        },
+        tooltip: {
+          formatter: `${marker.label}<br/>日期: ${dates[index]}${marker.description ? `<br/>${marker.description}` : ''}`
+        }
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+
+  const markLineData = [...alignedEventLines, ...patternEventLines]
+
+  const overlayLineSeries = (props.overlayLines || [])
+    .filter(line => Array.isArray(line.points) && line.points.length > 0)
+    .map(line => {
+      const pointMap = new Map<string, number>()
+      line.points.forEach(point => {
+        const normalizedDate = normalizeDate(point.date)
+        if (normalizedDate && Number.isFinite(point.value)) {
+          pointMap.set(normalizedDate, point.value)
+        }
+      })
+
+      return {
+        name: line.name,
+        type: 'line',
+        data: dates.map(date => {
+          const value = pointMap.get(normalizeDate(date))
+          return value === undefined ? null : Number(value.toFixed(3))
+        }),
+        smooth: false,
+        symbol: line.showSymbol ? 'circle' : 'none',
+        symbolSize: 4,
+        connectNulls: true,
+        z: 6,
+        lineStyle: {
+          color: line.color || '#2563eb',
+          width: line.width ?? 1.5,
+          type: line.type || 'solid'
+        },
+        itemStyle: {
+          color: line.color || '#2563eb'
+        },
+        tooltip: {
+          valueFormatter: (value: number | string) => typeof value === 'number' ? value.toFixed(2) : value
+        }
+      }
+    })
 
 // 生成交易信号标记
 const generateTradeSignals = (signals: TradeSignal[], type: 'buy' | 'sell') => {
@@ -299,12 +396,12 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
         name: 'K线',
         type: 'candlestick',
         data: data.map(item => [item[0], item[1], item[3], item[2]]), // 开盘、收盘、最高、最低
-        markLine: alignedEventLines.length
+        markLine: markLineData.length
           ? {
               symbol: 'none',
               silent: true,
               animation: false,
-              data: alignedEventLines
+              data: markLineData
             }
           : undefined,
         markPoint: {
@@ -332,7 +429,7 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
               } else if(param.data && param.data.name === '买入点') {
                 return `买入\n${param.data.value.toFixed(2)}元`;
               }
-              return param.name;
+              return param.data?.value || param.name;
             }
           },
           itemStyle: {
@@ -340,7 +437,9 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
             borderColor: '#fff',
             color: function(param: any) {
               // 确保卖出信号为绿色，买入信号为红色
-              return param.data.name === '卖出点' ? '#00FF00' : '#FF0000';
+              if (param.data?.name === '卖出点') return '#00FF00'
+              if (param.data?.name === '买入点') return '#FF0000'
+              return param.data?.itemStyle?.color || '#6b7280'
             }
           }
         },
@@ -350,7 +449,8 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
           borderColor: '#8A0000',
           borderColor0: '#008F28'
         }
-      }
+      },
+      ...overlayLineSeries
     ]
   }
   
@@ -365,7 +465,7 @@ const handleResize = () => {
 
 // 监听属性变化
 watch(
-  [() => props.klineData, () => props.tradeSignals, () => props.eventLines],
+  [() => props.klineData, () => props.tradeSignals, () => props.eventLines, () => props.overlayLines, () => props.patternMarkers],
   () => {
     nextTick(() => {
       updateChart()
@@ -387,6 +487,26 @@ watch(
 
 watch(
   () => props.eventLines,
+  () => {
+    nextTick(() => {
+      updateChart()
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+watch(
+  () => props.overlayLines,
+  () => {
+    nextTick(() => {
+      updateChart()
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+watch(
+  () => props.patternMarkers,
   () => {
     nextTick(() => {
       updateChart()

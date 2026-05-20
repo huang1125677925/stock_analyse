@@ -155,6 +155,7 @@ export interface CandlestickPatternResponse {
 export interface CandlestickPatternParams {
   start_date?: string // 格式：YYYY-MM-DD
   end_date?: string   // 格式：YYYY-MM-DD
+  type?: SwingTargetType
 }
 
 /**
@@ -173,7 +174,8 @@ export async function getCandlestickPatterns(
       {
         params: {
           start_date: params.start_date,
-          end_date: params.end_date
+          end_date: params.end_date,
+          type: params.type
         }
       }
     )
@@ -334,6 +336,99 @@ export async function getSwingAnalysis(
     return response.data
   } catch (error) {
     console.error('获取波段分析数据失败:', error)
+    throw error
+  }
+}
+
+export interface SwingChannelCandidateAnalysis {
+  latest_trade_date: string
+  latest_close: number | null
+  channel_window: number
+  lower_line_latest: number | null
+  upper_line_latest: number | null
+  channel_width_pct: number | null
+  distance_to_lower_pct: number | null
+  channel_position_pct: number | null
+  lower_slope: number | null
+  upper_slope: number | null
+  lower_slope_pct_per_day: number | null
+  upper_slope_pct_per_day: number | null
+  is_channel_up: boolean
+}
+
+export interface SwingChannelCandidateItem {
+  target_type: SwingTargetType
+  ts_code: string
+  code: string
+  name: string
+  index_code?: string | null
+  index_name?: string | null
+  exchange?: string | null
+  list_date?: string | null
+  etf_type?: string | null
+  amount?: number | null
+  analysis: SwingChannelCandidateAnalysis
+  score: number
+}
+
+export interface SwingChannelCandidateFilters {
+  channel_window: number
+  max_distance_pct: number
+  max_channel_position_pct: number
+  min_slope_pct: number
+  universe_limit: number
+  limit: number
+  adjust?: SwingAdjustType | null
+  codes: string[]
+}
+
+export interface SwingChannelSkippedItem {
+  ts_code: string
+  reason: string
+}
+
+export interface SwingChannelCandidatesData {
+  target_type: SwingTargetType
+  data_source: string
+  universe_trade_date: string
+  start_date: string
+  end_date: string
+  filters: SwingChannelCandidateFilters
+  total: number
+  matched_total: number
+  scanned_total: number
+  skipped_total: number
+  data: SwingChannelCandidateItem[]
+  skipped_sample: SwingChannelSkippedItem[]
+  theory: string[]
+  query_time: string
+}
+
+export interface SwingChannelCandidatesParams {
+  target_type?: SwingTargetType
+  codes?: string
+  start_date?: string
+  end_date?: string
+  channel_window?: number
+  max_distance_pct?: number
+  max_channel_position_pct?: number
+  min_slope_pct?: number
+  universe_limit?: number
+  limit?: number
+  adjust?: SwingAdjustType
+}
+
+export async function getSwingChannelCandidates(
+  params: SwingChannelCandidatesParams = {}
+): Promise<SwingChannelCandidatesData> {
+  try {
+    const response = await axios.get<SwingChannelCandidatesData>(
+      '/django/api/strategy/swing-channel-candidates/',
+      { params }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取波段选股候选列表失败:', error)
     throw error
   }
 }
