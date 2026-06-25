@@ -38,6 +38,34 @@
                 />
               </el-select>
             </div>
+            <div class="rps-filter-panel">
+              <div
+                v-for="filterGroup in rpsFilterGroups"
+                :key="filterGroup.field"
+                class="rps-filter-group"
+              >
+                <span class="rps-filter-label">{{ filterGroup.label }}</span>
+                <div class="rps-filter-tags">
+                  <el-check-tag
+                    v-for="tag in rpsRankOptions"
+                    :key="`${filterGroup.field}-${tag}`"
+                    :checked="selectedRpsRanks[filterGroup.field].includes(tag)"
+                    @change="toggleRpsRank(filterGroup.field, tag)"
+                  >
+                    {{ tag }}
+                  </el-check-tag>
+                </div>
+              </div>
+              <el-button
+                v-if="hasActiveRpsFilter"
+                link
+                type="primary"
+                class="rps-filter-reset"
+                @click="resetRpsFilters"
+              >
+                清空强度筛选
+              </el-button>
+            </div>
           </div>
         </template>
 
@@ -282,10 +310,10 @@
 </template>
 
 <script setup lang="ts">
- import { ref, computed, onMounted, watch, defineComponent, h } from 'vue'
+ import { ref, reactive, computed, onMounted, watch, defineComponent, h } from 'vue'
  import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
-import { Refresh, InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
+import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getIndexRps } from '@/services/strategyApi'
 import type { DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
@@ -296,7 +324,17 @@ interface Props {
   level?: DcIndustryLevel
 }
 
+type RpsField = 'RPS_5' | 'RPS_20' | 'RPS_60'
+type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
+
 const props = defineProps<Props>()
+
+const rpsRankOptions: RpsRankLabel[] = ['极强', '强势', '良好', '一般', '弱势']
+const rpsFilterGroups: Array<{ field: RpsField; label: string }> = [
+  { field: 'RPS_5', label: 'RPS_5强度' },
+  { field: 'RPS_20', label: 'RPS_20强度' },
+  { field: 'RPS_60', label: 'RPS_60强度' }
+]
 
 function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
   return industryLevelOptions.includes(value as DcIndustryLevel)
@@ -335,6 +373,13 @@ const queryTime = ref('')
 // 搜索关键词
 const searchKeyword = ref('')
 
+// RPS标签筛选
+const selectedRpsRanks = reactive<Record<RpsField, RpsRankLabel[]>>({
+  RPS_5: [],
+  RPS_20: [],
+  RPS_60: []
+})
+
 // 板块类型（默认：行业板块）
 const idxType = ref<IndexRpsIdxType>('行业板块')
 
@@ -359,6 +404,67 @@ const formatPercent = (value: unknown): string => {
   return `${sign}${num.toFixed(2)}%`
 }
 
+/**
+ * 工具：判断指定 RPS 字段是否启用了标签筛选
+ * 功能：用于识别当前字段是否存在选中的强度标签
+ * 参数：field(RpsField) RPS字段名
+ * 返回值：boolean 是否存在选中的标签
+ * 事件：无
+ */
+const hasSelectedRanks = (field: RpsField): boolean => selectedRpsRanks[field].length > 0
+
+/**
+ * 工具：切换 RPS 强度标签
+ * 功能：在指定字段上执行强度标签的选中与取消，用于多选筛选
+ * 参数：
+ *  - field(RpsField): RPS字段名
+ *  - rank(RpsRankLabel): 强度标签文本
+ * 返回值：无
+ * 事件：更新 selectedRpsRanks，触发表格过滤结果重算
+ */
+const toggleRpsRank = (field: RpsField, rank: RpsRankLabel) => {
+  const ranks = selectedRpsRanks[field]
+  const index = ranks.indexOf(rank)
+  if (index >= 0) {
+    ranks.splice(index, 1)
+    return
+  }
+  ranks.push(rank)
+}
+
+/**
+ * 工具：清空所有 RPS 强度标签筛选
+ * 功能：恢复 RPS_5、RPS_20、RPS_60 的全部强度筛选状态
+ * 参数：无
+ * 返回值：无
+ * 事件：重置 selectedRpsRanks，触发表格过滤结果重算
+ */
+const resetRpsFilters = () => {
+  rpsFilterGroups.forEach(({ field }) => {
+    selectedRpsRanks[field] = []
+  })
+}
+
+/**
+ * 工具：判断单条记录是否满足 RPS 标签筛选
+ * 功能：按 RPS_5、RPS_20、RPS_60 的已选标签过滤当前记录；同一字段内为“或”，不同字段间为“且”
+ * 参数：item(IndexRpsItem) 当前指数RPS记录
+ * 返回值：boolean 是否满足全部标签筛选条件
+ * 事件：无
+ */
+const matchesRpsFilters = (item: IndexRpsItem): boolean => {
+  return rpsFilterGroups.every(({ field }) => {
+    if (!hasSelectedRanks(field)) {
+      return true
+    }
+    return selectedRpsRanks[field].includes(getRpsRankText(Number(item[field])) as RpsRankLabel)
+  })
+}
+
+const hasActiveRpsFilter = computed(() => {
+  return rpsFilterGroups.some(({ field }) => hasSelectedRanks(field))
+})
+
 // 过滤后的RPS数据
 const filteredRpsData = computed(() => {
   let result = rpsData.value
@@ -367,6 +473,7 @@ const filteredRpsData = computed(() => {
       return item.name.includes(searchKeyword.value)
     })
   }
+  result = result.filter(matchesRpsFilters)
   return result
 })
 
@@ -605,6 +712,10 @@ watch(searchKeyword, () => {
   currentPage.value = 1
 })
 
+watch(selectedRpsRanks, () => {
+  currentPage.value = 1
+}, { deep: true })
+
 // 监听板块类型变化，刷新数据并重置分页
 watch(idxType, (newType) => {
   currentPage.value = 1
@@ -638,8 +749,46 @@ watch(() => route.query.level, (level) => {
 
 .table-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.table-controls {
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.rps-filter-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.rps-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rps-filter-label {
+  color: #606266;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rps-filter-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rps-filter-reset {
+  padding: 0;
 }
 
 .rps-data-section {
