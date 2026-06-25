@@ -1,21 +1,21 @@
 <template>
   <div class="congestion-page">
-    <el-card>
-      <div class="header-controls">
-        <h3>指数RPS强度排名</h3>
-      </div>
-      <IndexRpsView />
-    </el-card>
+    <IndexRpsView />
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * 组件：行业热点-指数RPS页面包装器（CongestionIndexRpsView）
+ * 功能：复用指数RPS主视图，用于行业热点导航入口，避免重复实现页面逻辑
+ * 参数：无
+ * 返回值：无（渲染 IndexRpsView 页面内容）
+ * 事件：无
+ */
 import IndexRpsView from '@/views/strategy/IndexRpsView.vue'
 </script>
 
 <style scoped lang="scss">
 .congestion-page { padding: 20px; }
-.header-controls { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-.header-controls h3 { margin:0; color:#303133; }
 @media (max-width: 768px) { .congestion-page { padding:12px; } }
 </style>

@@ -1,0 +1,1 @@
+import e from"./IndexRpsView-KaPCT5WE.js";import{d as o,c as s,e as t,o as n,_ as a}from"./index-CDg2oesf.js";import"./strategyApi-Ha3UaqEh.js";const c={class:"congestion-page"},p=o({__name:"CongestionIndexRpsView",setup(_){return(r,i)=>(n(),s("div",c,[t(e)]))}}),x=a(p,[["__scopeId","data-v-7cfd6a54"]]);export{x as default};

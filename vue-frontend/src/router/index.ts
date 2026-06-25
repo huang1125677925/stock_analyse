@@ -169,7 +169,7 @@ const router = createRouter({
           path: '/analysis/congestion/index-rps',
           name: 'congestion-index-rps',
           component: () => import('@/views/industry-stock-data/CongestionIndexRpsView.vue'),
-          meta: { title: '指数RPS强度排名' }
+          meta: {}
         },
         {
           path: '/analysis/sw-industry-tree',
@@ -224,7 +224,7 @@ const router = createRouter({
           path: '/strategy/index-rps',
           name: 'index-rps',
           component: () => import('@/views/strategy/IndexRpsView.vue'),
-          meta: { title: '指数RPS强度排名' }
+          meta: {}
         },
         {
           path: '/strategy/historical-rps',

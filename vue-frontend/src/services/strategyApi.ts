@@ -5,11 +5,15 @@ export interface IndexRpsItem {
   ts_code: string
   name: string
   return_5: number
-  RPS_5: number  
+  RPS_5: number
   return_20: number
-  RPS_20: number  
+  RPS_20: number
   return_60: number
-  RPS_60: number  
+  RPS_60: number
+  return_120: number
+  RPS_120: number
+  return_250: number
+  RPS_250: number
 }
 
 export type DcIndustryLevel = '东财一级行业' | '东财二级行业' | '东财三级行业'
@@ -64,7 +68,7 @@ export interface HistoricalRpsResponse {
  * @returns Promise<IndexRpsResponse>
  */
 export async function getIndexRps(
-  periods: string = "5,20,60",
+  periods: string = '5,20,60,120,250',
   save: boolean = false,
   idx_type: IndexRpsIdxType = '行业板块',
   level?: DcIndustryLevel

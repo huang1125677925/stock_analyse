@@ -4,39 +4,45 @@
 
     <!-- RPS数据表格 -->
     <div class="rps-data-section" v-if="rpsData.length > 0">
-      <el-card shadow="hover">
+      <el-card shadow="hover" class="rps-card">
         <template #header>
           <div class="table-header">
-            <div class="table-controls">
-              <el-input
-                v-model="searchKeyword"
-                placeholder="搜索指数名称"
-                :prefix-icon="Search"
-                clearable
-                style="width: 200px"
-              />
-              <el-select
-                v-model="idxType"
-                placeholder="选择板块类型"
-                style="width: 160px; margin-left: 12px"
-              >
-                <el-option label="行业板块" value="行业板块" />
-                <el-option label="概念板块" value="概念板块" />
-                <el-option label="地域板块" value="地域板块" />
-              </el-select>
-              <el-select
-                v-if="idxType === '行业板块'"
-                v-model="industryLevel"
-                placeholder="选择行业级别"
-                style="width: 160px; margin-left: 12px"
-              >
-                <el-option
-                  v-for="level in industryLevelOptions"
-                  :key="level"
-                  :label="level"
-                  :value="level"
+            <div class="toolbar-row">
+              <div class="table-controls">
+                <el-input
+                  v-model="searchKeyword"
+                  placeholder="搜索指数名称"
+                  :prefix-icon="Search"
+                  clearable
+                  class="control-item control-search"
                 />
-              </el-select>
+                <el-select
+                  v-model="idxType"
+                  placeholder="选择板块类型"
+                  class="control-item"
+                >
+                  <el-option label="行业板块" value="行业板块" />
+                  <el-option label="概念板块" value="概念板块" />
+                  <el-option label="地域板块" value="地域板块" />
+                </el-select>
+                <el-select
+                  v-if="idxType === '行业板块'"
+                  v-model="industryLevel"
+                  placeholder="选择行业级别"
+                  class="control-item"
+                >
+                  <el-option
+                    v-for="level in industryLevelOptions"
+                    :key="level"
+                    :label="level"
+                    :value="level"
+                  />
+                </el-select>
+              </div>
+              <div class="table-summary">
+                <el-tag type="info" effect="plain">共 {{ filteredRpsData.length }} 条</el-tag>
+                <el-tag v-if="queryTime" type="success" effect="light">更新时间 {{ queryTime }}</el-tag>
+              </div>
             </div>
             <div class="rps-filter-panel">
               <div
@@ -71,7 +77,7 @@
 
         <div class="methodology">
           <p>
-            RPS（Relative Price Strength）用于衡量当前指数相对同组指数的价格强度。系统先计算各指数在 5、20、60 日周期内的涨跌幅，再按涨跌幅从高到低排序。
+            RPS（Relative Price Strength）用于衡量当前指数相对同组指数的价格强度。系统会计算各指数在 5、20、60、120、250 日周期内的涨跌幅，再按涨跌幅从高到低排序。
           </p>
           <p>
             计算方式：RPS = (1 - 排名 / 总板块数) × 100。数值越高，表示该指数在同组指数中的相对强度越靠前。
@@ -79,7 +85,7 @@
         </div>
         
         <el-table
-          :data="paginatedRpsData"
+          :data="filteredRpsData"
           stripe
           border
           style="width: 100%"
@@ -112,158 +118,68 @@
             </template>
           </el-table-column>
           
-          <!-- 5日涨跌幅 -->
-          <el-table-column label="5日涨跌幅" min-width="90" sortable="custom" prop="return_5" align="center">
-            <template #header>
-              <div class="custom-header">
-                <span>5日涨跌幅</span>
-                <el-tooltip content="5日内的价格变化百分比" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="change-percent-cell">
-                <span :class="{ 'up': Number(scope.row.return_5) > 0, 'down': Number(scope.row.return_5) < 0 }">
-                  {{ formatPercent(scope.row.return_5) }}
-                </span>
-                <div class="trend-indicator">
-                  <el-icon v-if="Number(scope.row.return_5) > 0"><CaretTop /></el-icon>
-                  <el-icon v-else-if="Number(scope.row.return_5) < 0"><CaretBottom /></el-icon>
-                  <el-icon v-else><Minus /></el-icon>
+          <template v-for="period in rpsPeriods" :key="period">
+            <el-table-column
+              :label="`${period}日涨跌幅`"
+              min-width="110"
+              sortable="custom"
+              :prop="getReturnProp(period)"
+              align="center"
+            >
+              <template #header>
+                <div class="custom-header">
+                  <span>{{ period }}日涨跌幅</span>
+                  <el-tooltip :content="`${period}日内的价格变化百分比`" placement="top">
+                    <el-icon><InfoFilled /></el-icon>
+                  </el-tooltip>
                 </div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <!-- RPS_5 -->
-          <el-table-column label="RPS_5" min-width="110" sortable="custom" prop="RPS_5" align="center">
-            <template #header>
-              <div class="custom-header">
-                <span>RPS_5</span>
-                <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="rps-cell">
-                <el-progress
-                  :percentage="scope.row.RPS_5"
-                  :color="getRpsColor(scope.row.RPS_5)"
-                  :format="(val: number) => val.toFixed(1)"
-                  :stroke-width="18"
-                  :text-inside="true"
-                  :show-text="true"
-                />
-                <div class="rps-rank" :class="getRpsRankClass(scope.row.RPS_5)">
-                  {{ getRpsRankText(scope.row.RPS_5) }}
+              </template>
+              <template #default="scope">
+                <div class="change-percent-cell">
+                  <span :class="{ up: Number(scope.row[getReturnProp(period)]) > 0, down: Number(scope.row[getReturnProp(period)]) < 0 }">
+                    {{ formatPercent(scope.row[getReturnProp(period)]) }}
+                  </span>
+                  <div class="trend-indicator">
+                    <el-icon v-if="Number(scope.row[getReturnProp(period)]) > 0"><CaretTop /></el-icon>
+                    <el-icon v-else-if="Number(scope.row[getReturnProp(period)]) < 0"><CaretBottom /></el-icon>
+                    <el-icon v-else><Minus /></el-icon>
+                  </div>
                 </div>
-              </div>
-            </template>
-          </el-table-column>
+              </template>
+            </el-table-column>
 
-          <!-- 20日涨跌幅 -->
-          <el-table-column label="20日涨跌幅" min-width="90" sortable="custom" prop="return_20" align="center">
-            <template #header>
-              <div class="custom-header">
-                <span>20日涨跌幅</span>
-                <el-tooltip content="20日内的价格变化百分比" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="change-percent-cell">
-                <span :class="{ 'up': Number(scope.row.return_20) > 0, 'down': Number(scope.row.return_20) < 0 }">
-                  {{ formatPercent(scope.row.return_20) }}
-                </span>
-                <div class="trend-indicator">
-                  <el-icon v-if="Number(scope.row.return_20) > 0"><CaretTop /></el-icon>
-                  <el-icon v-else-if="Number(scope.row.return_20) < 0"><CaretBottom /></el-icon>
-                  <el-icon v-else><Minus /></el-icon>
+            <el-table-column
+              :label="`RPS_${period}`"
+              min-width="120"
+              sortable="custom"
+              :prop="getRpsProp(period)"
+              align="center"
+            >
+              <template #header>
+                <div class="custom-header">
+                  <span>{{ `RPS_${period}` }}</span>
+                  <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
+                    <el-icon><InfoFilled /></el-icon>
+                  </el-tooltip>
                 </div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <!-- RPS_20 -->
-          <el-table-column label="RPS_20" min-width="110" sortable="custom" prop="RPS_20" align="center">
-            <template #header>
-              <div class="custom-header">
-                <span>RPS_20</span>
-                <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="rps-cell">
-                <el-progress
-                  :percentage="Number(scope.row.RPS_20)"
-                  :color="getRpsColor(scope.row.RPS_20)"
-                  :format="(val: number) => val.toFixed(1)"
-                  :stroke-width="18"
-                  :text-inside="true"
-                  :show-text="true"
-                />
-                <div class="rps-rank" :class="getRpsRankClass(scope.row.RPS_20)">
-                  {{ getRpsRankText(scope.row.RPS_20) }}
+              </template>
+              <template #default="scope">
+                <div class="rps-cell">
+                  <el-progress
+                    :percentage="Number(scope.row[getRpsProp(period)])"
+                    :color="getRpsColor(Number(scope.row[getRpsProp(period)]))"
+                    :format="(val: number) => val.toFixed(1)"
+                    :stroke-width="18"
+                    :text-inside="true"
+                    :show-text="true"
+                  />
+                  <div class="rps-rank" :class="getRpsRankClass(Number(scope.row[getRpsProp(period)]))">
+                    {{ getRpsRankText(Number(scope.row[getRpsProp(period)])) }}
+                  </div>
                 </div>
-              </div>
-            </template>
-          </el-table-column>
-
-          <!-- 60日涨跌幅 -->
-          <el-table-column label="60日涨跌幅" min-width="90" sortable="custom" prop="return_60" align="center">
-            <template #header>
-              <div class="custom-header">
-                <span>60日涨跌幅</span>
-                <el-tooltip content="60日内的价格变化百分比" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="change-percent-cell">
-                <span :class="{ 'up': Number(scope.row.return_60) > 0, 'down': Number(scope.row.return_60) < 0 }">
-                  {{ formatPercent(scope.row.return_60) }}
-                </span>
-                <div class="trend-indicator">
-                  <el-icon v-if="Number(scope.row.return_60) > 0"><CaretTop /></el-icon>
-                  <el-icon v-else-if="Number(scope.row.return_60) < 0"><CaretBottom /></el-icon>
-                  <el-icon v-else><Minus /></el-icon>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <!-- RPS_60 -->
-          <el-table-column label="RPS_60" min-width="110" sortable="custom" prop="RPS_60" align="center">
-            <template #header>
-              <div class="custom-header">
-                <span>RPS_60</span>
-                <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="rps-cell">
-                <el-progress
-                  :percentage="Number(scope.row.RPS_60)"
-                  :color="getRpsColor(scope.row.RPS_60)"
-                  :format="(val: number) => val.toFixed(1)"
-                  :stroke-width="18"
-                  :text-inside="true"
-                  :show-text="true"
-                />
-                <div class="rps-rank" :class="getRpsRankClass(scope.row.RPS_60)">
-                  {{ getRpsRankText(scope.row.RPS_60) }}
-                </div>
-              </div>
-            </template>
-          </el-table-column>
+              </template>
+            </el-table-column>
+          </template>
           
           <!-- 操作列：领涨数据详情 -->
           <el-table-column label="操作" min-width="110" align="center">
@@ -279,7 +195,6 @@
           </el-table-column>
           
           </el-table>
-        
         <!-- 领涨数据详情对话框组件实例 -->
         <LeadRiseDetailDialog
           v-model="detailDialogVisible"
@@ -287,20 +202,6 @@
           :idx-type="idxType"
           :name="currentIndexName"
         />
-        
-        <!-- 表格底部分页 -->
-        <div class="table-footer">
-          <el-pagination
-            v-if="filteredRpsData.length > 10"
-            layout="total, sizes, prev, pager, next"
-            :total="filteredRpsData.length"
-            :page-sizes="[10, 20, 50, 100]"
-            v-model:page-size="pageSize"
-            v-model:current-page="currentPage"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
       </el-card>
     </div>
 
@@ -310,8 +211,8 @@
 </template>
 
 <script setup lang="ts">
- import { ref, reactive, computed, onMounted, watch, defineComponent, h } from 'vue'
- import { useRoute, useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, watch, defineComponent, h } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
 import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getIndexRps } from '@/services/strategyApi'
@@ -324,17 +225,19 @@ interface Props {
   level?: DcIndustryLevel
 }
 
-type RpsField = 'RPS_5' | 'RPS_20' | 'RPS_60'
+type RpsPeriod = 5 | 20 | 60 | 120 | 250
+type RpsField = `RPS_${RpsPeriod}`
+type ReturnField = `return_${RpsPeriod}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
 
 const props = defineProps<Props>()
 
+const rpsPeriods: readonly RpsPeriod[] = [5, 20, 60, 120, 250]
 const rpsRankOptions: RpsRankLabel[] = ['极强', '强势', '良好', '一般', '弱势']
-const rpsFilterGroups: Array<{ field: RpsField; label: string }> = [
-  { field: 'RPS_5', label: 'RPS_5强度' },
-  { field: 'RPS_20', label: 'RPS_20强度' },
-  { field: 'RPS_60', label: 'RPS_60强度' }
-]
+const rpsFilterGroups: Array<{ field: RpsField; label: string }> = rpsPeriods.map((period) => ({
+  field: `RPS_${period}` as RpsField,
+  label: `RPS_${period}强度`
+}))
 
 function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
   return industryLevelOptions.includes(value as DcIndustryLevel)
@@ -344,18 +247,18 @@ function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
 
 /**
  * 组件：指数RPS强度排名视图（IndexRpsView）
- * 功能：展示不同板块类型下的指数RPS强度排名，支持搜索、排序、分页与详情跳转
+ * 功能：展示不同板块类型下的指数RPS强度排名，支持搜索、排序、强度筛选与详情跳转
  * 参数：
  *  - 无外部props；内部状态包括：
  *    - idxType: 板块类型（'概念板块' | '行业板块' | '地域板块'），默认 '行业板块'
  *    - searchKeyword: 搜索关键词
- *    - currentPage/pageSize: 分页参数
+ *    - rpsPeriods: 展示周期（5/20/60/120/250）
  * 返回值：无（组件渲染UI）；内部从接口获取 IndexRpsData:
  *  - data: IndexRpsItem[] 指数数据
  *  - query_time: 查询时间
  * 事件：
  *  - 点击指数简称触发路由跳转到股票列表并携带概念名
- *  - 表格排序、分页变化重排/翻页
+ *  - 表格排序、筛选变化触发列表重排
  *  - 修改板块类型触发数据刷新
  */
 
@@ -374,21 +277,18 @@ const queryTime = ref('')
 const searchKeyword = ref('')
 
 // RPS标签筛选
-const selectedRpsRanks = reactive<Record<RpsField, RpsRankLabel[]>>({
-  RPS_5: [],
-  RPS_20: [],
-  RPS_60: []
-})
+const selectedRpsRanks = reactive<Record<RpsField, RpsRankLabel[]>>(
+  rpsPeriods.reduce((accumulator, period) => {
+    accumulator[`RPS_${period}` as RpsField] = []
+    return accumulator
+  }, {} as Record<RpsField, RpsRankLabel[]>)
+)
 
 // 板块类型（默认：行业板块）
 const idxType = ref<IndexRpsIdxType>('行业板块')
 
 // 行业板块级别，支持通过组件 prop 或 URL query: level 传入初始值
 const industryLevel = ref<DcIndustryLevel>(normalizeIndustryLevel(props.level || route.query.level))
-
-// 分页相关
-const currentPage = ref(1)
-const pageSize = ref(2000)
 
 /**
  * 百分比格式化工具
@@ -434,7 +334,7 @@ const toggleRpsRank = (field: RpsField, rank: RpsRankLabel) => {
 
 /**
  * 工具：清空所有 RPS 强度标签筛选
- * 功能：恢复 RPS_5、RPS_20、RPS_60 的全部强度筛选状态
+ * 功能：恢复全部 RPS 周期（5/20/60/120/250）的强度筛选状态
  * 参数：无
  * 返回值：无
  * 事件：重置 selectedRpsRanks，触发表格过滤结果重算
@@ -447,7 +347,7 @@ const resetRpsFilters = () => {
 
 /**
  * 工具：判断单条记录是否满足 RPS 标签筛选
- * 功能：按 RPS_5、RPS_20、RPS_60 的已选标签过滤当前记录；同一字段内为“或”，不同字段间为“且”
+ * 功能：按全部 RPS 周期的已选标签过滤当前记录；同一字段内为“或”，不同字段间为“且”
  * 参数：item(IndexRpsItem) 当前指数RPS记录
  * 返回值：boolean 是否满足全部标签筛选条件
  * 事件：无
@@ -477,17 +377,16 @@ const filteredRpsData = computed(() => {
   return result
 })
 
-// 分页后的数据
-const paginatedRpsData = computed(() => {
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  const endIndex = startIndex + pageSize.value
-  return filteredRpsData.value.slice(startIndex, endIndex)
-})
-
 // 获取默认排序属性
 const getDefaultSortProp = () => {
   return 'RPS_5' // 默认按RPS_5排序
 }
+
+// 获取涨跌幅字段名
+const getReturnProp = (period: RpsPeriod): ReturnField => `return_${period}`
+
+// 获取RPS字段名
+const getRpsProp = (period: RpsPeriod): RpsField => `RPS_${period}`
 
 // 获取RPS颜色
 const getRpsColor = (rpsValue: number) => {
@@ -515,11 +414,6 @@ const getRpsRankClass = (value: number) => {
   return 'rank-weak'
 }
 
-// 获取指定周期的RPS值
-const getRpsValue = (row: IndexRpsItem, period: number): number => {
-  return row[`RPS_${period}` as keyof IndexRpsItem] as number || 0
-}
-
 // 表格行样式
 const tableRowClassName = ({ row }: { row: IndexRpsItem }) => {
   // 根据RPS_5值设置行样式
@@ -545,17 +439,6 @@ const handleSortChange = (sort: { prop: string, order: string }) => {
       }
     })
   }
-}
-
-// 处理页面大小变化
-const handleSizeChange = (size: number) => {
-  pageSize.value = size
-  currentPage.value = 1 // 重置到第一页
-}
-
-// 处理页码变化
-const handleCurrentChange = (page: number) => {
-  currentPage.value = page
 }
 
 /**
@@ -681,7 +564,7 @@ const refreshData = async () => {
   
   loading.value = true
   try {
-    const periodsStr = '5,20,60' // 固定周期参数
+    const periodsStr = rpsPeriods.join(',') // 固定周期参数
     const response = await getIndexRps(
       periodsStr,
       false,
@@ -707,24 +590,13 @@ onMounted(() => {
   refreshData()
 })
 
-// 监听搜索关键词变化，重置页码
-watch(searchKeyword, () => {
-  currentPage.value = 1
-})
-
-watch(selectedRpsRanks, () => {
-  currentPage.value = 1
-}, { deep: true })
-
-// 监听板块类型变化，刷新数据并重置分页
-watch(idxType, (newType) => {
-  currentPage.value = 1
+// 监听板块类型变化，刷新数据
+watch(idxType, () => {
   refreshData()
 })
 
 // 监听行业级别变化，刷新行业板块数据
 watch(industryLevel, () => {
-  currentPage.value = 1
   if (idxType.value === '行业板块') {
     refreshData()
   }
@@ -743,20 +615,40 @@ watch(() => route.query.level, (level) => {
   padding: 20px;
 }
 
-.period-selection {
-  margin-bottom: 20px;
-}
-
 .table-header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   align-items: stretch;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .table-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.control-item {
+  width: 160px;
+}
+
+.control-search {
+  width: 220px;
+}
+
+.table-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -765,6 +657,7 @@ watch(() => route.query.level, (level) => {
   align-items: flex-start;
   gap: 16px;
   flex-wrap: wrap;
+  padding-top: 4px;
 }
 
 .rps-filter-group {
@@ -793,6 +686,18 @@ watch(() => route.query.level, (level) => {
 
 .rps-data-section {
   margin-bottom: 20px;
+}
+
+.rps-card {
+  border-radius: 14px;
+}
+
+:deep(.rps-card .el-card__header) {
+  padding: 18px 20px 16px;
+}
+
+:deep(.rps-card .el-card__body) {
+  padding: 0 20px 20px;
 }
 
 .methodology {
@@ -926,11 +831,6 @@ watch(() => route.query.level, (level) => {
 }
 
 /* 表格底部分页 */
-.table-footer {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -1015,5 +915,28 @@ watch(() => route.query.level, (level) => {
 .markdown-body :deep(strong) {
   color: #303133;
   font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .index-rps-view {
+    padding: 12px;
+  }
+
+  .control-item,
+  .control-search {
+    width: 100%;
+  }
+
+  .table-summary {
+    width: 100%;
+  }
+
+  :deep(.rps-card .el-card__header) {
+    padding: 16px;
+  }
+
+  :deep(.rps-card .el-card__body) {
+    padding: 0 16px 16px;
+  }
 }
 </style>
