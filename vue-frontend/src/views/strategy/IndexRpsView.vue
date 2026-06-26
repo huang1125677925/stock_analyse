@@ -242,16 +242,25 @@
             </el-table-column>
           </template>
           
-          <!-- 操作列：领涨数据详情 -->
-          <el-table-column label="操作" min-width="110" align="center">
+          <!-- 操作列：查看领涨数据与成分股RPS -->
+          <el-table-column label="操作" min-width="210" align="center" fixed="right">
             <template #default="scope">
-              <el-button
-                type="primary"
-                size="small"
-                @click="openLeadRiseDetail(scope.row)"
-              >
-                领涨数据详情
-              </el-button>
+              <div class="action-buttons">
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="openLeadRiseDetail(scope.row)"
+                >
+                  领涨数据详情
+                </el-button>
+                <el-button
+                  type="success"
+                  size="small"
+                  @click="openBoardMemberRpsDialog(scope.row)"
+                >
+                  成分股RPS
+                </el-button>
+              </div>
             </template>
           </el-table-column>
           
@@ -263,6 +272,161 @@
           :idx-type="idxType"
           :name="currentIndexName"
         />
+
+        <el-dialog
+          v-model="memberRpsDialogVisible"
+          :title="`成分股RPS强度 - ${memberRpsBoardName || memberRpsBoardTsCode}`"
+          width="1400px"
+          top="5vh"
+          destroy-on-close
+        >
+          <div class="member-rps-dialog" v-loading="memberRpsLoading" element-loading-text="正在加载成分股RPS数据...">
+            <div class="toolbar-row member-rps-toolbar">
+              <div class="table-controls">
+                <el-input
+                  v-model="memberRpsSearchKeyword"
+                  placeholder="搜索成分股名称或代码"
+                  :prefix-icon="Search"
+                  clearable
+                  class="control-item control-search"
+                />
+              </div>
+              <div class="table-summary">
+                <el-tag type="info" effect="plain">共 {{ filteredMemberRpsData.length }} 条</el-tag>
+                <el-tag v-if="memberRpsTradeDate" type="warning" effect="light">交易日 {{ memberRpsTradeDate }}</el-tag>
+                <el-tag v-if="memberRpsQueryTime" type="success" effect="light">更新时间 {{ memberRpsQueryTime }}</el-tag>
+              </div>
+            </div>
+
+            <div class="rps-filter-panel">
+              <div
+                v-for="filterGroup in memberRpsFilterGroups"
+                :key="filterGroup.field"
+                class="rps-filter-group"
+              >
+                <span class="rps-filter-label">{{ filterGroup.label }}</span>
+                <div class="rps-filter-tags">
+                  <el-check-tag
+                    v-for="tag in rpsRankOptions"
+                    :key="`${filterGroup.field}-${tag}`"
+                    :checked="(selectedMemberRpsRanks[filterGroup.field] || []).includes(tag)"
+                    @change="toggleMemberRpsRank(filterGroup.field, tag)"
+                  >
+                    {{ tag }}
+                  </el-check-tag>
+                </div>
+              </div>
+              <el-button
+                v-if="hasActiveMemberRpsFilter"
+                link
+                type="primary"
+                class="rps-filter-reset"
+                @click="resetMemberRpsFilters"
+              >
+                清空强度筛选
+              </el-button>
+            </div>
+
+            <el-table
+              :data="filteredMemberRpsData"
+              stripe
+              border
+              style="width: 100%"
+              height="620"
+              :default-sort="{ prop: memberRpsDefaultSortProp, order: 'descending' }"
+              highlight-current-row
+              @sort-change="handleMemberRpsSortChange"
+            >
+              <el-table-column type="index" label="#" width="50" align="center" fixed="left" />
+              <el-table-column prop="ts_code" label="ts_code" min-width="120" sortable="custom" fixed="left" align="center">
+                <template #default="scope">
+                  <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="name" label="名称" min-width="130" sortable="custom" fixed="left" />
+
+              <el-table-column prop="pct_change" label="当日涨跌幅" min-width="110" sortable="custom" align="center">
+                <template #default="scope">
+                  <div class="change-percent-cell">
+                    <span :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
+                      {{ formatPercent(scope.row.pct_change) }}
+                    </span>
+                    <div class="trend-indicator">
+                      <el-icon v-if="getNumericValue(scope.row.pct_change) > 0"><CaretTop /></el-icon>
+                      <el-icon v-else-if="getNumericValue(scope.row.pct_change) < 0"><CaretBottom /></el-icon>
+                      <el-icon v-else><Minus /></el-icon>
+                    </div>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="RPS_today" label="RPS_today" min-width="120" sortable="custom" align="center">
+                <template #default="scope">
+                  <div class="rps-cell">
+                    <el-progress
+                      :percentage="getNumericValue(scope.row.RPS_today)"
+                      :color="getRpsColor(getNumericValue(scope.row.RPS_today))"
+                      :format="() => formatRpsValue(scope.row.RPS_today)"
+                      :stroke-width="18"
+                      :text-inside="true"
+                      :show-text="true"
+                    />
+                    <div class="rps-rank" :class="getRpsRankClass(getNumericValue(scope.row.RPS_today))">
+                      {{ getRpsRankText(getNumericValue(scope.row.RPS_today)) }}
+                    </div>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <template v-for="period in memberRpsPeriods" :key="period">
+                <el-table-column
+                  :prop="getDynamicReturnProp(period)"
+                  :label="`${period}日涨跌幅`"
+                  min-width="110"
+                  sortable="custom"
+                  align="center"
+                >
+                  <template #default="scope">
+                    <div class="change-percent-cell">
+                      <span :class="{ up: getNumericValue(scope.row[getDynamicReturnProp(period)]) > 0, down: getNumericValue(scope.row[getDynamicReturnProp(period)]) < 0 }">
+                        {{ formatPercent(scope.row[getDynamicReturnProp(period)]) }}
+                      </span>
+                      <div class="trend-indicator">
+                        <el-icon v-if="getNumericValue(scope.row[getDynamicReturnProp(period)]) > 0"><CaretTop /></el-icon>
+                        <el-icon v-else-if="getNumericValue(scope.row[getDynamicReturnProp(period)]) < 0"><CaretBottom /></el-icon>
+                        <el-icon v-else><Minus /></el-icon>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+
+                <el-table-column
+                  :prop="getDynamicRpsProp(period)"
+                  :label="`RPS_${period}`"
+                  min-width="120"
+                  sortable="custom"
+                  align="center"
+                >
+                  <template #default="scope">
+                    <div class="rps-cell">
+                      <el-progress
+                        :percentage="getNumericValue(scope.row[getDynamicRpsProp(period)])"
+                        :color="getRpsColor(getNumericValue(scope.row[getDynamicRpsProp(period)]))"
+                        :format="() => formatRpsValue(scope.row[getDynamicRpsProp(period)])"
+                        :stroke-width="18"
+                        :text-inside="true"
+                        :show-text="true"
+                      />
+                      <div class="rps-rank" :class="getRpsRankClass(getNumericValue(scope.row[getDynamicRpsProp(period)]))">
+                        {{ getRpsRankText(getNumericValue(scope.row[getDynamicRpsProp(period)])) }}
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+              </template>
+            </el-table>
+          </div>
+        </el-dialog>
       </el-card>
     </div>
 
@@ -276,8 +440,8 @@ import { ref, reactive, computed, onMounted, watch, defineComponent, h } from 'v
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
 import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
-import { getIndexRps } from '@/services/strategyApi'
-import type { DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
+import { getDcBoardMemberRps, getIndexRps } from '@/services/strategyApi'
+import type { DcBoardMemberRpsItem, DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
 
 const industryLevelOptions: DcIndustryLevel[] = ['东财一级行业', '东财二级行业', '东财三级行业']
@@ -289,6 +453,7 @@ interface Props {
 type RpsPeriod = 5 | 20 | 60 | 120 | 250
 type RpsField = `RPS_${RpsPeriod}`
 type ReturnField = `return_${RpsPeriod}`
+type DynamicRpsField = 'RPS_today' | `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
 
 const props = defineProps<Props>()
@@ -336,6 +501,20 @@ const queryTime = ref('')
 
 // 搜索关键词
 const searchKeyword = ref('')
+
+// 成分股RPS对话框状态
+const memberRpsDialogVisible = ref(false)
+const memberRpsLoading = ref(false)
+const memberRpsBoardTsCode = ref('')
+const memberRpsBoardName = ref('')
+const memberRpsTradeDate = ref('')
+const memberRpsQueryTime = ref('')
+const memberRpsSearchKeyword = ref('')
+const memberRpsData = ref<DcBoardMemberRpsItem[]>([])
+const memberRpsPeriods = ref<number[]>([])
+const selectedMemberRpsRanks = reactive<Record<string, RpsRankLabel[]>>({
+  RPS_today: []
+})
 
 // RPS标签筛选
 const selectedRpsRanks = reactive<Record<RpsField, RpsRankLabel[]>>(
@@ -391,6 +570,46 @@ const formatRpsValue = (value: unknown): string => {
 }
 
 /**
+ * 动态字段工具
+ * 功能：为成分股 RPS 表格生成动态涨跌幅字段名
+ * 参数：period(number) 周期值
+ * 返回值：`return_${number}` 对应的动态字段名
+ * 事件：无
+ */
+const getDynamicReturnProp = (period: number): `return_${number}` => `return_${period}` as `return_${number}`
+
+/**
+ * 动态字段工具
+ * 功能：为成分股 RPS 表格生成动态 RPS 字段名
+ * 参数：period(number) 周期值
+ * 返回值：DynamicRpsField 对应的动态字段名
+ * 事件：无
+ */
+const getDynamicRpsProp = (period: number): DynamicRpsField => `RPS_${period}` as DynamicRpsField
+
+/**
+ * 工具：同步成分股 RPS 的筛选字段
+ * 功能：根据接口返回周期初始化对话框内的强度筛选状态
+ * 参数：periods(number[]) 当前接口返回的周期列表
+ * 返回值：无
+ * 事件：更新 selectedMemberRpsRanks
+ */
+const syncMemberRpsFilterFields = (periods: number[]) => {
+  selectedMemberRpsRanks.RPS_today = selectedMemberRpsRanks.RPS_today || []
+
+  Object.keys(selectedMemberRpsRanks).forEach((field) => {
+    if (field !== 'RPS_today' && !periods.some((period) => field === getDynamicRpsProp(period))) {
+      delete selectedMemberRpsRanks[field]
+    }
+  })
+
+  periods.forEach((period) => {
+    const field = getDynamicRpsProp(period)
+    selectedMemberRpsRanks[field] = selectedMemberRpsRanks[field] || []
+  })
+}
+
+/**
  * 工具：判断指定 RPS 字段是否启用了标签筛选
  * 功能：用于识别当前字段是否存在选中的强度标签
  * 参数：field(RpsField) RPS字段名
@@ -398,6 +617,15 @@ const formatRpsValue = (value: unknown): string => {
  * 事件：无
  */
 const hasSelectedRanks = (field: RpsField): boolean => selectedRpsRanks[field].length > 0
+
+/**
+ * 工具：判断成分股 RPS 字段是否启用了标签筛选
+ * 功能：用于识别弹窗内当前字段是否存在选中的强度标签
+ * 参数：field(DynamicRpsField) RPS字段名
+ * 返回值：boolean 是否存在选中的标签
+ * 事件：无
+ */
+const hasSelectedMemberRanks = (field: DynamicRpsField): boolean => (selectedMemberRpsRanks[field] || []).length > 0
 
 /**
  * 工具：切换 RPS 强度标签
@@ -419,6 +647,27 @@ const toggleRpsRank = (field: RpsField, rank: RpsRankLabel) => {
 }
 
 /**
+ * 工具：切换成分股 RPS 强度标签
+ * 功能：在成分股弹窗中对指定字段执行强度标签的选中与取消
+ * 参数：
+ *  - field(DynamicRpsField): RPS字段名
+ *  - rank(RpsRankLabel): 强度标签文本
+ * 返回值：无
+ * 事件：更新 selectedMemberRpsRanks，触发对话框列表过滤结果重算
+ */
+const toggleMemberRpsRank = (field: DynamicRpsField, rank: RpsRankLabel) => {
+  const ranks = selectedMemberRpsRanks[field] || []
+  const index = ranks.indexOf(rank)
+  if (index >= 0) {
+    ranks.splice(index, 1)
+    selectedMemberRpsRanks[field] = ranks
+    return
+  }
+  ranks.push(rank)
+  selectedMemberRpsRanks[field] = ranks
+}
+
+/**
  * 工具：清空所有 RPS 强度标签筛选
  * 功能：恢复全部 RPS 周期（5/20/60/120/250）的强度筛选状态
  * 参数：无
@@ -428,6 +677,19 @@ const toggleRpsRank = (field: RpsField, rank: RpsRankLabel) => {
 const resetRpsFilters = () => {
   rpsFilterGroups.forEach(({ field }) => {
     selectedRpsRanks[field] = []
+  })
+}
+
+/**
+ * 工具：清空成分股 RPS 强度标签筛选
+ * 功能：恢复成分股对话框内全部强度筛选状态
+ * 参数：无
+ * 返回值：无
+ * 事件：重置 selectedMemberRpsRanks，触发表格过滤结果重算
+ */
+const resetMemberRpsFilters = () => {
+  Object.keys(selectedMemberRpsRanks).forEach((field) => {
+    selectedMemberRpsRanks[field] = []
   })
 }
 
@@ -447,8 +709,36 @@ const matchesRpsFilters = (item: IndexRpsItem): boolean => {
   })
 }
 
+/**
+ * 工具：判断单条成分股记录是否满足 RPS 标签筛选
+ * 功能：按当前已选的 RPS_today 与各周期 RPS 标签过滤成分股记录
+ * 参数：item(DcBoardMemberRpsItem) 当前成分股RPS记录
+ * 返回值：boolean 是否满足全部标签筛选条件
+ * 事件：无
+ */
+const matchesMemberRpsFilters = (item: DcBoardMemberRpsItem): boolean => {
+  return memberRpsFilterGroups.value.every(({ field }) => {
+    if (!hasSelectedMemberRanks(field)) {
+      return true
+    }
+    return (selectedMemberRpsRanks[field] || []).includes(getRpsRankText(getNumericValue(item[field])) as RpsRankLabel)
+  })
+}
+
 const hasActiveRpsFilter = computed(() => {
   return rpsFilterGroups.some(({ field }) => hasSelectedRanks(field))
+})
+
+const memberRpsFilterGroups = computed<Array<{ field: DynamicRpsField; label: string }>>(() => ([
+  { field: 'RPS_today', label: '当日RPS强度' },
+  ...memberRpsPeriods.value.map((period) => ({
+    field: getDynamicRpsProp(period),
+    label: `RPS_${period}强度`
+  }))
+]))
+
+const hasActiveMemberRpsFilter = computed(() => {
+  return memberRpsFilterGroups.value.some(({ field }) => hasSelectedMemberRanks(field))
 })
 
 // 过滤后的RPS数据
@@ -463,10 +753,25 @@ const filteredRpsData = computed(() => {
   return result
 })
 
+const filteredMemberRpsData = computed(() => {
+  let result = memberRpsData.value
+  if (memberRpsSearchKeyword.value) {
+    const keyword = memberRpsSearchKeyword.value.trim()
+    result = result.filter((item) => item.name.includes(keyword) || item.ts_code.includes(keyword))
+  }
+  result = result.filter(matchesMemberRpsFilters)
+  return result
+})
+
 // 获取默认排序属性
 const getDefaultSortProp = () => {
   return 'RPS_5' // 默认按RPS_5排序
 }
+
+const memberRpsDefaultSortProp = computed(() => {
+  const firstPeriod = memberRpsPeriods.value[0]
+  return firstPeriod ? getDynamicRpsProp(firstPeriod) : 'RPS_today'
+})
 
 // 获取涨跌幅字段名
 const getReturnProp = (period: RpsPeriod): ReturnField => `return_${period}`
@@ -644,6 +949,65 @@ const openLeadRiseDetail = (row: IndexRpsItem) => {
   detailDialogVisible.value = true
 }
 
+/**
+ * 打开成分股 RPS 对话框
+ * 功能：按当前板块代码加载成分股 RPS 数据，并展示搜索和强度筛选结果
+ * 参数：row(IndexRpsItem) 当前行的板块数据
+ * 返回值：Promise<void>
+ * 事件：更新成分股 RPS 对话框状态并触发数据请求
+ */
+const openBoardMemberRpsDialog = async (row: IndexRpsItem) => {
+  memberRpsDialogVisible.value = true
+  memberRpsLoading.value = true
+  memberRpsBoardTsCode.value = row.ts_code
+  memberRpsBoardName.value = row.name
+  memberRpsTradeDate.value = ''
+  memberRpsQueryTime.value = ''
+  memberRpsSearchKeyword.value = ''
+  memberRpsData.value = []
+  memberRpsPeriods.value = []
+  resetMemberRpsFilters()
+
+  try {
+    const response = await getDcBoardMemberRps(row.ts_code, '5,20,60,120,250')
+    memberRpsData.value = response.data || []
+    memberRpsPeriods.value = response.periods || []
+    memberRpsBoardTsCode.value = response.board_ts_code || row.ts_code
+    memberRpsBoardName.value = response.board_name || row.name
+    memberRpsTradeDate.value = response.trade_date || ''
+    memberRpsQueryTime.value = response.query_time || ''
+    syncMemberRpsFilterFields(memberRpsPeriods.value)
+    ElMessage.success('成分股RPS数据加载成功')
+  } catch (error) {
+    console.error('加载成分股RPS数据失败:', error)
+    memberRpsData.value = []
+    ElMessage.error('加载成分股RPS数据失败，请稍后重试')
+  } finally {
+    memberRpsLoading.value = false
+  }
+}
+
+/**
+ * 处理成分股 RPS 表格排序变化
+ * 功能：根据当前排序字段对弹窗内成分股数据执行升降序重排
+ * 参数：sort({ prop: string, order: string }) 表格排序参数
+ * 返回值：无
+ * 事件：更新 memberRpsData 列表顺序
+ */
+const handleMemberRpsSortChange = (sort: { prop: string, order: string }) => {
+  if (sort.prop && sort.order) {
+    memberRpsData.value.sort((a, b) => {
+      const propA = getNumericValue((a as Record<string, unknown>)[sort.prop])
+      const propB = getNumericValue((b as Record<string, unknown>)[sort.prop])
+
+      if (sort.order === 'ascending') {
+        return propA - propB
+      }
+      return propB - propA
+    })
+  }
+}
+
 // 刷新数据
 const refreshData = async () => {
   if (loading.value) return
@@ -736,6 +1100,24 @@ watch(() => route.query.level, (level) => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.member-rps-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.member-rps-toolbar {
+  margin-bottom: 0;
 }
 
 .rps-filter-panel {

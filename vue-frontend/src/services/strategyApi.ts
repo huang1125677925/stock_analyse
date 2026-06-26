@@ -31,6 +31,27 @@ export interface IndexRpsData {
   query_time: string
 }
 
+export interface DcBoardMemberRpsItem {
+  ts_code: string
+  name: string
+  pct_change: number | null
+  RPS_today: number | null
+  [key: `return_${number}`]: number | null
+  [key: `RPS_${number}`]: number | null
+}
+
+export interface DcBoardMemberRpsData {
+  total: number
+  data: DcBoardMemberRpsItem[]
+  periods: number[]
+  board_ts_code: string
+  board_name: string
+  trade_date: string
+  member_count: number
+  errors: string[]
+  query_time: string
+}
+
 export interface IndexRpsResponse {
   code: number
   message: string
@@ -120,6 +141,36 @@ export async function getHistoricalRps(
     return response.data
   } catch (error) {
     console.error('获取历史RPS数据失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 获取东财板块成分股 RPS 强度排名
+ * @param tsCode 东财板块代码，例如 BK1462.DC
+ * @param periods 时间周期，多个周期用逗号分隔
+ * @param tradeDate 截止交易日，格式 YYYYMMDD
+ * @returns Promise<DcBoardMemberRpsData>
+ */
+export async function getDcBoardMemberRps(
+  tsCode: string,
+  periods: string = '5,20,60',
+  tradeDate?: string
+): Promise<DcBoardMemberRpsData> {
+  try {
+    const response = await axios.get<DcBoardMemberRpsData>(
+      '/django/api/strategy/dc-board-member-rps/',
+      {
+        params: {
+          ts_code: tsCode,
+          periods,
+          ...(tradeDate ? { trade_date: tradeDate } : {})
+        }
+      }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取东财板块成分股RPS排名失败:', error)
     throw error
   }
 }
