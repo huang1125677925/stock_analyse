@@ -117,6 +117,67 @@
               </el-button>
             </template>
           </el-table-column>
+
+          <el-table-column
+            prop="pct_change"
+            label="当日涨跌幅"
+            min-width="110"
+            sortable="custom"
+            align="center"
+          >
+            <template #header>
+              <div class="custom-header">
+                <span>当日涨跌幅</span>
+                <el-tooltip content="截止交易日当天涨跌幅" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="change-percent-cell">
+                <span :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
+                  {{ formatPercent(scope.row.pct_change) }}
+                </span>
+                <div class="trend-indicator">
+                  <el-icon v-if="getNumericValue(scope.row.pct_change) > 0"><CaretTop /></el-icon>
+                  <el-icon v-else-if="getNumericValue(scope.row.pct_change) < 0"><CaretBottom /></el-icon>
+                  <el-icon v-else><Minus /></el-icon>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column
+            prop="RPS_today"
+            label="RPS_today"
+            min-width="120"
+            sortable="custom"
+            align="center"
+          >
+            <template #header>
+              <div class="custom-header">
+                <span>RPS_today</span>
+                <el-tooltip content="基于当天涨跌幅计算的 RPS 强度" placement="top">
+                  <el-icon><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </template>
+            <template #default="scope">
+              <div class="rps-cell">
+                <el-progress
+                  :percentage="getNumericValue(scope.row.RPS_today)"
+                  :color="getRpsColor(getNumericValue(scope.row.RPS_today))"
+                  :format="() => formatRpsValue(scope.row.RPS_today)"
+                  :stroke-width="18"
+                  :text-inside="true"
+                  :show-text="true"
+                />
+                <div class="rps-rank" :class="getRpsRankClass(getNumericValue(scope.row.RPS_today))">
+                  {{ getRpsRankText(getNumericValue(scope.row.RPS_today)) }}
+                </div>
+              </div>
+            </template>
+          </el-table-column>
           
           <template v-for="period in rpsPeriods" :key="period">
             <el-table-column
@@ -302,6 +363,31 @@ const formatPercent = (value: unknown): string => {
   if (!Number.isFinite(num)) return '-'
   const sign = num > 0 ? '+' : ''
   return `${sign}${num.toFixed(2)}%`
+}
+
+/**
+ * 数值格式化工具
+ * 功能：将可能为空的接口字段转换为可用于排序和进度条的数值
+ * 参数：value(unknown) 原始值
+ * 返回值：number 有效数值；无效时返回 0
+ * 事件：无
+ */
+const getNumericValue = (value: unknown): number => {
+  const num = typeof value === 'number' ? value : parseFloat(String(value))
+  return Number.isFinite(num) ? num : 0
+}
+
+/**
+ * RPS 文本格式化工具
+ * 功能：将 RPS 数值格式化为进度条文本，兼容空值显示
+ * 参数：value(unknown) 原始 RPS 值
+ * 返回值：string 格式化后的 RPS 文本；无效时返回 '-'
+ * 事件：无
+ */
+const formatRpsValue = (value: unknown): string => {
+  const num = typeof value === 'number' ? value : parseFloat(String(value))
+  if (!Number.isFinite(num)) return '-'
+  return num.toFixed(1)
 }
 
 /**

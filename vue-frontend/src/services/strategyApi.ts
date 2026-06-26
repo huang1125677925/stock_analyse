@@ -4,6 +4,8 @@ import axios from './axiosConfig'
 export interface IndexRpsItem {
   ts_code: string
   name: string
+  pct_change: number | null
+  RPS_today: number | null
   return_5: number
   RPS_5: number
   return_20: number
