@@ -134,7 +134,7 @@
             <template #header>
               <div class="custom-header">
                 <span>指数简称</span>
-                <el-tooltip content="点击指数名称可查看详情" placement="top">
+                <el-tooltip content="点击指数名称可查看趋势看板K线图" placement="top">
                   <el-icon><InfoFilled /></el-icon>
                 </el-tooltip>
               </div>
@@ -300,6 +300,72 @@
           :idx-type="idxType"
           :name="currentIndexName"
         />
+
+        <el-dialog
+          v-model="indexTrendDialogVisible"
+          width="88%"
+          top="6vh"
+          :close-on-click-modal="false"
+          destroy-on-close
+          append-to-body
+        >
+          <template #header>
+            <div class="trend-dialog-header">
+              <div class="trend-dialog-title">
+                {{ indexTrendBoard.name || indexTrendBoard.code }} 趋势看板K线图
+              </div>
+              <div class="trend-dialog-subtitle">
+                {{ indexTrendDateRange.start || '-' }} 至 {{ indexTrendDateRange.end || '-' }}
+              </div>
+            </div>
+          </template>
+
+          <div class="trend-dialog-body">
+            <div class="toolbar-row">
+              <div class="table-summary">
+                <el-tag v-if="indexTrendBoard.code" type="info" effect="plain">
+                  板块代码 {{ indexTrendBoard.code }}
+                </el-tag>
+                <el-tag type="warning" effect="light">板块类型 {{ idxType }}</el-tag>
+                <el-tag v-if="latestIndexTrendData" type="success" effect="light">
+                  最新收盘 {{ latestIndexTrendData.close_price.toFixed(2) }}
+                </el-tag>
+                <el-tag
+                  v-if="latestIndexTrendData"
+                  :type="latestIndexTrendData.change_percent > 0 ? 'danger' : latestIndexTrendData.change_percent < 0 ? 'success' : 'info'"
+                  effect="light"
+                >
+                  最新涨跌幅 {{ formatPercent(latestIndexTrendData.change_percent) }}
+                </el-tag>
+                <el-tag v-if="latestIndexTrendData" type="info" effect="light">
+                  最新成交额 {{ formatAmount(latestIndexTrendData.amount) }}
+                </el-tag>
+              </div>
+              <div class="trend-shortcuts">
+                <el-radio-group v-model="indexTrendShortcut" @change="handleIndexTrendShortcutChange">
+                  <el-radio-button label="1y">最近1年</el-radio-button>
+                  <el-radio-button label="3y">最近3年</el-radio-button>
+                  <el-radio-button label="5y">最近5年</el-radio-button>
+                </el-radio-group>
+              </div>
+            </div>
+
+            <el-card class="trend-preview-card" v-loading="indexTrendLoading">
+              <StockKLineChart
+                v-if="indexTrendData.length"
+                :stock-code="indexTrendBoard.code"
+                :stock-name="indexTrendBoard.name"
+                :kline-data="indexTrendData"
+                height="420px"
+              />
+              <el-empty
+                v-else-if="!indexTrendLoading"
+                :description="indexTrendEmptyText"
+                :image-size="80"
+              />
+            </el-card>
+          </div>
+        </el-dialog>
 
         <el-dialog
           v-model="memberRpsDialogVisible"
@@ -548,12 +614,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, defineComponent, h } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
 import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getDcBoardMemberRps, getIndexRps } from '@/services/strategyApi'
 import type { DcBoardMemberRpsItem, DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
+import { fetchDcDaily } from '@/services/dcDailyApi'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 
@@ -608,7 +675,7 @@ function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
  *  - data: IndexRpsItem[] 指数数据
  *  - query_time: 查询时间
  * 事件：
- *  - 点击指数简称触发路由跳转到股票列表并携带概念名
+ *  - 点击指数简称触发东财指数趋势看板弹窗并加载K线图
  *  - 表格排序、筛选变化触发列表重排
  *  - 修改板块类型触发数据刷新
  */
@@ -616,8 +683,6 @@ function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
 // 数据加载状态
 const loading = ref(false)
 
-// 路由
-const router = useRouter()
 const route = useRoute()
 
 // RPS数据
@@ -628,6 +693,19 @@ const queryTime = ref('')
 const searchKeyword = ref('')
 
 // 成分股RPS对话框状态
+const indexTrendDialogVisible = ref(false)
+const indexTrendLoading = ref(false)
+const indexTrendShortcut = ref<MemberTrendShortcut>('1y')
+const indexTrendData = ref<StockHistoryDataItem[]>([])
+const indexTrendBoard = reactive({
+  code: '',
+  name: ''
+})
+const indexTrendDateRange = reactive({
+  start: '',
+  end: ''
+})
+let indexTrendRequestId = 0
 const memberRpsDialogVisible = ref(false)
 const memberRpsLoading = ref(false)
 const memberRpsBoardTsCode = ref('')
@@ -756,6 +834,27 @@ const formatDateToYYYYMMDDWithDash = (date: Date): string => {
  * 事件：无
  */
 const formatDateForStockApi = (dateText: string): string => dateText.replace(/-/g, '')
+
+/**
+ * 数值格式化工具
+ * 功能：将成交额等大数值转换为易读的亿/万单位，便于弹窗摘要展示
+ * 参数：value(unknown) 原始数值
+ * 返回值：string 格式化后的数值文本
+ * 事件：无
+ */
+const formatAmount = (value: unknown): string => {
+  const numericValue = getNumericValue(value)
+  if (!Number.isFinite(numericValue) || numericValue === 0) {
+    return '0'
+  }
+  if (numericValue >= 100000000) {
+    return `${(numericValue / 100000000).toFixed(2)}亿`
+  }
+  if (numericValue >= 10000) {
+    return `${(numericValue / 10000).toFixed(2)}万`
+  }
+  return numericValue.toFixed(2)
+}
 
 /**
  * 动态字段工具
@@ -1090,6 +1189,18 @@ const memberStockTrendEmptyText = computed(() => {
     : '请选择股票查看K线趋势'
 })
 
+const indexTrendEmptyText = computed(() => {
+  return indexTrendBoard.code
+    ? '暂无该东财指数区间K线数据'
+    : '请选择指数查看趋势看板'
+})
+
+const latestIndexTrendData = computed(() => {
+  return indexTrendData.value.length > 0
+    ? indexTrendData.value[indexTrendData.value.length - 1]
+    : null
+})
+
 // 过滤后的RPS数据
 const filteredRpsData = computed(() => {
   let result = rpsData.value
@@ -1184,14 +1295,105 @@ const handleSortChange = (sort: { prop: string, order: string }) => {
 }
 
 /**
- * 显示指数详情（跳转到股票列表页面）
- * 功能：点击指数简称时跳转到股票列表页面，并将概念名作为查询参数传递，便于在股票列表中按概念筛选
- * 参数：row(IndexRpsItem) 当前行的指数数据
+ * 工具：应用东财指数趋势看板快捷时间范围
+ * 功能：根据最近1年、3年、5年的快捷选项计算东财指数K线查询区间
+ * 参数：range(MemberTrendShortcut) 快捷时间范围
  * 返回值：无
- * 事件：路由跳转到 '/stock-list'，并携带 query: { dc_concept }
+ * 事件：更新 indexTrendDateRange
+ */
+const applyIndexTrendShortcut = (range: MemberTrendShortcut) => {
+  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+  indexTrendDateRange.start = formatDateToYYYYMMDDWithDash(startDate)
+  indexTrendDateRange.end = formatDateToYYYYMMDDWithDash(endDate)
+}
+
+/**
+ * 工具：加载东财指数趋势看板K线数据
+ * 功能：调用 /django/api/tasks/dc-daily/ 获取东财板块日线行情，并转换为 K 线组件所需结构
+ * 参数：无
+ * 返回值：Promise<void>
+ * 事件：更新 indexTrendData、indexTrendLoading
+ */
+const loadIndexTrendData = async () => {
+  const requestId = ++indexTrendRequestId
+
+  if (!indexTrendBoard.code || !indexTrendDateRange.start || !indexTrendDateRange.end) {
+    indexTrendData.value = []
+    return
+  }
+
+  indexTrendLoading.value = true
+  try {
+    const response = await fetchDcDaily({
+      ts_code: indexTrendBoard.code,
+      idx_type: idxType.value,
+      start_date: formatDateForStockApi(indexTrendDateRange.start),
+      end_date: formatDateForStockApi(indexTrendDateRange.end),
+      fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate'
+    })
+
+    if (requestId !== indexTrendRequestId) return
+
+    indexTrendData.value = [...(response.records || [])]
+      .sort((a, b) => a.trade_date.localeCompare(b.trade_date))
+      .map((item) => ({
+        stock_code: item.ts_code,
+        stock_name: indexTrendBoard.name,
+        date: item.trade_date,
+        open_price: getNumericValue(item.open),
+        close_price: getNumericValue(item.close),
+        high_price: getNumericValue(item.high),
+        low_price: getNumericValue(item.low),
+        change_percent: getNumericValue(item.pct_change),
+        change_amount: getNumericValue(item.change),
+        volume: getNumericValue(item.vol),
+        amount: getNumericValue(item.amount),
+        amplitude: getNumericValue(item.swing),
+        turnover_rate: getNumericValue(item.turnover_rate),
+        created_at: ''
+      }))
+  } catch (error) {
+    if (requestId !== indexTrendRequestId) return
+    console.error('加载东财指数趋势看板失败:', error)
+    indexTrendData.value = []
+    ElMessage.error('加载东财指数趋势看板失败，请稍后重试')
+  } finally {
+    if (requestId === indexTrendRequestId) {
+      indexTrendLoading.value = false
+    }
+  }
+}
+
+/**
+ * 事件：切换东财指数趋势看板快捷范围
+ * 功能：响应最近1年、3年、5年快捷范围切换并刷新东财指数K线数据
+ * 参数：range(MemberTrendShortcut) 快捷时间范围
+ * 返回值：无
+ * 事件：更新查询区间并重新加载图表数据
+ */
+const handleIndexTrendShortcutChange = (range: MemberTrendShortcut) => {
+  applyIndexTrendShortcut(range)
+  loadIndexTrendData()
+}
+
+/**
+ * 事件：打开东财指数趋势看板弹窗
+ * 功能：点击指数简称时打开趋势看板弹窗，并展示该东财指数的K线图
+ * 参数：row(IndexRpsItem) 当前行的指数数据
+ * 返回值：Promise<void>
+ * 事件：更新指数趋势看板弹窗状态并触发 dc-daily 数据请求
  */
 const showIndexDetail = (row: IndexRpsItem) => {
-  router.push({ path: '/stock-list', query: { dc_concept: row.name } })
+  indexTrendBoard.code = row.ts_code
+  indexTrendBoard.name = row.name
+  indexTrendShortcut.value = '1y'
+  indexTrendData.value = []
+  applyIndexTrendShortcut('1y')
+  indexTrendDialogVisible.value = true
+  loadIndexTrendData()
 }
 
 /**

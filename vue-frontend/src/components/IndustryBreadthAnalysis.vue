@@ -3,6 +3,19 @@
     <el-card class="control-card" shadow="hover">
       <div class="controls">
         <div class="control-group">
+          <span class="control-label">板块类型：</span>
+          <el-select
+            v-model="selectedIdxType"
+            placeholder="选择板块类型"
+            :disabled="loading"
+            @change="handleIdxTypeChange"
+            style="width: 160px"
+          >
+            <el-option label="行业板块" value="行业板块" />
+            <el-option label="概念板块" value="概念板块" />
+          </el-select>
+        </div>
+        <div v-if="selectedIdxType === '行业板块'" class="control-group">
           <span class="control-label">行业层级：</span>
           <el-select
             v-model="selectedLevel"
@@ -78,17 +91,17 @@
     <el-card class="chart-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span>市场宽度热力图（{{ selectedLevel }} / MA {{ maWindow }}）</span>
-          <span class="tips">数据来源：行业MA宽度接口</span>
+          <span>市场宽度热力图（{{ selectedBoardLabel }} / MA {{ maWindow }}）</span>
+          <span class="tips">数据来源：板块MA宽度接口</span>
         </div>
       </template>
 
       <div class="methodology">
         <p>
-          统计口径：基于东方财富行业板块成分，按照所选行业层级汇总各板块中收盘价高于 MA{{ maWindow }} 的股票占比。
+          统计口径：基于东方财富{{ selectedIdxType === '概念板块' ? '概念板块' : '行业板块' }}成分，汇总各板块中收盘价高于 MA{{ maWindow }} 的股票占比。
         </p>
         <p>
-          计算方式：市场宽度 = count_above_ma / eligible_count。数值越高，表示该行业板块内站上均线的股票占比越高，整体走势越强。
+          计算方式：市场宽度 = count_above_ma / eligible_count。数值越高，表示该板块内站上均线的股票占比越高，整体走势越强。
         </p>
       </div>
 
@@ -101,6 +114,74 @@
 
       <div v-else class="empty-tip">暂无数据</div>
     </el-card>
+
+    <el-dialog
+      v-model="trendDialogVisible"
+      width="88%"
+      top="6vh"
+      :close-on-click-modal="false"
+      destroy-on-close
+      append-to-body
+    >
+      <template #header>
+        <div class="trend-dialog-header">
+          <div class="trend-dialog-title">
+            {{ trendBoard.name || trendBoard.code }} 趋势看板K线图
+          </div>
+          <div class="trend-dialog-subtitle">
+            {{ trendDateRange.start || '-' }} 至 {{ trendDateRange.end || '-' }}
+          </div>
+        </div>
+      </template>
+
+      <div class="trend-dialog-body">
+        <div class="toolbar-row">
+          <div class="table-summary">
+            <el-tag v-if="trendBoard.code" type="info" effect="plain">
+              板块代码 {{ trendBoard.code }}
+            </el-tag>
+            <el-tag v-if="trendBoard.idxType" type="warning" effect="light">
+              板块类型 {{ trendBoard.idxType }}
+            </el-tag>
+            <el-tag v-if="latestTrendData" type="success" effect="light">
+              最新收盘 {{ latestTrendData.close_price.toFixed(2) }}
+            </el-tag>
+            <el-tag
+              v-if="latestTrendData"
+              :type="latestTrendData.change_percent > 0 ? 'danger' : latestTrendData.change_percent < 0 ? 'success' : 'info'"
+              effect="light"
+            >
+              最新涨跌幅 {{ formatPercent(latestTrendData.change_percent) }}
+            </el-tag>
+            <el-tag v-if="latestTrendData" type="info" effect="light">
+              最新成交额 {{ formatAmount(latestTrendData.amount) }}
+            </el-tag>
+          </div>
+          <div class="trend-shortcuts">
+            <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
+              <el-radio-button label="1y">最近1年</el-radio-button>
+              <el-radio-button label="3y">最近3年</el-radio-button>
+              <el-radio-button label="5y">最近5年</el-radio-button>
+            </el-radio-group>
+          </div>
+        </div>
+
+        <el-card class="trend-preview-card" v-loading="trendLoading">
+          <StockKLineChart
+            v-if="trendData.length"
+            :stock-code="trendBoard.code"
+            :stock-name="trendBoard.name"
+            :kline-data="trendData"
+            height="420px"
+          />
+          <el-empty
+            v-else-if="!trendLoading"
+            :description="trendEmptyText"
+            :image-size="80"
+          />
+        </el-card>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -108,24 +189,35 @@
 /**
  * 市场宽度热力图组件
  * 功能：
- * - 使用行业 MA 市场宽度接口渲染热力图（日期 × 板块，值为宽度比例）
+ * - 使用板块 MA 市场宽度接口渲染热力图（日期 × 板块，值为宽度比例）
+ * - 支持行业板块与概念板块切换，并在点击热力图单元格后打开东财板块 K 线趋势弹窗
  * - 支持选择东方财富行业层级、固定最近20天结束日期与 MA 窗口
  * 参数：无
  * 返回值：无
  * 事件（Emits）：
  * - chartReady(chart): 图表初始化完成
- * - chartClick(payload): 图表点击事件，包含 { industry, date, value }
+ * - chartClick(payload): 图表点击事件，包含 { industry, sectorCode, date, value, idxType }
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import * as echarts from 'echarts'
+import { ElMessage } from 'element-plus'
 import HeatmapChart from '@/components/HeatmapChart.vue'
+import StockKLineChart from '@/components/StockKLineChart.vue'
 import {
   fetchIndustryMaBreadth,
+  type IndustryMaBreadthIdxType,
   type EastMoneyIndustryLevel,
   type IndustryMaBreadthItem
 } from '@/services/strategyBreadthApi'
+import { fetchDcDaily } from '@/services/dcDailyApi'
+import type { StockHistoryDataItem } from '@/services/stockHistoryApi'
 
-const emit = defineEmits<{ chartReady: [chart: echarts.ECharts]; chartClick: [payload: { industry: string; date: string; value: number }] }>()
+type TrendShortcut = '1y' | '3y' | '5y'
+
+const emit = defineEmits<{
+  chartReady: [chart: echarts.ECharts]
+  chartClick: [payload: { industry: string; sectorCode: string; date: string; value: number; idxType: IndustryMaBreadthIdxType }]
+}>()
 
 const FIXED_RANGE_DAYS = 20
 const loading = ref(false)
@@ -133,12 +225,27 @@ const endDate = ref<string>(formatDate(new Date()))
 const maWindow = ref<number>(20)
 const sortByLastColumn = ref(true)
 const maWindowOptions = [5, 10, 20, 30, 60, 90, 250]
+const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
   { label: '东财二级行业', value: '东财二级行业' },
   { label: '东财三级行业', value: '东财三级行业' }
 ]
 const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
+const trendDialogVisible = ref(false)
+const trendLoading = ref(false)
+const trendShortcut = ref<TrendShortcut>('1y')
+const trendData = ref<StockHistoryDataItem[]>([])
+const trendBoard = reactive({
+  code: '',
+  name: '',
+  idxType: '行业板块' as IndustryMaBreadthIdxType
+})
+const trendDateRange = reactive({
+  start: '',
+  end: ''
+})
+let trendRequestId = 0
 
 // 计算日期范围字符串（YYYY-MM-DD）
 function formatDate(d: Date): string {
@@ -165,7 +272,159 @@ function disableFutureDate(date: Date): boolean {
   return date.getTime() > Date.now()
 }
 
+function formatDateForApi(dateText: string): string {
+  return dateText.replace(/-/g, '')
+}
+
+function formatPercent(value: unknown): string {
+  const num = typeof value === 'number' ? value : parseFloat(String(value))
+  if (!Number.isFinite(num)) return '-'
+  const sign = num > 0 ? '+' : ''
+  return `${sign}${num.toFixed(2)}%`
+}
+
+function getNumericValue(value: unknown): number {
+  const num = typeof value === 'number' ? value : parseFloat(String(value))
+  return Number.isFinite(num) ? num : 0
+}
+
+function formatAmount(value: unknown): string {
+  const numericValue = getNumericValue(value)
+  if (!Number.isFinite(numericValue) || numericValue === 0) return '0'
+  if (numericValue >= 100000000) return `${(numericValue / 100000000).toFixed(2)}亿`
+  if (numericValue >= 10000) return `${(numericValue / 10000).toFixed(2)}万`
+  return numericValue.toFixed(2)
+}
+
+/**
+ * 工具：应用板块趋势快捷时间范围
+ * 功能：根据最近1年、3年、5年的快捷选项计算东财板块K线查询区间
+ * 参数：range(TrendShortcut) 快捷时间范围
+ * 返回值：无
+ * 事件：更新 trendDateRange
+ */
+const applyTrendShortcut = (range: TrendShortcut) => {
+  const yearMap: Record<TrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const end = new Date()
+  const start = new Date()
+  start.setFullYear(end.getFullYear() - yearMap[range])
+  trendDateRange.start = formatDate(start)
+  trendDateRange.end = formatDate(end)
+}
+
+/**
+ * 工具：加载东财板块趋势K线数据
+ * 功能：调用 /django/api/tasks/dc-daily/ 获取当前选中板块日线，并转换为K线组件需要的数据结构
+ * 参数：无
+ * 返回值：Promise<void>
+ * 事件：更新 trendData、trendLoading
+ */
+const loadTrendData = async () => {
+  const requestId = ++trendRequestId
+
+  if (!trendBoard.code || !trendDateRange.start || !trendDateRange.end) {
+    trendData.value = []
+    return
+  }
+
+  trendLoading.value = true
+  try {
+    const response = await fetchDcDaily({
+      ts_code: trendBoard.code,
+      idx_type: trendBoard.idxType,
+      start_date: formatDateForApi(trendDateRange.start),
+      end_date: formatDateForApi(trendDateRange.end),
+      fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate'
+    })
+
+    if (requestId !== trendRequestId) return
+
+    trendData.value = [...(response.records || [])]
+      .sort((a, b) => a.trade_date.localeCompare(b.trade_date))
+      .map((item) => ({
+        stock_code: item.ts_code,
+        stock_name: trendBoard.name,
+        date: item.trade_date,
+        open_price: getNumericValue(item.open),
+        close_price: getNumericValue(item.close),
+        high_price: getNumericValue(item.high),
+        low_price: getNumericValue(item.low),
+        change_percent: getNumericValue(item.pct_change),
+        change_amount: getNumericValue(item.change),
+        volume: getNumericValue(item.vol),
+        amount: getNumericValue(item.amount),
+        amplitude: getNumericValue(item.swing),
+        turnover_rate: getNumericValue(item.turnover_rate),
+        created_at: ''
+      }))
+  } catch (err) {
+    if (requestId !== trendRequestId) return
+    console.error('获取东财板块趋势K线失败:', err)
+    trendData.value = []
+    ElMessage.error('获取东财板块趋势K线失败，请稍后重试')
+  } finally {
+    if (requestId === trendRequestId) {
+      trendLoading.value = false
+    }
+  }
+}
+
+/**
+ * 事件：切换板块趋势快捷范围
+ * 功能：响应最近1年、3年、5年快捷范围切换并重新加载K线数据
+ * 参数：range(TrendShortcut) 快捷时间范围
+ * 返回值：无
+ * 事件：更新趋势查询区间并刷新图表
+ */
+const handleTrendShortcutChange = (range: TrendShortcut) => {
+  applyTrendShortcut(range)
+  loadTrendData()
+}
+
+/**
+ * 事件：打开板块趋势弹窗
+ * 功能：点击热力图行业/概念单元格时打开东财板块K线趋势弹窗
+ * 参数：
+ * - sectorCode(string): 板块代码
+ * - sectorName(string): 板块名称
+ * - idxType(IndustryMaBreadthIdxType): 板块类型
+ * 返回值：无
+ * 事件：更新趋势弹窗状态并触发日线请求
+ */
+const openTrendDialog = (sectorCode: string, sectorName: string, idxType: IndustryMaBreadthIdxType) => {
+  if (!sectorCode) {
+    ElMessage.warning('未找到该板块代码，暂时无法打开K线趋势图')
+    return
+  }
+  trendBoard.code = sectorCode
+  trendBoard.name = sectorName
+  trendBoard.idxType = idxType
+  trendShortcut.value = '1y'
+  trendData.value = []
+  applyTrendShortcut('1y')
+  trendDialogVisible.value = true
+  loadTrendData()
+}
+
 const rawData = ref<IndustryMaBreadthItem[]>([])
+
+const selectedBoardLabel = computed(() => {
+  return selectedIdxType.value === '行业板块'
+    ? selectedLevel.value
+    : '东财概念板块'
+})
+
+const latestTrendData = computed(() => {
+  return trendData.value.length > 0
+    ? trendData.value[trendData.value.length - 1]
+    : null
+})
+
+const trendEmptyText = computed(() => {
+  return trendBoard.code
+    ? '暂无该东财板块区间K线数据'
+    : '请选择板块查看趋势看板'
+})
 
 // 切换按最后一列排序的状态
 const toggleLastColumnSort = () => {
@@ -279,8 +538,8 @@ const fetchData = async () => {
       startDate: start,
       endDate: end,
       maWindow: maWindow.value,
-      idxType: '行业板块',
-      level: selectedLevel.value
+      idxType: selectedIdxType.value,
+      level: selectedIdxType.value === '行业板块' ? selectedLevel.value : undefined
     })
     rawData.value = data.data ?? []
   } catch (err) {
@@ -294,15 +553,27 @@ const handleParamsChange = () => {
   fetchData()
 }
 
+const handleIdxTypeChange = () => {
+  fetchData()
+}
+
 const onChartReady = (chart: echarts.ECharts) => emit('chartReady', chart)
 const onChartClick = (params: any) => {
   const [x, y, v] = (params?.data ?? []) as [number, number, number]
+  const date = typeof x === 'number' ? dates.value[x] : ''
+  const industry = typeof y === 'number' ? industries.value[y] : ''
+  const matchedRecord = rawData.value.find((item) => item.date === date && item.sector_name === industry)
   const payload = {
-    date: typeof x === 'number' ? dates.value[x] : '',
-    industry: typeof y === 'number' ? industries.value[y] : '',
-    value: typeof v === 'number' ? v : 0
+    date,
+    industry,
+    sectorCode: matchedRecord?.sector_code || '',
+    value: typeof v === 'number' ? v : 0,
+    idxType: selectedIdxType.value
   }
   emit('chartClick', payload)
+  if (payload.sectorCode && payload.industry) {
+    openTrendDialog(payload.sectorCode, payload.industry, payload.idxType)
+  }
 }
 
 onMounted(() => {
@@ -332,6 +603,53 @@ onMounted(() => {
   .control-label {
     color: #666;
   }
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.table-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trend-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trend-dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.trend-dialog-subtitle {
+  font-size: 13px;
+  color: #909399;
+}
+
+.trend-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trend-shortcuts {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.trend-preview-card {
+  min-height: 220px;
 }
 
 .chart-card {
