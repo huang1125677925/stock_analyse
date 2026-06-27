@@ -31,6 +31,26 @@ export interface IndexRpsData {
   query_time: string
 }
 
+export interface MajorIndexRpsItem {
+  ts_code: string
+  name: string
+  market: '国内' | '国际' | string
+  source: string
+  trade_date: string
+  pct_change: number | null
+  RPS_today: number | null
+  [key: `return_${number}`]: number | null
+  [key: `RPS_${number}`]: number | null
+}
+
+export interface MajorIndexRpsData {
+  total: number
+  data: MajorIndexRpsItem[]
+  periods: number[]
+  errors: string[]
+  query_time: string
+}
+
 export interface DcBoardMemberRpsItem {
   ts_code: string
   name: string
@@ -111,6 +131,33 @@ export async function getIndexRps(
     return response.data
   } catch (error) {
     console.error('获取实时指数RPS强度排名失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 获取国内+国际大盘指数 RPS 强度排名
+ * @param periods 时间周期，多个周期用逗号分隔
+ * @param tradeDate 截止交易日，格式 YYYYMMDD
+ * @returns Promise<MajorIndexRpsData>
+ */
+export async function getMajorIndexRps(
+  periods: string = '5,20,60,120,250',
+  tradeDate?: string
+): Promise<MajorIndexRpsData> {
+  try {
+    const response = await axios.get<MajorIndexRpsData>(
+      '/django/api/strategy/major-index-rps/',
+      {
+        params: {
+          periods,
+          ...(tradeDate ? { trade_date: tradeDate } : {})
+        }
+      }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取大盘指数RPS强度排名失败:', error)
     throw error
   }
 }

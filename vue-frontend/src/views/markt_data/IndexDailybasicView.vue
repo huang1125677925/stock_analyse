@@ -82,6 +82,21 @@
         <div :ref="el => setChartRef(dataset.value, el)" class="chart-container"></div>
       </el-card>
     </div>
+
+    <el-card class="related-page-card" shadow="hover">
+      <template #header>
+        <div class="header-content">
+          <span>相关页面</span>
+        </div>
+      </template>
+      <div class="related-page-content">
+        <div>
+          <div class="related-page-title">大盘指数RPS</div>
+          <div class="related-page-desc">查看国内与国际主要指数的多周期涨跌幅和 RPS 强度排名，辅助判断当前全球主要指数的相对强弱。</div>
+        </div>
+        <el-button type="primary" @click="router.push('/major-index-rps')">进入页面</el-button>
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -98,12 +113,14 @@
  * - loaded: 数据加载完成时触发，传递记录数
  */
 import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndexDailybasic, fetchMarketCombinedDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
 import * as echarts from 'echarts'
 
 // emits：对外发出 loaded 事件
 const emit = defineEmits<{ (e: 'loaded', count: number): void }>()
+const router = useRouter()
 
 // 加载状态
 const loading = ref(false)
@@ -470,4 +487,11 @@ onUnmounted(() => {
 .chart-container { width: 100%; height: 420px; }
 .range-buttons { margin-left: 8px; }
 .range-text { margin-left: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
+.related-page-card { margin-top: 20px; }
+.related-page-content { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.related-page-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.related-page-desc { color: var(--el-text-color-secondary); line-height: 1.6; }
+@media (max-width: 768px) {
+  .related-page-content { flex-direction: column; align-items: flex-start; }
+}
 </style>

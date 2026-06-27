@@ -1,5 +1,50 @@
 # 股票策略API文档
 
+## 价值股选取策略API
+
+### 获取价值股候选列表
+
+**接口地址**: `/django/api/strategy/value-stocks/`
+
+**请求方式**: GET
+
+**数据来源**: Tushare `income_vip` + `fina_indicator_vip`
+
+**请求参数**:
+
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+| ----- | --- | ---- | ----- | ---- |
+| report_period | string | 否 | 自动查找 | 财报期，格式 `YYYYMMDD`，如 `20240331` |
+| min_revenue_growth | number | 否 | 0 | 最低营收同比增长率，单位 `%` |
+| min_net_profit | number | 否 | 0 | 最低净利润，单位元 |
+| limit | integer | 否 | 50 | 返回数量，最大 2000 |
+| lookback_periods | integer | 否 | 8 | 未指定财报期时向前查找的季度数，最大 16 |
+
+**响应字段摘要**:
+
+- `report_period`: 实际使用的财报期
+- `data[].total_revenue`: 营业总收入
+- `data[].net_profit`: 归母净利润优先，缺失时使用净利润
+- `data[].revenue_growth_rate`: 营收同比增长率，优先使用 `or_yoy`，缺失时使用 `q_sales_yoy`
+- `data[].net_profit_growth_rate`: 净利润同比增长率
+- `data[].roe`: ROE
+- `data[].gross_profit_margin`: 毛利率
+
+### 获取候选股票营收历史
+
+**接口地址**: `/django/api/strategy/value-stocks/revenue-history/`
+
+**请求方式**: GET
+
+**请求参数**:
+
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+| ----- | --- | ---- | ----- | ---- |
+| ts_codes | string | 是 | - | Tushare 股票代码，多个用逗号分隔，如 `600519.SH,000333.SZ` |
+| periods | integer | 否 | 8 | 返回最近财报期数量，最大 16 |
+
+**说明**: 该接口用于给前端绘制高营收增长股票的过去一段时间营收走势，返回每个股票各财报期的 `total_revenue` 和 `net_profit`。
+
 ## 指数RPS强度排名API
 
 ### 获取实时指数RPS强度排名
@@ -12,7 +57,7 @@
 
 | 参数名 | 类型 | 必填 | 默认值 | 说明 |
 | ----- | --- | ---- | ----- | ---- |
-| periods | string | 否 | "5,20,60" | 时间周期，多个周期用逗号分隔 |
+| periods | string | 否 | "5,20,60" | 回看交易日周期，多个周期用逗号分隔，如 `5,20,60,120,250` |
 | save | boolean | 否 | false | 是否保存到数据库 |
 
 **响应示例**:
@@ -44,6 +89,67 @@
   }
 }
 ```
+
+### 获取东财板块成分股RPS排名
+
+**接口地址**: `/django/api/strategy/dc-board-member-rps/`
+
+**请求方式**: GET
+
+**数据来源**: Tushare `dc_member` + `dc_index` + `daily`
+
+**请求参数**:
+
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+| ----- | --- | ---- | ----- | ---- |
+| `ts_code` | string | 否 | `BK1462.DC` | 东财板块代码 |
+| `periods` | string | 否 | `5,20,60` | 回看交易日周期，多个周期用逗号分隔 |
+| `trade_date` | string | 否 | 最新交易日 | 截止交易日，格式 `YYYYMMDD` |
+| `token` | string | 否 | 环境变量 | Tushare Token，传入时覆盖环境变量 |
+
+**响应字段摘要**:
+
+- `board_ts_code`: 本次查询的东财板块代码
+- `board_name`: 板块名称
+- `member_count`: 板块成分股数量
+- `data[].ts_code`: 成分股 Tushare 代码
+- `data[].name`: 成分股名称
+- `data[].pct_change`: 截止交易日当天涨跌幅
+- `data[].RPS_today`: 按当天涨跌幅计算的横向 RPS
+- `data[].return_{period}`: 对应周期区间收益率
+- `data[].RPS_{period}`: 对应周期区间收益率的 RPS
+
+**详细文档**:
+
+- 参见 `docs/dc_board_member_rps_api.md`
+
+### 获取国内+国际大盘指数RPS排名
+
+**接口地址**: `/django/api/strategy/major-index-rps/`
+
+**请求方式**: GET
+
+**数据来源**: Tushare `index_daily` + `index_global`
+
+**请求参数**:
+
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+| ----- | --- | ---- | ----- | ---- |
+| `periods` | string | 否 | `5,20,60,120,250` | 回看交易日周期，多个周期用逗号分隔 |
+| `trade_date` | string | 否 | 当前日期 | 目标截止日期，格式 `YYYYMMDD` |
+| `token` | string | 否 | 环境变量 | Tushare Token，传入时覆盖环境变量 |
+
+**响应字段摘要**:
+
+- `data[].ts_code`: 指数代码
+- `data[].name`: 指数名称
+- `data[].market`: 市场类型，`国内` 或 `国际`
+- `data[].source`: 行情来源，`index_daily` 或 `index_global`
+- `data[].trade_date`: 该指数截至目标日期最近可用的交易日
+- `data[].pct_change`: 该指数最近可用交易日的当日涨跌幅
+- `data[].RPS_today`: 按当天涨跌幅计算的横向 RPS
+- `data[].return_{period}`: 该指数按自身交易序列回看 `period` 根K线的区间收益率
+- `data[].RPS_{period}`: 对应周期区间收益率的 RPS
 
 ### 获取历史RPS数据
 
@@ -88,9 +194,10 @@
 ## 使用说明
 
 1. 获取指数RPS强度排名数据时，可以通过`periods`参数指定需要计算的时间周期，多个周期用逗号分隔。
-2. 如果需要保存数据到数据库，可以设置`save=true`参数。
-3. 查询历史RPS数据时，可以通过`period`参数指定需要查询的时间周期。
-4. 历史数据支持分页查询，可以通过`limit`和`offset`参数进行控制。
+2. `periods` 按交易日计算，例如 `120`、`250` 分别表示回看 120 个、250 个交易日，而不是自然日。
+3. 如果需要保存数据到数据库，可以设置`save=true`参数。
+4. 查询历史RPS数据时，可以通过`period`参数指定需要查询的时间周期。
+5. 历史数据支持分页查询，可以通过`limit`和`offset`参数进行控制。
 
 ## 数据说明
 
@@ -115,7 +222,8 @@
 | start_date | string | 否 | - | 开始日期，格式YYYY-MM-DD，默认过去90天 |
 | end_date | string | 否 | - | 结束日期，格式YYYY-MM-DD，默认当天 |
 | ma_window | integer | 否 | 20 | 移动平均窗口大小（交易日），建议≥2 |
-| sector_codes | string | 否 | - | 行业板块代码列表，逗号分隔；为空则计算所有板块 |
+| idx_type | string | 否 | 行业板块 | 东方财富板块类型，支持：行业板块、概念板块、地域板块 |
+| level | string | 否 | - | 东财行业层级，仅`idx_type=行业板块`时生效，支持：东财一级行业、东财二级行业、东财三级行业 |
 
 **响应示例**:
 
@@ -128,92 +236,39 @@
     "total": 2,
     "data": [
       {
-        "date": "2024-05-17",
-        "sector_code": "BK001",
-        "sector_name": "电子信息",
+        "date": "2026-06-26",
+        "sector_code": "BK0420.DC",
+        "sector_name": "消费电子",
         "count_above_ma": 56,
         "eligible_count": 100,
         "breadth_ratio": 0.56
       },
       {
-        "date": "2024-05-18",
-        "sector_code": "BK001",
-        "sector_name": "电子信息",
+        "date": "2026-06-26",
+        "sector_code": "BK0475.DC",
+        "sector_name": "半导体",
         "count_above_ma": 60,
         "eligible_count": 102,
         "breadth_ratio": 0.5882
       }
     ],
-    "start_date": "2024-05-10",
-    "end_date": "2024-05-18",
+    "start_date": "2026-06-01",
+    "end_date": "2026-06-27",
     "ma_window": 20,
-    "sector_codes": ["BK001"],
-    "query_time": "2024-05-20T12:00:00"
+    "idx_type": "行业板块",
+    "level": "东财一级行业",
+    "query_time": "2026-06-27T12:00:00"
   }
 }
 ```
 
-**字段含义说明（patterns项）**:
+**字段说明**:
 - date: 交易日期，格式 YYYY-MM-DD。
-- hammer（TA-Lib: CDLHAMMER）: 锤子线，常见于下跌末期的看涨反转形态；信号取值：100=识别到锤子线，0=无信号。
-- morning_star（TA-Lib: CDLMORNINGSTAR）: 早晨之星，三根K线构成的看涨反转形态；信号取值：100=识别到，0=无信号。
-- piercing（TA-Lib: CDLPIERCING）: 刺透形态，两根K线构成的看涨反转；信号取值：100=识别到，0=无信号。
-- kicking（TA-Lib: CDLKICKING）: 踢击形态，由两根跳空实体K线构成；信号取值：100=看涨踢击，-100=看跌踢击，0=无信号。
-- inverted_hammer（TA-Lib: CDLINVERTEDHAMMER）: 倒锤头，常见于下跌末期的看涨反转提示；信号取值：100=识别到，0=无信号。
-- engulfing（TA-Lib: CDLENGULFING）: 吞没形态，两根K线构成；信号取值：100=看涨吞没，-100=看跌吞没，0=无信号。
-- harami（TA-Lib: CDLHARAMI）: 孕线，两根K线构成；信号取值：100=看涨孕线，-100=看跌孕线，0=无信号。
-- hanging_man（TA-Lib: CDLHANGINGMAN）: 上吊线，常见于上涨末期的看跌反转提示；信号取值：-100=识别到，0=无信号。
-- evening_star（TA-Lib: CDLEVENINGSTAR）: 黄昏之星，三根K线构成的看跌反转形态；信号取值：-100=识别到，0=无信号。
-- dark_cloud_cover（TA-Lib: CDLDARKCLOUDCOVER）: 乌云盖顶，两根K线构成的看跌反转；信号取值：-100=识别到，0=无信号。
-- three_black_crows（TA-Lib: CDL3BLACKCROWS）: 三只黑乌鸦，连续三根阴线的看跌延续/反转信号；信号取值：-100=识别到，0=无信号。
-- identical_three_crows（TA-Lib: CDLIDENTICAL3CROWS）: 同样三乌鸦，三根近似实体的阴线；信号取值：-100=识别到，0=无信号。
-- doji（TA-Lib: CDLDOJI）: 十字星，开收盘几乎相等的中性形态；信号取值：100=识别到，0=无信号。
-- long_legged_doji（TA-Lib: CDLLONGLEGGEDDOJI）: 长脚十字星，影线很长、实体极小的十字星；信号取值：100=识别到，0=无信号。
-- gravestone_doji（TA-Lib: CDLGRAVESTONEDOJI）: 墓碑十字星，上影线长、下影线短或无的十字星；信号取值：100=识别到，0=无信号。
-- two_crows（TA-Lib: CDL2CROWS）: 两只乌鸦，连续两根阴线的看跌延续/反转；信号取值：-100=识别到，0=无信号。
-- three_inside（TA-Lib: CDL3INSIDE）: 三内部上涨/下跌，孕线组合的延续/反转形态；信号取值：±100，0=无信号。
-- three_line_strike（TA-Lib: CDL3LINESTRIKE）: 三线打击，三根同向K线后出现反向强实体；信号取值：±100，0=无信号。
-- three_outside（TA-Lib: CDL3OUTSIDE）: 三外部上涨/下跌，孕线的外部扩展；信号取值：±100，0=无信号。
-- three_stars_in_south（TA-Lib: CDL3STARSINSOUTH）: 南方三星，低位三根星线形态；信号取值：±100，0=无信号。
-- three_white_soldiers（TA-Lib: CDL3WHITESOLDIERS）: 三个白兵，连续三根阳线的看涨延续；信号取值：100=识别到，0=无信号。
-- abandoned_baby（TA-Lib: CDLABANDONEDBABY）: 弃婴，跳空的三烛线反转形态；信号取值：±100，0=无信号。
-- advance_block（TA-Lib: CDLADVANCEBLOCK）: 大敌当前，多头推进但力度衰减的形态；信号取值：-100=识别到，0=无信号。
-- belt_hold（TA-Lib: CDLBELTHOLD）: 捉腰带线，开盘即为实体端的长实体；信号取值：±100，0=无信号。
-- breakaway（TA-Lib: CDLBREAKAWAY）: 脱离形态，五根K线的趋势脱离；信号取值：±100，0=无信号。
-- closing_marubozu（TA-Lib: CDLCLOSINGMARUBOZU）: 收盘秃线，收盘在极端的秃线；信号取值：±100，0=无信号。
-- conceal_baby_swallow（TA-Lib: CDLCONCEALBABYSWALL）: 藏婴吞没，影线与实体组合的吞没；信号取值：-100=识别到，0=无信号。
-- counterattack（TA-Lib: CDLCOUNTERATTACK）: 反击线，收盘价相同的对立实体；信号取值：±100，0=无信号。
-- doji_star（TA-Lib: CDLDOJISTAR）: 十字星形态，星位的十字线；信号取值：±100，0=无信号。
-- dragonfly_doji（TA-Lib: CDLDRAGONFLYDOJI）: 蜻蜓十字，下影线很长的十字；信号取值：100=识别到，0=无信号。
-- evening_doji_star（TA-Lib: CDLEVENINGDOJISTAR）: 十字暮星，三烛线看跌反转；信号取值：-100=识别到，0=无信号。
-- gap_side_by_side_white（TA-Lib: CDLGAPSIDESIDEWHITE）: 并列阳线，上/下跳空并列阳线；信号取值：±100，0=无信号。
-- homing_pigeon（TA-Lib: CDLHOMINGPIGEON）: 家鸽，小实体包裹的看涨组合；信号取值：100=识别到，0=无信号。
-- in_neck（TA-Lib: CDLINNECK）: 颈内线，阴线后次日收盘接近前日最低；信号取值：-100=识别到，0=无信号。
-- kicking_by_length（TA-Lib: CDLKICKINGBYLENGTH）: 由较长秃线决定的反冲；信号取值：±100，0=无信号。
-- ladder_bottom（TA-Lib: CDLLADDERBOTTOM）: 梯底，低位多头反攻形态；信号取值：100=识别到，0=无信号。
-- long_line（TA-Lib: CDLLONGLINE）: 长线，极长实体的K线；信号取值：±100，0=无信号。
-- marubozu（TA-Lib: CDLMARUBOZU）: 秃线/缺影线，实体无影线；信号取值：±100，0=无信号。
-- matching_low（TA-Lib: CDLMATCHINGLOW）: 相同低价，连续两根最低价相同的看涨形态；信号取值：100=识别到，0=无信号。
-- mat_hold（TA-Lib: CDLMATHOLD）: 垫脚石，五根K线的看涨延续形态；信号取值：100=识别到，0=无信号。
-- morning_doji_star（TA-Lib: CDLMORNINGDOJISTAR）: 十字晨星，三烛线看涨反转；信号取值：100=识别到，0=无信号。
-- on_neck（TA-Lib: CDLONNECK）: 颈上线，阴线后次日收盘与前日最低相同；信号取值：-100=识别到，0=无信号。
-- rickshaw_man（TA-Lib: CDLRICKSHAWMAN）: 黄包车夫，带长影线的十字；信号取值：100=识别到，0=无信号。
-- rise_fall_three_methods（TA-Lib: CDLRISEFALL3METHODS）: 上升/下降三法，中继形态；信号取值：±100，0=无信号。
-- separating_lines（TA-Lib: CDLSEPARATINGLINES）: 分离线，趋势延续形态；信号取值：±100，0=无信号。
-- shooting_star（TA-Lib: CDLSHOOTINGSTAR）: 射击之星，高位看跌反转；信号取值：-100=识别到，0=无信号。
-- short_line（TA-Lib: CDLSHORTLINE）: 短线，极短实体的K线；信号取值：±100，0=无信号。
-- spinning_top（TA-Lib: CDLSPINNINGTOP）: 纺锤线，小实体上下影线均较长；信号取值：±100，0=无信号。
-- stalled_pattern（TA-Lib: CDLSTALLEDPATTERN）: 停顿形态，上涨趋势中的停顿；信号取值：-100=识别到，0=无信号。
-- stick_sandwich（TA-Lib: CDLSTICKSANDWICH）: 条形三明治，三根K线构成的看涨反转；信号取值：100=识别到，0=无信号。
-- takuri（TA-Lib: CDLTAKURI）: 探水杆，极长下影线的反转提示；信号取值：100=识别到，0=无信号。
-- tasuki_gap（TA-Lib: CDLTASUKIGAP）: 跳空并列线，跳空后的并列线；信号取值：±100，0=无信号。
-- thrusting（TA-Lib: CDLTHRUSTING）: 插入形态，下跌中的弱反弹；信号取值：-100=识别到，0=无信号。
-- tristar（TA-Lib: CDLTRISTAR）: 三星，三根十字线的反转形态；信号取值：±100，0=无信号。
-- unique_three_river（TA-Lib: CDLUNIQUE3RIVER）: 独特三河，低位三烛线形态；信号取值：100=识别到，0=无信号。
-- upside_gap_two_crows（TA-Lib: CDLUPSIDEGAP2CROWS）: 向上跳空两只乌鸦，看跌延续/反转；信号取值：-100=识别到，0=无信号。
-- xside_gap_three_methods（TA-Lib: CDLXSIDEGAP3METHODS）: 向上/向下跳空三法，中继形态；信号取值：±100，0=无信号。
-
-> 通用说明：TA-Lib CDL 系列的信号取值统一为 +100（看涨）、-100（看跌）、0（无信号）。部分形态仅有正向或负向信号（如 CDLHAMMER 仅有 +100，CDLDARKCLOUDCOVER 仅有 -100）。
+- sector_code: 东方财富板块代码。
+- sector_name: 东方财富板块名称。
+- count_above_ma: 当日板块内收盘价高于 MA_N 的股票数量。
+- eligible_count: 当日有有效 MA_N 值、可参与统计的股票数量。
+- breadth_ratio: `count_above_ma / eligible_count`，范围 `[0,1]`，保留 4 位小数。
 
 **错误响应示例**:
 
@@ -227,7 +282,8 @@
 
 **说明**:
 - 宽度定义为“收盘价高于MA_N”的股票在行业内的占比，breadth_ratio范围为[0,1]，结果四舍五入到4位小数。
-- 行业与个股映射通过 IndividualStock.industry 与 IndustrySector.name 对应，仅使用数据库数据。
+- 当前实现优先使用本地快照文件 `data/dc_board_members_snapshot.json` 提供板块与成分映射，查询阶段主要依赖 Tushare `stk_factor_pro`。
+- 当本地快照缺失时，才会回退为 Tushare 在线模式：`trade_cal`、`dc_index`、`dc_member`、`stk_factor_pro`。
 - 接口返回统一使用 success_response/error_response 封装。
 
 ---
@@ -522,7 +578,7 @@
 
 ## 个股K线形态识别API
 
-### 分析指定股票的K线形态（TA-Lib）
+### 分析指定股票或ETF的K线形态（TA-Lib）
 
 **接口地址**: `/django/api/strategy/individual-analysis/candlestick/<stock_code>/`
 
@@ -532,7 +588,8 @@
 
 | 参数名 | 类型 | 必填 | 默认值 | 说明 |
 | ----- | --- | ---- | ----- | ---- |
-| stock_code | string | 是 | - | 股票代码，路径参数 |
+| stock_code | string | 是 | - | 股票代码或ETF代码，路径参数。ETF支持 `510300.SH`，也兼容不带后缀的 `510300` |
+| type | string | 否 | - | 标的类型，支持 `stock` 或 `etf`。不传时先按股票查，查不到再按ETF查 |
 | start_date | string | 否 | - | 开始日期，格式YYYY-MM-DD |
 | end_date | string | 否 | - | 结束日期，格式YYYY-MM-DD |
 
@@ -546,6 +603,7 @@
   "data": {
     "stock_code": "600519",
     "stock_name": "贵州茅台",
+    "target_type": "stock",
     "total": 3,
     "patterns": [
       {
@@ -594,7 +652,7 @@
 ```json
 {
   "code": 404,
-  "message": "股票代码不存在: 000000",
+  "message": "股票或ETF代码不存在/无日频数据: 000000",
   "timestamp": "2024-10-26T12:00:00"
 }
 ```
@@ -609,7 +667,9 @@
 
 **说明**:
 - 识别形态使用 TA-Lib 的 CDL 系列函数，信号值定义：+100 看涨，-100 看跌，0 无信号。
-- 仅从数据库获取数据（IndividualStock、IndividualStockDaily），不进行外部数据拉取。
+- `type=stock` 时只查询股票数据；`type=etf` 时只查询ETF数据；不传 `type` 时保持自动识别。
+- 仅从数据库获取数据，不进行外部数据拉取。股票读取 IndividualStock、IndividualStockDaily；ETF读取 EtfBasic、EtfDaily。
+- ETF 输入优先按完整 ts_code 匹配；如果路径只传6位代码，会依次尝试 `.SH`、`.SZ` 后缀。
 - 输入数据按“日期”升序排列并转换为 numpy 数组后传入 TA-Lib。
 - 返回统一使用 success_response/error_response 封装；日期格式为 YYYY-MM-DD。
 
@@ -966,3 +1026,11 @@
 - `indicators` 为字典，键为指标名（如 `MACD`、`RSI`），值为该指标对应的逐日结果列表；具体字段取决于对应 TA-Lib 函数输出。
 - 当某些指标因参数不足或计算异常被跳过时，会在 `skipped` 中记录 `{ indicator, reason }`，其余指标照常返回。
 - 仅从数据库获取数据（`IndividualStock`、`IndividualStockDaily`），不进行外部数据拉取。
+
+---
+
+## 涨停打板组合数据接口
+
+新增的涨停情绪、竞价候选、题材梯队、炸板回封、游资复盘接口已拆分为独立文档，详见：
+
+- [`docs/limit_board_strategy_api.md`](./limit_board_strategy_api.md)
