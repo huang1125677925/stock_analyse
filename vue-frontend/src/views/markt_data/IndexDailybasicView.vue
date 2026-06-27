@@ -18,21 +18,19 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="日期范围">
+          <el-form-item label="截止日期">
             <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
+              v-model="endDate"
+              type="date"
+              placeholder="请选择截止日期"
               value-format="YYYYMMDD"
-              :shortcuts="dateShortcuts"
             />
             <el-button-group class="range-buttons">
               <el-button @click="setYearRange(1)">最近一年</el-button>
               <el-button @click="setYearRange(3)">最近三年</el-button>
               <el-button @click="setYearRange(5)">最近五年</el-button>
             </el-button-group>
+            <span class="range-text">当前范围：{{ dateRangeText }}</span>
           </el-form-item>
         </el-form>
       </div>
@@ -137,52 +135,18 @@ const metricOptions = [
   { label: '换手率(自由流通)', value: 'turnover_rate_f' },
 ]
 
-// 日期快捷选项
-const dateShortcuts = [
-  {
-    text: '最近一年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 1)
-      return [start, end]
-    },
-  },
-  {
-    text: '最近三年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 3)
-      return [start, end]
-    },
-  },
-  {
-    text: '最近五年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 5)
-      return [start, end]
-    },
-  },
-  {
-    text: '最近十年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 10)
-      return [start, end]
-    },
-  },
-]
-
 // 当前选中的指标
 const selectedMetric = ref('pe')
 const metricLabel = computed(() => metricOptions.find(opt => opt.value === selectedMetric.value)?.label || selectedMetric.value)
 
-// 日期范围：默认最近365天 (展示趋势通常需要较长时间跨度)
-const dateRange = ref<[string, string]>()
+// 查询时间范围：以截止日期为基准，向前回溯指定年数
+const endDate = ref<string>('')
+const lookbackYears = ref<number>(1)
+const dateRange = computed<[string, string]>(() => buildYearDateRange(lookbackYears.value, endDate.value))
+const dateRangeText = computed(() => {
+  const [startDate, finalDate] = dateRange.value
+  return `${formatDisplayDate(startDate)} 至 ${formatDisplayDate(finalDate)}`
+})
 
 // 数据
 const totalCount = ref<number>(0)
@@ -287,20 +251,41 @@ function getValuationStatus(values: number[]): IndexValuationStatus | null {
 function buildDefaultDateRange(days = 365): [string, string] {
   const end = new Date()
   const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-  const fmt = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-  return [fmt(start), fmt(end)]
+  return [formatDateValue(start), formatDateValue(end)]
 }
 
-function buildYearDateRange(years: number): [string, string] {
-  const end = new Date()
-  const start = new Date()
-  start.setFullYear(end.getFullYear() - years)
-  const fmt = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-  return [fmt(start), fmt(end)]
+function formatDateValue(date: Date): string {
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`
+}
+
+function parseDateValue(value?: string): Date {
+  if (!value || value.length !== 8) {
+    return new Date()
+  }
+
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(4, 6)) - 1
+  const day = Number(value.slice(6, 8))
+  return new Date(year, month, day)
+}
+
+function formatDisplayDate(value: string): string {
+  if (!value || value.length !== 8) {
+    return '--'
+  }
+
+  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
+}
+
+function buildYearDateRange(years: number, endDateValue?: string): [string, string] {
+  const end = parseDateValue(endDateValue)
+  const start = new Date(end)
+  start.setFullYear(start.getFullYear() - years)
+  return [formatDateValue(start), formatDateValue(end)]
 }
 
 function setYearRange(years: number) {
-  dateRange.value = buildYearDateRange(years)
+  lookbackYears.value = years
 }
 
 function formatMetricValue(value: number | null): string {
@@ -323,11 +308,11 @@ async function fetchData() {
     loading.value = true
     chartInstances.forEach(chart => chart.showLoading())
     
-    const [startDate, endDate] = dateRange.value || buildDefaultDateRange()
+    const [startDate, endDateValue] = dateRange.value
     const loaded = await Promise.all(indexOptions.map(async option => {
       const res = option.value === 'all_market'
-        ? await fetchMarketCombinedDailybasic({ startDate, endDate })
-        : await fetchIndexDailybasic({ tsCode: option.value, startDate, endDate })
+        ? await fetchMarketCombinedDailybasic({ startDate, endDate: endDateValue })
+        : await fetchIndexDailybasic({ tsCode: option.value, startDate, endDate: endDateValue })
 
       const records = (res.records || []).sort((a, b) => {
         const dateA = String(a.trade_date || '')
@@ -454,13 +439,14 @@ function handleResize() {
   chartInstances.forEach(chart => chart.resize())
 }
 
-// 监听日期范围变化，自动刷新数据
-watch(dateRange, () => {
+// 监听截止日期与回溯年限变化，自动刷新数据
+watch([endDate, lookbackYears], () => {
   fetchData()
 })
 
 onMounted(() => {
-  dateRange.value = buildDefaultDateRange()
+  const [, defaultEndDate] = buildDefaultDateRange()
+  endDate.value = defaultEndDate
   window.addEventListener('resize', handleResize)
   fetchData()
 })
@@ -483,4 +469,5 @@ onUnmounted(() => {
 .index-card { width: 100%; min-width: 0; }
 .chart-container { width: 100%; height: 420px; }
 .range-buttons { margin-left: 8px; }
+.range-text { margin-left: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
 </style>
