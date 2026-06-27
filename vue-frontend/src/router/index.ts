@@ -151,7 +151,7 @@ const router = createRouter({
           path: '/analysis/congestion/breadth',
           name: 'congestion-breadth',
           component: () => import('@/views/industry-stock-data/CongestionBreadthView.vue'),
-          meta: { title: '行业宽度分析' }
+          meta: { title: '市场宽度分析' }
         },
         {
           path: '/analysis/congestion/scale-breadth',

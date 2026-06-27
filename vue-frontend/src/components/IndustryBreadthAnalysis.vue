@@ -3,11 +3,35 @@
     <el-card class="control-card" shadow="hover">
       <div class="controls">
         <div class="control-group">
+          <span class="control-label">行业层级：</span>
+          <el-select
+            v-model="selectedLevel"
+            placeholder="选择行业层级"
+            :disabled="loading"
+            @change="handleParamsChange"
+            style="width: 160px"
+          >
+            <el-option
+              v-for="option in levelOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </div>
+        <div class="control-group">
           <span class="control-label">时间范围：</span>
-          <el-select v-model="recentDays" placeholder="选择最近天数" :disabled="loading" @change="handleParamsChange" style="width: 160px">
+          <el-select
+            v-model="recentDays"
+            placeholder="选择最近天数"
+            :disabled="loading"
+            @change="handleParamsChange"
+            style="width: 160px"
+          >
             <el-option :label="'最近20天'" :value="20" />
             <el-option :label="'最近30天'" :value="30" />
-            <el-option :label="'最近40天'" :value="40" />
+            <el-option :label="'最近60天'" :value="60" />
+            <el-option :label="'最近90天'" :value="90" />
           </el-select>
         </div>
         <div class="control-group">
@@ -33,17 +57,17 @@
     <el-card class="chart-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span>行业宽度热力图（MA {{ maWindow }}）</span>
+          <span>市场宽度热力图（{{ selectedLevel }} / MA {{ maWindow }}）</span>
           <span class="tips">数据来源：行业MA宽度接口</span>
         </div>
       </template>
 
       <div class="methodology">
         <p>
-          统计口径：基于申万一级行业分类及行业成分股映射，将股票归入对应行业后，按交易日统计各行业内部走势强弱。
+          统计口径：基于东方财富行业板块成分，按照所选行业层级汇总各板块中收盘价高于 MA{{ maWindow }} 的股票占比。
         </p>
         <p>
-          计算方式：行业宽度 = 收盘价高于 MA{{ maWindow }} 的股票数 / 行业内可统计股票总数。数值越高，表示该行业内站上均线的股票占比越高，整体走势越强。
+          计算方式：市场宽度 = count_above_ma / eligible_count。数值越高，表示该行业板块内站上均线的股票占比越高，整体走势越强。
         </p>
       </div>
 
@@ -61,11 +85,11 @@
 
 <script setup lang="ts">
 /**
- * 行业宽度热力图组件
+ * 市场宽度热力图组件
  * 功能：
- * - 使用行业MA宽度数据渲染热力图（日期 × 行业，值为宽度比例）
- * - 支持选择时间范围与MA窗口
- * 
+ * - 使用行业 MA 市场宽度接口渲染热力图（日期 × 板块，值为宽度比例）
+ * - 支持选择东方财富行业层级、最近查询范围与 MA 窗口
+ * 参数：无
  * 返回值：无
  * 事件（Emits）：
  * - chartReady(chart): 图表初始化完成
@@ -74,7 +98,11 @@
 import { ref, computed, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import HeatmapChart from '@/components/HeatmapChart.vue'
-import { fetchIndustryMaBreadth, type IndustryMaBreadthItem } from '@/services/strategyBreadthApi'
+import {
+  fetchIndustryMaBreadth,
+  type EastMoneyIndustryLevel,
+  type IndustryMaBreadthItem
+} from '@/services/strategyBreadthApi'
 
 const emit = defineEmits<{ chartReady: [chart: echarts.ECharts]; chartClick: [payload: { industry: string; date: string; value: number }] }>()
 
@@ -82,6 +110,12 @@ const loading = ref(false)
 const recentDays = ref<number>(20)
 const maWindow = ref<number>(20)
 const sortByLastColumn = ref(true)
+const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
+  { label: '东财一级行业', value: '东财一级行业' },
+  { label: '东财二级行业', value: '东财二级行业' },
+  { label: '东财三级行业', value: '东财三级行业' }
+]
+const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
 
 // 计算日期范围字符串（YYYY-MM-DD）
 function formatDate(d: Date): string {
@@ -208,7 +242,13 @@ const fetchData = async () => {
   loading.value = true
   try {
     const [start, end] = computeDateRangeByRecentDays(recentDays.value)
-    const data = await fetchIndustryMaBreadth(start, end, maWindow.value)
+    const data = await fetchIndustryMaBreadth({
+      startDate: start,
+      endDate: end,
+      maWindow: maWindow.value,
+      idxType: '行业板块',
+      level: selectedLevel.value
+    })
     rawData.value = data.data ?? []
   } catch (err) {
     console.error('获取行业MA宽度数据失败:', err)

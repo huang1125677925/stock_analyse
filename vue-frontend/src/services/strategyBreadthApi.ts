@@ -53,6 +53,16 @@ export interface IndustryMaBreadthItem {
 }
 
 /**
+ * 行业MA宽度板块类型
+ */
+export type IndustryMaBreadthIdxType = '行业板块' | '概念板块' | '地域板块'
+
+/**
+ * 东方财富行业层级
+ */
+export type EastMoneyIndustryLevel = '东财一级行业' | '东财二级行业' | '东财三级行业'
+
+/**
  * 行业MA宽度响应数据
  */
 export interface IndustryMaBreadthData {
@@ -61,29 +71,36 @@ export interface IndustryMaBreadthData {
   start_date: string
   end_date: string
   ma_window: number
-  sector_codes: string[]
+  idx_type: IndustryMaBreadthIdxType
+  level?: EastMoneyIndustryLevel
   query_time: string
 }
 
 /**
+ * 行业MA宽度查询参数
+ */
+export interface IndustryMaBreadthQuery {
+  startDate?: string
+  endDate?: string
+  maWindow?: number
+  idxType?: IndustryMaBreadthIdxType
+  level?: EastMoneyIndustryLevel
+}
+
+/**
  * 获取行业MA宽度数据
- * @param startDate 开始日期 YYYY-MM-DD，可选
- * @param endDate 结束日期 YYYY-MM-DD，可选
- * @param maWindow 移动平均窗口，默认20
- * @param sectorCodes 行业板块代码列表，可选
+ * @param query 查询参数，支持日期范围、均线窗口、板块类型与行业层级
  * @returns IndustryMaBreadthData
  */
 export async function fetchIndustryMaBreadth(
-  startDate?: string,
-  endDate?: string,
-  maWindow: number = 20,
-  sectorCodes?: string[]
+  query: IndustryMaBreadthQuery = {}
 ): Promise<IndustryMaBreadthData> {
   const params: Record<string, any> = {}
-  if (startDate) params.start_date = startDate
-  if (endDate) params.end_date = endDate
-  if (maWindow) params.ma_window = maWindow
-  if (sectorCodes && sectorCodes.length > 0) params.sector_codes = sectorCodes.join(',')
+  if (query.startDate) params.start_date = query.startDate
+  if (query.endDate) params.end_date = query.endDate
+  params.ma_window = query.maWindow ?? 20
+  params.idx_type = query.idxType ?? '行业板块'
+  if (query.level) params.level = query.level
 
   const res = await axios.get<
     ApiResponse<IndustryMaBreadthData> | IndustryMaBreadthData,
