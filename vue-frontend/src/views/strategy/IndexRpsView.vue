@@ -72,6 +72,34 @@
                 清空强度筛选
               </el-button>
             </div>
+            <div class="rps-filter-panel">
+              <div
+                v-for="filterGroup in changeFilterGroups"
+                :key="filterGroup.field"
+                class="rps-filter-group"
+              >
+                <span class="rps-filter-label">{{ filterGroup.label }}</span>
+                <div class="rps-filter-tags">
+                  <el-check-tag
+                    v-for="tag in changeDirectionOptions"
+                    :key="`${filterGroup.field}-${tag}`"
+                    :checked="selectedChangeDirections[filterGroup.field].includes(tag)"
+                    @change="toggleChangeDirection(filterGroup.field, tag)"
+                  >
+                    {{ tag }}
+                  </el-check-tag>
+                </div>
+              </div>
+              <el-button
+                v-if="hasActiveChangeFilter"
+                link
+                type="primary"
+                class="rps-filter-reset"
+                @click="resetChangeFilters"
+              >
+                清空涨跌幅筛选
+              </el-button>
+            </div>
           </div>
         </template>
 
@@ -326,6 +354,34 @@
                 清空强度筛选
               </el-button>
             </div>
+            <div class="rps-filter-panel">
+              <div
+                v-for="filterGroup in memberChangeFilterGroups"
+                :key="filterGroup.field"
+                class="rps-filter-group"
+              >
+                <span class="rps-filter-label">{{ filterGroup.label }}</span>
+                <div class="rps-filter-tags">
+                  <el-check-tag
+                    v-for="tag in changeDirectionOptions"
+                    :key="`${filterGroup.field}-${tag}`"
+                    :checked="(selectedMemberChangeDirections[filterGroup.field] || []).includes(tag)"
+                    @change="toggleMemberChangeDirection(filterGroup.field, tag)"
+                  >
+                    {{ tag }}
+                  </el-check-tag>
+                </div>
+              </div>
+              <el-button
+                v-if="hasActiveMemberChangeFilter"
+                link
+                type="primary"
+                class="rps-filter-reset"
+                @click="resetMemberChangeFilters"
+              >
+                清空涨跌幅筛选
+              </el-button>
+            </div>
 
             <el-table
               :data="filteredMemberRpsData"
@@ -453,17 +509,28 @@ interface Props {
 type RpsPeriod = 5 | 20 | 60 | 120 | 250
 type RpsField = `RPS_${RpsPeriod}`
 type ReturnField = `return_${RpsPeriod}`
+type MainChangeField = 'pct_change' | ReturnField
+type MemberChangeField = 'pct_change' | `return_${number}`
 type DynamicRpsField = 'RPS_today' | `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
+type ChangeDirectionLabel = '上涨' | '平盘' | '下跌'
 
 const props = defineProps<Props>()
 
 const rpsPeriods: readonly RpsPeriod[] = [5, 20, 60, 120, 250]
 const rpsRankOptions: RpsRankLabel[] = ['极强', '强势', '良好', '一般', '弱势']
+const changeDirectionOptions: ChangeDirectionLabel[] = ['上涨', '平盘', '下跌']
 const rpsFilterGroups: Array<{ field: RpsField; label: string }> = rpsPeriods.map((period) => ({
   field: `RPS_${period}` as RpsField,
   label: `RPS_${period}强度`
 }))
+const changeFilterGroups: Array<{ field: MainChangeField; label: string }> = [
+  { field: 'pct_change', label: '当日涨跌幅' },
+  ...rpsPeriods.map((period) => ({
+    field: `return_${period}` as ReturnField,
+    label: `${period}日涨跌幅`
+  }))
+]
 
 function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
   return industryLevelOptions.includes(value as DcIndustryLevel)
@@ -515,6 +582,9 @@ const memberRpsPeriods = ref<number[]>([])
 const selectedMemberRpsRanks = reactive<Record<string, RpsRankLabel[]>>({
   RPS_today: []
 })
+const selectedMemberChangeDirections = reactive<Record<string, ChangeDirectionLabel[]>>({
+  pct_change: []
+})
 
 // RPS标签筛选
 const selectedRpsRanks = reactive<Record<RpsField, RpsRankLabel[]>>(
@@ -522,6 +592,12 @@ const selectedRpsRanks = reactive<Record<RpsField, RpsRankLabel[]>>(
     accumulator[`RPS_${period}` as RpsField] = []
     return accumulator
   }, {} as Record<RpsField, RpsRankLabel[]>)
+)
+const selectedChangeDirections = reactive<Record<MainChangeField, ChangeDirectionLabel[]>>(
+  changeFilterGroups.reduce((accumulator, { field }) => {
+    accumulator[field] = []
+    return accumulator
+  }, {} as Record<MainChangeField, ChangeDirectionLabel[]>)
 )
 
 // 板块类型（默认：行业板块）
@@ -554,6 +630,24 @@ const formatPercent = (value: unknown): string => {
 const getNumericValue = (value: unknown): number => {
   const num = typeof value === 'number' ? value : parseFloat(String(value))
   return Number.isFinite(num) ? num : 0
+}
+
+/**
+ * 涨跌方向工具
+ * 功能：将涨跌幅数值归类为上涨、平盘或下跌，供标签筛选复用
+ * 参数：value(unknown) 原始涨跌幅值
+ * 返回值：ChangeDirectionLabel 涨跌方向标签
+ * 事件：无
+ */
+const getChangeDirection = (value: unknown): ChangeDirectionLabel => {
+  const numericValue = getNumericValue(value)
+  if (numericValue > 0) {
+    return '上涨'
+  }
+  if (numericValue < 0) {
+    return '下跌'
+  }
+  return '平盘'
 }
 
 /**
@@ -610,6 +704,28 @@ const syncMemberRpsFilterFields = (periods: number[]) => {
 }
 
 /**
+ * 工具：同步成分股涨跌幅筛选字段
+ * 功能：根据接口返回周期初始化对话框内的涨跌幅方向筛选状态
+ * 参数：periods(number[]) 当前接口返回的周期列表
+ * 返回值：无
+ * 事件：更新 selectedMemberChangeDirections
+ */
+const syncMemberChangeFilterFields = (periods: number[]) => {
+  selectedMemberChangeDirections.pct_change = selectedMemberChangeDirections.pct_change || []
+
+  Object.keys(selectedMemberChangeDirections).forEach((field) => {
+    if (field !== 'pct_change' && !periods.some((period) => field === getDynamicReturnProp(period))) {
+      delete selectedMemberChangeDirections[field]
+    }
+  })
+
+  periods.forEach((period) => {
+    const field = getDynamicReturnProp(period)
+    selectedMemberChangeDirections[field] = selectedMemberChangeDirections[field] || []
+  })
+}
+
+/**
  * 工具：判断指定 RPS 字段是否启用了标签筛选
  * 功能：用于识别当前字段是否存在选中的强度标签
  * 参数：field(RpsField) RPS字段名
@@ -626,6 +742,24 @@ const hasSelectedRanks = (field: RpsField): boolean => selectedRpsRanks[field].l
  * 事件：无
  */
 const hasSelectedMemberRanks = (field: DynamicRpsField): boolean => (selectedMemberRpsRanks[field] || []).length > 0
+
+/**
+ * 工具：判断指定涨跌幅字段是否启用了方向筛选
+ * 功能：用于识别当前字段是否存在选中的上涨/平盘/下跌标签
+ * 参数：field(MainChangeField) 涨跌幅字段名
+ * 返回值：boolean 是否存在选中的方向标签
+ * 事件：无
+ */
+const hasSelectedChangeDirections = (field: MainChangeField): boolean => selectedChangeDirections[field].length > 0
+
+/**
+ * 工具：判断成分股涨跌幅字段是否启用了方向筛选
+ * 功能：用于识别弹窗内当前字段是否存在选中的上涨/平盘/下跌标签
+ * 参数：field(MemberChangeField) 涨跌幅字段名
+ * 返回值：boolean 是否存在选中的方向标签
+ * 事件：无
+ */
+const hasSelectedMemberChangeDirections = (field: MemberChangeField): boolean => (selectedMemberChangeDirections[field] || []).length > 0
 
 /**
  * 工具：切换 RPS 强度标签
@@ -668,6 +802,46 @@ const toggleMemberRpsRank = (field: DynamicRpsField, rank: RpsRankLabel) => {
 }
 
 /**
+ * 工具：切换涨跌幅方向标签
+ * 功能：在指定字段上执行上涨/平盘/下跌标签的选中与取消，用于多选筛选
+ * 参数：
+ *  - field(MainChangeField): 涨跌幅字段名
+ *  - direction(ChangeDirectionLabel): 涨跌方向标签
+ * 返回值：无
+ * 事件：更新 selectedChangeDirections，触发表格过滤结果重算
+ */
+const toggleChangeDirection = (field: MainChangeField, direction: ChangeDirectionLabel) => {
+  const directions = selectedChangeDirections[field]
+  const index = directions.indexOf(direction)
+  if (index >= 0) {
+    directions.splice(index, 1)
+    return
+  }
+  directions.push(direction)
+}
+
+/**
+ * 工具：切换成分股涨跌幅方向标签
+ * 功能：在成分股弹窗中对指定字段执行上涨/平盘/下跌标签的选中与取消
+ * 参数：
+ *  - field(MemberChangeField): 涨跌幅字段名
+ *  - direction(ChangeDirectionLabel): 涨跌方向标签
+ * 返回值：无
+ * 事件：更新 selectedMemberChangeDirections，触发对话框列表过滤结果重算
+ */
+const toggleMemberChangeDirection = (field: MemberChangeField, direction: ChangeDirectionLabel) => {
+  const directions = selectedMemberChangeDirections[field] || []
+  const index = directions.indexOf(direction)
+  if (index >= 0) {
+    directions.splice(index, 1)
+    selectedMemberChangeDirections[field] = directions
+    return
+  }
+  directions.push(direction)
+  selectedMemberChangeDirections[field] = directions
+}
+
+/**
  * 工具：清空所有 RPS 强度标签筛选
  * 功能：恢复全部 RPS 周期（5/20/60/120/250）的强度筛选状态
  * 参数：无
@@ -681,6 +855,19 @@ const resetRpsFilters = () => {
 }
 
 /**
+ * 工具：清空所有涨跌幅方向筛选
+ * 功能：恢复主表当日与各周期涨跌幅的筛选状态
+ * 参数：无
+ * 返回值：无
+ * 事件：重置 selectedChangeDirections，触发表格过滤结果重算
+ */
+const resetChangeFilters = () => {
+  changeFilterGroups.forEach(({ field }) => {
+    selectedChangeDirections[field] = []
+  })
+}
+
+/**
  * 工具：清空成分股 RPS 强度标签筛选
  * 功能：恢复成分股对话框内全部强度筛选状态
  * 参数：无
@@ -690,6 +877,19 @@ const resetRpsFilters = () => {
 const resetMemberRpsFilters = () => {
   Object.keys(selectedMemberRpsRanks).forEach((field) => {
     selectedMemberRpsRanks[field] = []
+  })
+}
+
+/**
+ * 工具：清空成分股涨跌幅方向筛选
+ * 功能：恢复成分股对话框内全部涨跌幅方向筛选状态
+ * 参数：无
+ * 返回值：无
+ * 事件：重置 selectedMemberChangeDirections，触发表格过滤结果重算
+ */
+const resetMemberChangeFilters = () => {
+  Object.keys(selectedMemberChangeDirections).forEach((field) => {
+    selectedMemberChangeDirections[field] = []
   })
 }
 
@@ -710,6 +910,22 @@ const matchesRpsFilters = (item: IndexRpsItem): boolean => {
 }
 
 /**
+ * 工具：判断单条记录是否满足涨跌幅方向筛选
+ * 功能：按当日与各周期涨跌幅的已选方向标签过滤当前记录；同一字段内为“或”，不同字段间为“且”
+ * 参数：item(IndexRpsItem) 当前指数RPS记录
+ * 返回值：boolean 是否满足全部方向筛选条件
+ * 事件：无
+ */
+const matchesChangeFilters = (item: IndexRpsItem): boolean => {
+  return changeFilterGroups.every(({ field }) => {
+    if (!hasSelectedChangeDirections(field)) {
+      return true
+    }
+    return selectedChangeDirections[field].includes(getChangeDirection(item[field]))
+  })
+}
+
+/**
  * 工具：判断单条成分股记录是否满足 RPS 标签筛选
  * 功能：按当前已选的 RPS_today 与各周期 RPS 标签过滤成分股记录
  * 参数：item(DcBoardMemberRpsItem) 当前成分股RPS记录
@@ -725,8 +941,30 @@ const matchesMemberRpsFilters = (item: DcBoardMemberRpsItem): boolean => {
   })
 }
 
+/**
+ * 工具：判断单条成分股记录是否满足涨跌幅方向筛选
+ * 功能：按当日与各周期涨跌幅的已选方向标签过滤成分股记录
+ * 参数：item(DcBoardMemberRpsItem) 当前成分股RPS记录
+ * 返回值：boolean 是否满足全部方向筛选条件
+ * 事件：无
+ */
+const matchesMemberChangeFilters = (item: DcBoardMemberRpsItem): boolean => {
+  return memberChangeFilterGroups.value.every(({ field }) => {
+    if (!hasSelectedMemberChangeDirections(field)) {
+      return true
+    }
+    return (selectedMemberChangeDirections[field] || []).includes(
+      getChangeDirection(item[field])
+    )
+  })
+}
+
 const hasActiveRpsFilter = computed(() => {
   return rpsFilterGroups.some(({ field }) => hasSelectedRanks(field))
+})
+
+const hasActiveChangeFilter = computed(() => {
+  return changeFilterGroups.some(({ field }) => hasSelectedChangeDirections(field))
 })
 
 const memberRpsFilterGroups = computed<Array<{ field: DynamicRpsField; label: string }>>(() => ([
@@ -736,9 +974,20 @@ const memberRpsFilterGroups = computed<Array<{ field: DynamicRpsField; label: st
     label: `RPS_${period}强度`
   }))
 ]))
+const memberChangeFilterGroups = computed<Array<{ field: MemberChangeField; label: string }>>(() => ([
+  { field: 'pct_change', label: '当日涨跌幅' },
+  ...memberRpsPeriods.value.map((period) => ({
+    field: getDynamicReturnProp(period),
+    label: `${period}日涨跌幅`
+  }))
+]))
 
 const hasActiveMemberRpsFilter = computed(() => {
   return memberRpsFilterGroups.value.some(({ field }) => hasSelectedMemberRanks(field))
+})
+
+const hasActiveMemberChangeFilter = computed(() => {
+  return memberChangeFilterGroups.value.some(({ field }) => hasSelectedMemberChangeDirections(field))
 })
 
 // 过滤后的RPS数据
@@ -750,6 +999,7 @@ const filteredRpsData = computed(() => {
     })
   }
   result = result.filter(matchesRpsFilters)
+  result = result.filter(matchesChangeFilters)
   return result
 })
 
@@ -760,6 +1010,7 @@ const filteredMemberRpsData = computed(() => {
     result = result.filter((item) => item.name.includes(keyword) || item.ts_code.includes(keyword))
   }
   result = result.filter(matchesMemberRpsFilters)
+  result = result.filter(matchesMemberChangeFilters)
   return result
 })
 
@@ -967,6 +1218,7 @@ const openBoardMemberRpsDialog = async (row: IndexRpsItem) => {
   memberRpsData.value = []
   memberRpsPeriods.value = []
   resetMemberRpsFilters()
+  resetMemberChangeFilters()
 
   try {
     const response = await getDcBoardMemberRps(row.ts_code, '5,20,60,120,250')
@@ -977,6 +1229,7 @@ const openBoardMemberRpsDialog = async (row: IndexRpsItem) => {
     memberRpsTradeDate.value = response.trade_date || ''
     memberRpsQueryTime.value = response.query_time || ''
     syncMemberRpsFilterFields(memberRpsPeriods.value)
+    syncMemberChangeFilterFields(memberRpsPeriods.value)
     ElMessage.success('成分股RPS数据加载成功')
   } catch (error) {
     console.error('加载成分股RPS数据失败:', error)
