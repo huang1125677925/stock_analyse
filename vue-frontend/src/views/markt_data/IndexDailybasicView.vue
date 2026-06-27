@@ -38,6 +38,37 @@
       </div>
     </el-card>
 
+    <el-card class="table-section" shadow="hover">
+      <template #header>
+        <div class="header-content">
+          <span>{{ metricLabel }} 最新估值与分位数对比</span>
+          <el-tag type="info" effect="plain">共 {{ comparisonRows.length }} 个指数</el-tag>
+        </div>
+      </template>
+      <el-table :data="comparisonRows" border stripe style="width: 100%" empty-text="暂无指数估值对比数据">
+        <el-table-column prop="label" label="指数" min-width="160" fixed="left" />
+        <el-table-column prop="latestTradeDate" label="最新日期" min-width="120" align="center" />
+        <el-table-column label="最新估值" min-width="140" align="right">
+          <template #default="{ row }">
+            {{ formatMetricValue(row.latestValue) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="历史分位" min-width="140" align="center">
+          <template #default="{ row }">
+            <span v-if="row.percentile !== null">{{ row.percentile.toFixed(2) }}%</span>
+            <span v-else>--</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="估值状态" min-width="120" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.status" :type="row.type" effect="dark">{{ row.status }}</el-tag>
+            <span v-else>--</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="totalCount" label="样本数" min-width="100" align="right" />
+      </el-table>
+    </el-card>
+
     <div class="chart-section" v-loading="loading">
       <el-card v-for="dataset in datasets" :key="dataset.value" class="index-card">
         <template #header>
@@ -170,12 +201,38 @@ interface IndexDataset {
   valuation: IndexValuationStatus | null
 }
 
+interface ComparisonRow {
+  label: string
+  latestTradeDate: string
+  latestValue: number | null
+  percentile: number | null
+  status: string
+  type: IndexValuationStatus['type']
+  totalCount: number
+}
+
 const datasets = ref<IndexDataset[]>(indexOptions.map(item => ({
   ...item,
   records: [],
   totalCount: 0,
   valuation: null,
 })))
+
+const comparisonRows = computed<ComparisonRow[]>(() => datasets.value.map(dataset => {
+  const latestRecord = dataset.records[dataset.records.length - 1]
+  const rawMetricValue = latestRecord?.[selectedMetric.value]
+  const latestValue = rawMetricValue == null ? null : Number(rawMetricValue)
+
+  return {
+    label: dataset.label,
+    latestTradeDate: String(latestRecord?.trade_date || '--'),
+    latestValue: Number.isFinite(latestValue) ? latestValue : null,
+    percentile: dataset.valuation?.percentile ?? null,
+    status: dataset.valuation?.status ?? '',
+    type: dataset.valuation?.type ?? 'info',
+    totalCount: dataset.totalCount,
+  }
+}))
 
 // ECharts 相关
 const chartRefs = new Map<string, HTMLElement>()
@@ -244,6 +301,21 @@ function buildYearDateRange(years: number): [string, string] {
 
 function setYearRange(years: number) {
   dateRange.value = buildYearDateRange(years)
+}
+
+function formatMetricValue(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) {
+    return '--'
+  }
+
+  if (Math.abs(value) >= 1000) {
+    return value.toLocaleString('zh-CN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  }
+
+  return value.toFixed(2)
 }
 
 async function fetchData() {
@@ -407,11 +479,8 @@ onUnmounted(() => {
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .header-title { display: flex; align-items: center; gap: 10px; }
 .valuation-tag { margin-left: 10px; font-weight: bold; }
-.chart-section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.index-card { min-width: 0; }
+.chart-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.index-card { width: 100%; min-width: 0; }
 .chart-container { width: 100%; height: 420px; }
 .range-buttons { margin-left: 8px; }
-@media (max-width: 1200px) {
-  .chart-section { grid-template-columns: 1fr; }
-}
 </style>
