@@ -399,7 +399,17 @@
                   <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="name" label="名称" min-width="130" sortable="custom" fixed="left" />
+              <el-table-column prop="name" label="名称" min-width="150" sortable="custom" fixed="left">
+                <template #default="scope">
+                  <el-button
+                    type="primary"
+                    link
+                    @click="openMemberStockTrendDialog(scope.row)"
+                  >
+                    {{ scope.row.name }}
+                  </el-button>
+                </template>
+              </el-table-column>
 
               <el-table-column prop="pct_change" label="当日涨跌幅" min-width="110" sortable="custom" align="center">
                 <template #default="scope">
@@ -483,6 +493,51 @@
             </el-table>
           </div>
         </el-dialog>
+
+        <el-dialog
+          v-model="memberStockTrendDialogVisible"
+          width="88%"
+          top="6vh"
+          :close-on-click-modal="false"
+          destroy-on-close
+          append-to-body
+        >
+          <template #header>
+            <div class="trend-dialog-header">
+              <div class="trend-dialog-title">
+                {{ memberStockTrendStock.name || memberStockTrendStock.code }} K线趋势图
+              </div>
+              <div class="trend-dialog-subtitle">
+                {{ memberStockTrendDateRange.start || '-' }} 至 {{ memberStockTrendDateRange.end || '-' }}
+              </div>
+            </div>
+          </template>
+
+          <div class="trend-dialog-body">
+            <div class="trend-shortcuts">
+              <el-radio-group v-model="memberStockTrendShortcut" @change="handleMemberStockTrendShortcutChange">
+                <el-radio-button label="1y">最近1年</el-radio-button>
+                <el-radio-button label="3y">最近3年</el-radio-button>
+                <el-radio-button label="5y">最近5年</el-radio-button>
+              </el-radio-group>
+            </div>
+
+            <el-card class="trend-preview-card" v-loading="memberStockTrendLoading">
+              <StockKLineChart
+                v-if="memberStockTrendData.length"
+                :stock-code="memberStockTrendStock.code"
+                :stock-name="memberStockTrendStock.name"
+                :kline-data="memberStockTrendData"
+                height="420px"
+              />
+              <el-empty
+                v-else-if="!memberStockTrendLoading"
+                :description="memberStockTrendEmptyText"
+                :image-size="80"
+              />
+            </el-card>
+          </div>
+        </el-dialog>
       </el-card>
     </div>
 
@@ -499,6 +554,8 @@ import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/
 import { getDcBoardMemberRps, getIndexRps } from '@/services/strategyApi'
 import type { DcBoardMemberRpsItem, DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
+import StockKLineChart from '@/components/StockKLineChart.vue'
+import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 
 const industryLevelOptions: DcIndustryLevel[] = ['东财一级行业', '东财二级行业', '东财三级行业']
 
@@ -514,6 +571,7 @@ type MemberChangeField = 'pct_change' | `return_${number}`
 type DynamicRpsField = 'RPS_today' | `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
 type ChangeDirectionLabel = '上涨' | '平盘' | '下跌'
+type MemberTrendShortcut = '1y' | '3y' | '5y'
 
 const props = defineProps<Props>()
 
@@ -579,6 +637,19 @@ const memberRpsQueryTime = ref('')
 const memberRpsSearchKeyword = ref('')
 const memberRpsData = ref<DcBoardMemberRpsItem[]>([])
 const memberRpsPeriods = ref<number[]>([])
+const memberStockTrendDialogVisible = ref(false)
+const memberStockTrendLoading = ref(false)
+const memberStockTrendShortcut = ref<MemberTrendShortcut>('1y')
+const memberStockTrendData = ref<StockHistoryDataItem[]>([])
+const memberStockTrendStock = reactive({
+  code: '',
+  name: ''
+})
+const memberStockTrendDateRange = reactive({
+  start: '',
+  end: ''
+})
+let memberStockTrendRequestId = 0
 const selectedMemberRpsRanks = reactive<Record<string, RpsRankLabel[]>>({
   RPS_today: []
 })
@@ -662,6 +733,29 @@ const formatRpsValue = (value: unknown): string => {
   if (!Number.isFinite(num)) return '-'
   return num.toFixed(1)
 }
+
+/**
+ * 日期格式化工具
+ * 功能：将 Date 对象格式化为 YYYY-MM-DD，供弹窗标题和快捷时间范围展示
+ * 参数：date(Date) 日期对象
+ * 返回值：string 格式化后的日期文本
+ * 事件：无
+ */
+const formatDateToYYYYMMDDWithDash = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * 日期转换工具
+ * 功能：将 YYYY-MM-DD 日期文本转换为股票历史接口所需的 YYYYMMDD 格式
+ * 参数：dateText(string) 原始日期文本
+ * 返回值：string 接口日期格式
+ * 事件：无
+ */
+const formatDateForStockApi = (dateText: string): string => dateText.replace(/-/g, '')
 
 /**
  * 动态字段工具
@@ -990,6 +1084,12 @@ const hasActiveMemberChangeFilter = computed(() => {
   return memberChangeFilterGroups.value.some(({ field }) => hasSelectedMemberChangeDirections(field))
 })
 
+const memberStockTrendEmptyText = computed(() => {
+  return memberStockTrendStock.code
+    ? '暂无该股票区间K线数据'
+    : '请选择股票查看K线趋势'
+})
+
 // 过滤后的RPS数据
 const filteredRpsData = computed(() => {
   let result = rpsData.value
@@ -1261,6 +1361,88 @@ const handleMemberRpsSortChange = (sort: { prop: string, order: string }) => {
   }
 }
 
+/**
+ * 工具：应用成分股K线弹窗时间快捷范围
+ * 功能：根据最近1年、3年、5年的快捷选项计算弹窗查询区间
+ * 参数：range(MemberTrendShortcut) 快捷时间范围
+ * 返回值：无
+ * 事件：更新 memberStockTrendDateRange
+ */
+const applyMemberStockTrendShortcut = (range: MemberTrendShortcut) => {
+  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+  memberStockTrendDateRange.start = formatDateToYYYYMMDDWithDash(startDate)
+  memberStockTrendDateRange.end = formatDateToYYYYMMDDWithDash(endDate)
+}
+
+/**
+ * 工具：加载成分股K线趋势数据
+ * 功能：根据当前选中的股票代码和时间范围请求历史K线数据，并按日期升序排序供图表展示
+ * 参数：无
+ * 返回值：Promise<void>
+ * 事件：更新 memberStockTrendData、memberStockTrendLoading
+ */
+const loadMemberStockTrendData = async () => {
+  const requestId = ++memberStockTrendRequestId
+
+  if (!memberStockTrendStock.code || !memberStockTrendDateRange.start || !memberStockTrendDateRange.end) {
+    memberStockTrendData.value = []
+    return
+  }
+
+  memberStockTrendLoading.value = true
+  try {
+    const data = await fetchStockHistoryData(
+      memberStockTrendStock.code,
+      formatDateForStockApi(memberStockTrendDateRange.start),
+      formatDateForStockApi(memberStockTrendDateRange.end),
+      'qfq'
+    )
+    if (requestId !== memberStockTrendRequestId) return
+    memberStockTrendData.value = [...data].sort((a, b) => a.date.localeCompare(b.date))
+  } catch (error) {
+    if (requestId !== memberStockTrendRequestId) return
+    console.error('加载成分股K线趋势失败:', error)
+    memberStockTrendData.value = []
+    ElMessage.error('加载成分股K线趋势失败，请稍后重试')
+  } finally {
+    if (requestId === memberStockTrendRequestId) {
+      memberStockTrendLoading.value = false
+    }
+  }
+}
+
+/**
+ * 事件：切换成分股K线弹窗快捷范围
+ * 功能：响应最近1年、3年、5年快捷范围切换并刷新K线趋势数据
+ * 参数：range(MemberTrendShortcut) 快捷时间范围
+ * 返回值：无
+ * 事件：更新查询区间并重新加载图表数据
+ */
+const handleMemberStockTrendShortcutChange = (range: MemberTrendShortcut) => {
+  applyMemberStockTrendShortcut(range)
+  loadMemberStockTrendData()
+}
+
+/**
+ * 事件：打开成分股K线趋势弹窗
+ * 功能：在成分股RPS弹窗中点击股票名称后，继续打开股票K线趋势弹窗
+ * 参数：row(DcBoardMemberRpsItem) 当前成分股记录
+ * 返回值：Promise<void>
+ * 事件：更新成分股K线弹窗状态并触发历史K线数据请求
+ */
+const openMemberStockTrendDialog = (row: DcBoardMemberRpsItem) => {
+  memberStockTrendStock.code = row.ts_code
+  memberStockTrendStock.name = row.name
+  memberStockTrendShortcut.value = '1y'
+  memberStockTrendData.value = []
+  applyMemberStockTrendShortcut('1y')
+  memberStockTrendDialogVisible.value = true
+  loadMemberStockTrendData()
+}
+
 // 刷新数据
 const refreshData = async () => {
   if (loading.value) return
@@ -1367,6 +1549,38 @@ watch(() => route.query.level, (level) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.trend-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trend-dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.trend-dialog-subtitle {
+  font-size: 13px;
+  color: #909399;
+}
+
+.trend-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trend-shortcuts {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.trend-preview-card {
+  min-height: 220px;
 }
 
 .member-rps-toolbar {
