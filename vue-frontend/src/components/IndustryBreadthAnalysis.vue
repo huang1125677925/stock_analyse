@@ -21,22 +21,43 @@
         </div>
         <div class="control-group">
           <span class="control-label">时间范围：</span>
-          <el-select
-            v-model="recentDays"
-            placeholder="选择最近天数"
+          <el-input
+            value="最近20天"
+            disabled
+            style="width: 160px"
+          />
+        </div>
+        <div class="control-group">
+          <span class="control-label">结束日期：</span>
+          <el-date-picker
+            v-model="endDate"
+            type="date"
+            placeholder="选择结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            :clearable="false"
             :disabled="loading"
+            :disabled-date="disableFutureDate"
             @change="handleParamsChange"
             style="width: 160px"
-          >
-            <el-option :label="'最近20天'" :value="20" />
-            <el-option :label="'最近30天'" :value="30" />
-            <el-option :label="'最近60天'" :value="60" />
-            <el-option :label="'最近90天'" :value="90" />
-          </el-select>
+          />
         </div>
         <div class="control-group">
           <span class="control-label">MA窗口：</span>
-          <el-input-number v-model="maWindow" :min="5" :max="120" :step="5" :disabled="loading" @change="handleParamsChange" />
+          <el-select
+            v-model="maWindow"
+            placeholder="选择 MA 窗口"
+            :disabled="loading"
+            @change="handleParamsChange"
+            style="width: 140px"
+          >
+            <el-option
+              v-for="option in maWindowOptions"
+              :key="option"
+              :label="`MA${option}`"
+              :value="option"
+            />
+          </el-select>
         </div>
         <div class="control-group">
           <el-button type="primary" :loading="loading" @click="fetchData">刷新</el-button>
@@ -88,7 +109,7 @@
  * 市场宽度热力图组件
  * 功能：
  * - 使用行业 MA 市场宽度接口渲染热力图（日期 × 板块，值为宽度比例）
- * - 支持选择东方财富行业层级、最近查询范围与 MA 窗口
+ * - 支持选择东方财富行业层级、固定最近20天结束日期与 MA 窗口
  * 参数：无
  * 返回值：无
  * 事件（Emits）：
@@ -106,10 +127,12 @@ import {
 
 const emit = defineEmits<{ chartReady: [chart: echarts.ECharts]; chartClick: [payload: { industry: string; date: string; value: number }] }>()
 
+const FIXED_RANGE_DAYS = 20
 const loading = ref(false)
-const recentDays = ref<number>(20)
+const endDate = ref<string>(formatDate(new Date()))
 const maWindow = ref<number>(20)
 const sortByLastColumn = ref(true)
+const maWindowOptions = [5, 10, 20, 30, 60, 90, 250]
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
   { label: '东财二级行业', value: '东财二级行业' },
@@ -125,11 +148,21 @@ function formatDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-function computeDateRangeByRecentDays(days: number): [string, string] {
-  const end = new Date()
+function parseDate(dateText: string): Date {
+  const [year, month, day] = dateText.split('-').map(Number)
+  return new Date(year, (month || 1) - 1, day || 1)
+}
+
+function computeDateRangeByEndDate(endDateText: string, days: number): [string, string] {
+  const end = parseDate(endDateText)
   const start = new Date()
+  start.setTime(end.getTime())
   start.setDate(end.getDate() - days)
   return [formatDate(start), formatDate(end)]
+}
+
+function disableFutureDate(date: Date): boolean {
+  return date.getTime() > Date.now()
 }
 
 const rawData = ref<IndustryMaBreadthItem[]>([])
@@ -241,7 +274,7 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const [start, end] = computeDateRangeByRecentDays(recentDays.value)
+    const [start, end] = computeDateRangeByEndDate(endDate.value, FIXED_RANGE_DAYS)
     const data = await fetchIndustryMaBreadth({
       startDate: start,
       endDate: end,
