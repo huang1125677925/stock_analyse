@@ -149,13 +149,11 @@ const router = createRouter({
           path: '/analysis/congestion/turnover',
           name: 'congestion-turnover',
           component: () => import('@/views/industry-stock-data/CongestionTurnoverView.vue'),
-          meta: { title: '成交金额占比分位数' }
+          meta: { title: '行业成交额分析' }
         },
         {
           path: '/analysis/industry-turnover-heatmap',
-          name: 'industry-turnover-heatmap',
-          component: () => import('@/views/industry-stock-data/IndustryTurnoverHeatmapView.vue'),
-          meta: { title: '行业成交额热力图' }
+          redirect: '/analysis/congestion/turnover'
         },
         {
           path: '/analysis/congestion/fundflow',

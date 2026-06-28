@@ -2,7 +2,7 @@
   <div class="congestion-page">
     <el-card>
       <div class="header-controls">
-        <h3>成交金额占比分位数</h3>
+        <h3>行业成交额分析</h3>
       </div>
       <TurnoverAnalysis />
     </el-card>
@@ -10,6 +10,15 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 行业成交额分析页面
+ * 功能：
+ * - 承载行业成交额分析组件
+ * - 统一提供页面级标题与布局容器
+ * 参数：无
+ * 返回值：无
+ * 事件：无
+ */
 import TurnoverAnalysis from '@/components/TurnoverAnalysis.vue'
 </script>
 

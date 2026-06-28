@@ -470,8 +470,7 @@ const etfIndexMegaMenuSections = [
   {
     title: '行业热点',
     items: [
-      { title: '成交金额占比分位数', path: '/analysis/congestion/turnover' },
-      { title: '行业成交额热力图', path: '/analysis/industry-turnover-heatmap' },
+      { title: '行业成交额分析', path: '/analysis/congestion/turnover' },
       { title: '行业流入资金分析', path: '/analysis/congestion/fundflow' },
       { title: '行业宽度分析', path: '/analysis/congestion/breadth' },
       { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },

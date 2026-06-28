@@ -5,7 +5,7 @@
         v-model="selectedLevel"
         placeholder="行业层级"
         :disabled="loading"
-        @change="updateChart"
+        @change="fetchTurnoverData"
         style="width: 160px;"
       >
         <el-option
@@ -15,22 +15,45 @@
           :value="option.value"
         />
       </el-select>
-      <!-- 日期范围选择 -->
-      <DateRangeSelector 
-        v-model="selectedDateRange" 
+      <el-date-picker
+        v-model="endDate"
+        type="date"
+        placeholder="截止日期"
         :disabled="loading"
-        @change="updateChart" 
-        style="margin-right: 10px;"
+        :clearable="false"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        @change="fetchTurnoverData"
+        style="width: 160px;"
       />
-      <el-button @click="sortByLastColumn" type="primary" :disabled="loading">按最后一列排序</el-button>
+      <DateRangeSelector
+        v-model="selectedDateRange"
+        :disabled="true"
+        style="margin-right: 0;"
+      />
+      <el-select
+        v-model="selectedMetric"
+        placeholder="热力图类型"
+        :disabled="loading"
+        style="width: 220px;"
+      >
+        <el-option
+          v-for="option in metricOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+      <el-button @click="sortByLastColumn" type="primary" :disabled="loading">
+        {{ sortButtonText }}
+      </el-button>
     </div>
-    
-    <div class="chart-container">
-      <!-- 换手率热力图 -->
-      <TurnoverHeatmap 
+
+    <div class="chart-container" v-loading="loading">
+      <TurnoverHeatmap
         :industries="allIndustries"
         :dates="allDates"
-        :sort-metric="sortMetric as 'turnover' | 'amount'"
+        :metric="selectedMetric"
         :sort-ascending="sortAscending"
         @chart-ready="handleChartReady"
         @chart-click="handleChartClick"
@@ -41,17 +64,19 @@
 
 <script setup lang="ts">
 /**
- * 成交金额占比分位数分析组件
+ * 行业成交额分析组件
  * 功能：
- * - 按东财行业层级查询并展示行业成交金额占比分位数热力图
- * - 支持日期范围切换和按最后一列排序
+ * - 按东财行业层级查询并展示行业成交额相关热力图
+ * - 支持截止日期选择与固定最近20天数据窗口
+ * - 支持在板块成交额、成交额占总额比例、成交额百分位排名之间切换
+ * - 支持按最后一个交易日的当前指标值排序
  * 参数：无
  * 返回值：无
  * 事件：
  * - chart-ready: 热力图实例初始化完成
  * - chart-click: 点击热力图行业单元格后跳转股票列表
  */
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryTurnoverPercentile } from '@/services/industry-turnover-percentile'
@@ -60,52 +85,73 @@ import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
 import DateRangeSelector from '@/components/DateRangeSelector.vue'
 import TurnoverHeatmap from '@/components/TurnoverHeatmap.vue'
 
-// 数据结构定义
-interface CongestionData {
-  turnoverRateFQuantile: number
-  amountCongestionQuantile: number
+type TurnoverMetricType = 'amount' | 'amount_ratio' | 'amount_percentile'
+
+interface IndustryMetricData {
+  amount: number
+  amountRatio: number
+  amountPercentile: number
 }
 
 interface IndustryData {
   name: string
-  data: CongestionData[]
+  data: IndustryMetricData[]
 }
 
-// 响应式变量
 const router = useRouter()
-const sortMetric = ref('amount')
 const selectedDateRange = ref('20')
+const endDate = ref(new Date().toISOString().split('T')[0])
+const selectedMetric = ref<TurnoverMetricType>('amount_percentile')
 const sortAscending = ref(true)
 const loading = ref(false)
+const recentDays = 20
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
   { label: '东财二级行业', value: '东财二级行业' },
   { label: '东财三级行业', value: '东财三级行业' }
 ]
 const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
+const metricOptions: Array<{ label: string; value: TurnoverMetricType }> = [
+  { label: '成交额百分位排名热力图', value: 'amount_percentile' },
+  { label: '板块成交额热力图', value: 'amount' },
+  { label: '成交额占总额比例热力图', value: 'amount_ratio' }
+]
 
-// 数据存储
 const allIndustries = ref<IndustryData[]>([])
 const allDates = ref<string[]>([])
 
-// 获取换手率数据
+const sortButtonText = computed(() => (sortAscending.value ? '按最后一列升序' : '按最后一列降序'))
+
+const normalizeRatio = (value?: number) => {
+  if (!Number.isFinite(value)) {
+    return 0
+  }
+
+  return Math.abs(value as number) <= 1 ? (value as number) * 100 : (value as number)
+}
+
+const normalizePercentile = (value?: number) => {
+  if (!Number.isFinite(value)) {
+    return 0
+  }
+
+  return value! <= 1 ? value! * 100 : value!
+}
+
+const getStartDateByEndDate = (endDateValue: string, days: number) => {
+  const startDate = new Date(endDateValue)
+  startDate.setDate(startDate.getDate() - days + 1)
+  return startDate.toISOString().split('T')[0]
+}
+
 const fetchTurnoverData = async () => {
   loading.value = true
   try {
-    // 计算日期范围
-    const today = new Date()
-    const endDate = today.toISOString().split('T')[0]
-    
-    // 根据选择的日期范围计算开始日期
-    const days = selectedDateRange.value === 'all' ? 30 : parseInt(selectedDateRange.value)
-    const startDate = new Date(today)
-    startDate.setDate(today.getDate() - days)
-    const formattedStartDate = startDate.toISOString().split('T')[0]
-    
-    // 使用stockApi中的函数获取数据
+    const endDateValue = endDate.value
+    const formattedStartDate = getStartDateByEndDate(endDateValue, recentDays)
     const response = await fetchIndustryTurnoverPercentile({
       startDate: formattedStartDate,
-      endDate,
+      endDate: endDateValue,
       idxType: '行业板块',
       level: selectedLevel.value
     })
@@ -117,14 +163,12 @@ const fetchTurnoverData = async () => {
         console.error('API返回的数据不是数组:', apiData)
         throw new Error('API返回的数据格式不正确')
       }
-      
-      // 提取所有唯一日期
+
       const uniqueDates = [...new Set(apiData.map((item: IndustryTurnoverPercentileItem) => item.date))].sort() as string[]
       allDates.value = uniqueDates
-      
-      // 按行业分组数据
-      const industriesMap = new Map<string, {name: string, data: CongestionData[]}>() 
-      
+
+      const industriesMap = new Map<string, { name: string, data: IndustryMetricData[] }>()
+
       apiData.forEach((item: IndustryTurnoverPercentileItem) => {
         if (!industriesMap.has(item.sector_code)) {
           industriesMap.set(item.sector_code, {
@@ -132,28 +176,24 @@ const fetchTurnoverData = async () => {
             data: []
           })
         }
-        
-        // 为每个日期添加数据
         const industryData = industriesMap.get(item.sector_code)!
         const dateIndex = uniqueDates.indexOf(item.date)
-        
-        // 确保数据数组长度与日期数组一致
+
         while (industryData.data.length < uniqueDates.length) {
           industryData.data.push({
-            turnoverRateFQuantile: 0,
-            amountCongestionQuantile: 0
+            amount: 0,
+            amountRatio: 0,
+            amountPercentile: 0
           })
         }
-        
-        // 更新对应日期的数据
-        const amountPercentile = item.amount_percentile ?? item.turnover_ratio_percentile ?? 0
+
         industryData.data[dateIndex] = {
-          turnoverRateFQuantile: amountPercentile,
-          amountCongestionQuantile: amountPercentile
+          amount: item.amount ?? 0,
+          amountRatio: normalizeRatio(item.amount_ratio ?? item.turnover_ratio),
+          amountPercentile: normalizePercentile(item.amount_percentile ?? item.turnover_ratio_percentile)
         }
       })
-      
-      // 转换为数组
+
       allIndustries.value = Array.from(industriesMap.values())
     } else {
       ElMessage.error('获取数据失败')
@@ -166,25 +206,15 @@ const fetchTurnoverData = async () => {
   }
 }
 
-// 更新图表
-const updateChart = () => {
-  fetchTurnoverData()
-}
-
-// 按最后一列排序
 const sortByLastColumn = () => {
   sortAscending.value = !sortAscending.value
 }
 
-// 图表事件处理
-const handleChartReady = (chartInstance: any) => {
-  // 图表准备就绪
+const handleChartReady = (_chartInstance: any) => {
+  // 预留给后续图表联动能力
 }
 
 const handleChartClick = (payload: any) => {
-  // 图表点击事件 - 跳转到股票列表页面（使用子组件提供的结构化 payload，避免索引错位）
-  console.log('Chart clicked payload:', payload)
-
   const industryName = payload?.industry?.name
   if (!industryName) return
 
@@ -209,8 +239,9 @@ onMounted(() => {
     align-items: center;
     margin-bottom: 20px;
     gap: 10px;
+    flex-wrap: wrap;
   }
-  
+
   .chart-container {
     width: 100%;
     min-height: 500px;
