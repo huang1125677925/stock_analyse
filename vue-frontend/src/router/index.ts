@@ -152,6 +152,12 @@ const router = createRouter({
           meta: { title: '成交金额占比分位数' }
         },
         {
+          path: '/analysis/industry-turnover-heatmap',
+          name: 'industry-turnover-heatmap',
+          component: () => import('@/views/industry-stock-data/IndustryTurnoverHeatmapView.vue'),
+          meta: { title: '行业成交额热力图' }
+        },
+        {
           path: '/analysis/congestion/fundflow',
           name: 'congestion-fundflow',
           component: () => import('@/views/industry-stock-data/CongestionFundFlowView.vue'),
@@ -162,18 +168,6 @@ const router = createRouter({
           name: 'congestion-breadth',
           component: () => import('@/views/industry-stock-data/CongestionBreadthView.vue'),
           meta: { title: '市场宽度分析' }
-        },
-        {
-          path: '/analysis/congestion/scale-breadth',
-          name: 'congestion-scale-breadth',
-          component: () => import('@/views/industry-stock-data/CongestionScaleBreadthView.vue'),
-          meta: { title: '行业规模宽度' }
-        },
-        {
-          path: '/analysis/congestion/output-scale',
-          name: 'congestion-output-scale',
-          component: () => import('@/views/industry-stock-data/CongestionOutputScaleView.vue'),
-          meta: { title: '行业产出营收' }
         },
         {
           path: '/analysis/congestion/index-rps',
