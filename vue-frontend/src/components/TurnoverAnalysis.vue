@@ -26,11 +26,20 @@
         @change="fetchTurnoverData"
         style="width: 160px;"
       />
-      <DateRangeSelector
+      <el-select
         v-model="selectedDateRange"
-        :disabled="true"
-        style="margin-right: 0;"
-      />
+        placeholder="最近天数"
+        :disabled="loading"
+        @change="fetchTurnoverData"
+        style="width: 140px;"
+      >
+        <el-option
+          v-for="option in dateRangeOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
       <el-select
         v-model="selectedMetric"
         placeholder="热力图类型"
@@ -59,6 +68,13 @@
         @chart-click="handleChartClick"
       />
     </div>
+
+    <IndustryTrendDialog
+      v-model="trendDialogVisible"
+      :sector-code="trendBoard.sectorCode"
+      :sector-name="trendBoard.name"
+      idx-type="行业板块"
+    />
   </div>
 </template>
 
@@ -67,22 +83,22 @@
  * 行业成交额分析组件
  * 功能：
  * - 按东财行业层级查询并展示行业成交额相关热力图
- * - 支持截止日期选择与固定最近20天数据窗口
+ * - 支持截止日期选择与最近40天/60天范围切换
  * - 支持在板块成交额、成交额占总额比例、成交额百分位排名之间切换
  * - 支持按最后一个交易日的当前指标值排序
+ * - 支持点击行业单元格后弹出东财行业趋势看板
  * 参数：无
  * 返回值：无
  * 事件：
  * - chart-ready: 热力图实例初始化完成
- * - chart-click: 点击热力图行业单元格后跳转股票列表
+ * - chart-click: 点击热力图行业单元格后弹出趋势看板
  */
 import { computed, ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryTurnoverPercentile } from '@/services/industry-turnover-percentile'
 import type { IndustryTurnoverPercentileItem } from '@/services/industry-turnover-percentile'
 import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
-import DateRangeSelector from '@/components/DateRangeSelector.vue'
+import IndustryTrendDialog from '@/components/IndustryTrendDialog.vue'
 import TurnoverHeatmap from '@/components/TurnoverHeatmap.vue'
 
 type TurnoverMetricType = 'amount' | 'amount_ratio' | 'amount_percentile'
@@ -95,16 +111,24 @@ interface IndustryMetricData {
 
 interface IndustryData {
   name: string
+  sectorCode: string
   data: IndustryMetricData[]
 }
 
-const router = useRouter()
-const selectedDateRange = ref('20')
+const selectedDateRange = ref('40')
 const endDate = ref(new Date().toISOString().split('T')[0])
 const selectedMetric = ref<TurnoverMetricType>('amount_percentile')
 const sortAscending = ref(true)
 const loading = ref(false)
-const recentDays = 20
+const trendDialogVisible = ref(false)
+const trendBoard = ref({
+  sectorCode: '',
+  name: ''
+})
+const dateRangeOptions = [
+  { label: '最近40天', value: '40' },
+  { label: '最近60天', value: '60' }
+]
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
   { label: '东财二级行业', value: '东财二级行业' },
@@ -138,6 +162,11 @@ const normalizePercentile = (value?: number) => {
   return value! <= 1 ? value! * 100 : value!
 }
 
+const getRecentDays = (rangeValue: string) => {
+  const parsedValue = Number.parseInt(rangeValue, 10)
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 40
+}
+
 const getStartDateByEndDate = (endDateValue: string, days: number) => {
   const startDate = new Date(endDateValue)
   startDate.setDate(startDate.getDate() - days + 1)
@@ -148,7 +177,7 @@ const fetchTurnoverData = async () => {
   loading.value = true
   try {
     const endDateValue = endDate.value
-    const formattedStartDate = getStartDateByEndDate(endDateValue, recentDays)
+    const formattedStartDate = getStartDateByEndDate(endDateValue, getRecentDays(selectedDateRange.value))
     const response = await fetchIndustryTurnoverPercentile({
       startDate: formattedStartDate,
       endDate: endDateValue,
@@ -167,12 +196,13 @@ const fetchTurnoverData = async () => {
       const uniqueDates = [...new Set(apiData.map((item: IndustryTurnoverPercentileItem) => item.date))].sort() as string[]
       allDates.value = uniqueDates
 
-      const industriesMap = new Map<string, { name: string, data: IndustryMetricData[] }>()
+      const industriesMap = new Map<string, IndustryData>()
 
       apiData.forEach((item: IndustryTurnoverPercentileItem) => {
         if (!industriesMap.has(item.sector_code)) {
           industriesMap.set(item.sector_code, {
             name: item.sector_name,
+            sectorCode: item.sector_code,
             data: []
           })
         }
@@ -216,14 +246,17 @@ const handleChartReady = (_chartInstance: any) => {
 
 const handleChartClick = (payload: any) => {
   const industryName = payload?.industry?.name
-  if (!industryName) return
+  const sectorCode = payload?.industry?.sectorCode
+  if (!industryName || !sectorCode) {
+    ElMessage.warning('未找到该行业板块代码，暂时无法打开趋势图')
+    return
+  }
 
-  router.push({
-    path: '/stock-list',
-    query: { industry: industryName }
-  })
-
-  ElMessage.success(`正在跳转到 ${industryName} 行业的股票列表`)
+  trendBoard.value = {
+    sectorCode,
+    name: industryName
+  }
+  trendDialogVisible.value = true
 }
 
 // 组件挂载时获取数据

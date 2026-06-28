@@ -42,6 +42,7 @@ interface IndustryMetricData {
 
 interface IndustryData {
   name: string
+  sectorCode: string
   data: IndustryMetricData[]
 }
 
@@ -71,10 +72,22 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'chart-ready': [chart: echarts.ECharts]
-  'chart-click': [payload: { industry?: { name: string }, date?: string, value?: number, metric: TurnoverMetricType, rawParams: any }]
+  'chart-click': [payload: { industry?: { name: string; sectorCode: string }, date?: string, value?: number, metric: TurnoverMetricType, rawParams: any }]
 }>()
 
-const formatAmount = (value: number) => `${value.toFixed(2)}亿`
+const formatAmount = (value: number) => {
+  const numericValue = Number.isFinite(value) ? value : 0
+
+  if (Math.abs(numericValue) >= 100000000) {
+    return `${(numericValue / 100000000).toFixed(2)}亿`
+  }
+
+  if (Math.abs(numericValue) >= 10000) {
+    return `${(numericValue / 10000).toFixed(2)}万`
+  }
+
+  return `${numericValue.toFixed(0)}元`
+}
 const formatRatio = (value: number) => `${value.toFixed(2)}%`
 const formatPercentile = (value: number) => `${value.toFixed(0)}`
 
@@ -95,7 +108,7 @@ const metricConfigs = computed<Record<TurnoverMetricType, MetricConfig>>(() => {
       max: getMaxValue(amountValues, 1),
       getValue: (item) => item.amount,
       formatValue: formatAmount,
-      labelFormatter: (value) => value.toFixed(1)
+      labelFormatter: (value) => formatAmount(value)
     },
     amount_ratio: {
       title: '成交额占总额比例热力图',
@@ -253,7 +266,7 @@ const handleChartClick = (params: any) => {
   const date = typeof dateIndex === 'number' ? props.dates[dateIndex] : undefined
 
   emit('chart-click', {
-    industry: industry ? { name: industry.name } : undefined,
+    industry: industry ? { name: industry.name, sectorCode: industry.sectorCode } : undefined,
     date,
     value,
     metric: props.metric,

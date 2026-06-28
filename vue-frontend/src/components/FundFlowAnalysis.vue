@@ -70,6 +70,13 @@
         @chart-click="handleChartClick"
       />
     </div>
+
+    <IndustryTrendDialog
+      v-model="trendDialogVisible"
+      :sector-code="trendBoard.sectorCode"
+      :sector-name="trendBoard.name"
+      idx-type="行业板块"
+    />
   </div>
 </template>
 
@@ -79,32 +86,37 @@
  * 功能：
  * - 按东财行业层级查询并展示行业资金流热力图
  * - 支持日/周周期切换、多种资金流指标、日期范围和正负值过滤
+ * - 支持点击行业单元格后弹出东财行业趋势看板
  * 参数：无
  * 返回值：无
  * 事件：
  * - chart-ready: 热力图实例初始化完成
- * - chart-click: 点击热力图行业单元格后跳转股票列表
+ * - chart-click: 点击热力图行业单元格后弹出趋势看板
  */
 import { ref, onMounted } from 'vue'
 import { watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import FundFlowMetricSelector from './FundFlowMetricSelector.vue'
 import DateRangeSelector from './DateRangeSelector.vue'
 import FundFlowHeatmap from './FundFlowHeatmap.vue'
+import IndustryTrendDialog from '@/components/IndustryTrendDialog.vue'
 import { FundFlowMetricType } from '@/services/industry-fund-flow'
 import { fetchIndustryFundFlowData } from '@/services/industry-fund-flow'
 import type { IndustryFundFlowData } from '@/services/industry-fund-flow'
 import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
 
 // 响应式变量
-const router = useRouter()
 const selectedFundFlowMetric = ref(FundFlowMetricType.MAIN_NET_INFLOW_AMOUNT)
 const selectedDateRange = ref('5') // 修改默认值为5（按天时为5天，按周时为5周）
 const weekFlag = ref(false) // 数据周期标志，false为按天，true为按周
 const valueFilter = ref<'all' | 'positive' | 'negative'>('all')
 const sortAscending = ref(true)
 const loading = ref(false)
+const trendDialogVisible = ref(false)
+const trendBoard = ref({
+  sectorCode: '',
+  name: ''
+})
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
   { label: '东财二级行业', value: '东财二级行业' },
@@ -181,19 +193,18 @@ const handleChartReady = (chartInstance: any) => {
 }
 
 const handleChartClick = (payload: any) => {
-  // 图表点击事件（来自子组件已计算好的行业与日期）
-  console.log('Fund flow chart clicked payload:', payload)
+  const industryName = payload?.industry?.indexName
+  const sectorCode = payload?.industry?.indexCode
+  if (!industryName || !sectorCode) {
+    ElMessage.warning('未找到该行业板块代码，暂时无法打开趋势图')
+    return
+  }
 
-  const industryName = payload?.industry?.indexName || payload?.industry?.indexCode
-  if (!industryName) return
-
-  // 跳转到股票列表页面，传递行业参数
-  router.push({
-    path: '/stock-list',
-    query: { industry: industryName }
-  })
-
-  ElMessage.success(`正在跳转到 ${industryName} 的股票列表`)
+  trendBoard.value = {
+    sectorCode,
+    name: industryName
+  }
+  trendDialogVisible.value = true
 }
 
 // 组件挂载时获取数据
