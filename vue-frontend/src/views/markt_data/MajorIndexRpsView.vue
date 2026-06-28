@@ -91,7 +91,26 @@
       >
         <el-table-column type="index" label="#" width="60" align="center" fixed="left" />
         <el-table-column prop="ts_code" label="指数代码" min-width="120" sortable="custom" fixed="left" />
-        <el-table-column prop="name" label="指数名称" min-width="140" sortable="custom" fixed="left" />
+        <el-table-column prop="name" label="指数名称" min-width="140" sortable="custom" fixed="left">
+          <template #header>
+            <div class="custom-header">
+              <span>指数名称</span>
+              <el-tooltip content="点击指数名称可查看趋势看板K线图" placement="top">
+                <el-icon><InfoFilled /></el-icon>
+              </el-tooltip>
+            </div>
+          </template>
+          <template #default="{ row }">
+            <el-button
+              type="primary"
+              link
+              class="index-name-button"
+              @click="openTrendDialog(row)"
+            >
+              {{ row.name }}
+            </el-button>
+          </template>
+        </el-table-column>
         <el-table-column prop="market" label="市场" min-width="90" align="center" sortable="custom">
           <template #default="{ row }">
             <el-tag :type="row.market === '国内' ? 'danger' : 'success'" effect="light">
@@ -162,6 +181,13 @@
         </template>
       </el-table>
     </el-card>
+
+    <MajorIndexTrendDialog
+      v-model="trendDialogVisible"
+      :index-code="trendIndex.code"
+      :index-name="trendIndex.name"
+      :market="trendIndex.market"
+    />
   </div>
 </template>
 
@@ -178,7 +204,8 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { RefreshRight, Search } from '@element-plus/icons-vue'
+import { InfoFilled, RefreshRight, Search } from '@element-plus/icons-vue'
+import MajorIndexTrendDialog from '@/components/MajorIndexTrendDialog.vue'
 import {
   getMajorIndexRps,
   type MajorIndexRpsData,
@@ -205,6 +232,12 @@ const tradeDate = ref('')
 const sortState = ref<SortState>({
   prop: 'RPS_today',
   order: 'descending',
+})
+const trendDialogVisible = ref(false)
+const trendIndex = ref({
+  code: '',
+  name: '',
+  market: '',
 })
 
 const domesticCount = computed(() => rows.value.filter(item => item.market === '国内').length)
@@ -350,6 +383,22 @@ function handleSortChange({ prop, order }: { prop: string; order: SortOrder }) {
   }
 }
 
+/**
+ * 事件：打开大盘指数趋势弹窗
+ * 功能：点击指数名称后打开趋势看板弹窗，并传递当前指数代码、名称与市场信息
+ * 参数：row(MajorIndexRpsItem) 当前行指数数据
+ * 返回值：无
+ * 事件：更新 trendIndex 与 trendDialogVisible
+ */
+function openTrendDialog(row: MajorIndexRpsItem) {
+  trendIndex.value = {
+    code: row.ts_code,
+    name: row.name,
+    market: row.market,
+  }
+  trendDialogVisible.value = true
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -425,6 +474,16 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.custom-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.index-name-button {
+  padding: 0;
 }
 
 .methodology {
