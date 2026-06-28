@@ -346,6 +346,8 @@
                   <el-radio-button label="1y">最近1年</el-radio-button>
                   <el-radio-button label="3y">最近3年</el-radio-button>
                   <el-radio-button label="5y">最近5年</el-radio-button>
+                  <el-radio-button label="10y">最近10年</el-radio-button>
+                  <el-radio-button label="20y">最近20年</el-radio-button>
                 </el-radio-group>
               </div>
             </div>
@@ -585,6 +587,8 @@
                 <el-radio-button label="1y">最近1年</el-radio-button>
                 <el-radio-button label="3y">最近3年</el-radio-button>
                 <el-radio-button label="5y">最近5年</el-radio-button>
+                <el-radio-button label="10y">最近10年</el-radio-button>
+                <el-radio-button label="20y">最近20年</el-radio-button>
               </el-radio-group>
             </div>
 
@@ -638,7 +642,7 @@ type MemberChangeField = 'pct_change' | `return_${number}`
 type DynamicRpsField = 'RPS_today' | `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
 type ChangeDirectionLabel = '上涨' | '平盘' | '下跌'
-type MemberTrendShortcut = '1y' | '3y' | '5y'
+type MemberTrendShortcut = '1y' | '3y' | '5y' | '10y' | '20y'
 
 const props = defineProps<Props>()
 
@@ -1296,13 +1300,13 @@ const handleSortChange = (sort: { prop: string, order: string }) => {
 
 /**
  * 工具：应用东财指数趋势看板快捷时间范围
- * 功能：根据最近1年、3年、5年的快捷选项计算东财指数K线查询区间
+ * 功能：根据最近1年、3年、5年、10年、20年的快捷选项计算东财指数K线查询区间
  * 参数：range(MemberTrendShortcut) 快捷时间范围
  * 返回值：无
  * 事件：更新 indexTrendDateRange
  */
 const applyIndexTrendShortcut = (range: MemberTrendShortcut) => {
-  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5, '10y': 10, '20y': 20 }
   const endDate = new Date()
   const startDate = new Date()
   startDate.setFullYear(endDate.getFullYear() - yearMap[range])
@@ -1369,7 +1373,7 @@ const loadIndexTrendData = async () => {
 
 /**
  * 事件：切换东财指数趋势看板快捷范围
- * 功能：响应最近1年、3年、5年快捷范围切换并刷新东财指数K线数据
+ * 功能：响应最近1年、3年、5年、10年、20年快捷范围切换并刷新东财指数K线数据
  * 参数：range(MemberTrendShortcut) 快捷时间范围
  * 返回值：无
  * 事件：更新查询区间并重新加载图表数据
@@ -1565,13 +1569,13 @@ const handleMemberRpsSortChange = (sort: { prop: string, order: string }) => {
 
 /**
  * 工具：应用成分股K线弹窗时间快捷范围
- * 功能：根据最近1年、3年、5年的快捷选项计算弹窗查询区间
+ * 功能：根据最近1年、3年、5年、10年、20年的快捷选项计算弹窗查询区间
  * 参数：range(MemberTrendShortcut) 快捷时间范围
  * 返回值：无
  * 事件：更新 memberStockTrendDateRange
  */
 const applyMemberStockTrendShortcut = (range: MemberTrendShortcut) => {
-  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5, '10y': 10, '20y': 20 }
   const endDate = new Date()
   const startDate = new Date()
   startDate.setFullYear(endDate.getFullYear() - yearMap[range])
@@ -1618,7 +1622,7 @@ const loadMemberStockTrendData = async () => {
 
 /**
  * 事件：切换成分股K线弹窗快捷范围
- * 功能：响应最近1年、3年、5年快捷范围切换并刷新K线趋势数据
+ * 功能：响应最近1年、3年、5年、10年、20年快捷范围切换并刷新K线趋势数据
  * 参数：range(MemberTrendShortcut) 快捷时间范围
  * 返回值：无
  * 事件：更新查询区间并重新加载图表数据

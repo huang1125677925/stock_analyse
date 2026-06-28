@@ -47,6 +47,8 @@
             <el-radio-button label="1y">最近1年</el-radio-button>
             <el-radio-button label="3y">最近3年</el-radio-button>
             <el-radio-button label="5y">最近5年</el-radio-button>
+            <el-radio-button label="10y">最近10年</el-radio-button>
+            <el-radio-button label="20y">最近20年</el-radio-button>
           </el-radio-group>
         </div>
       </div>
@@ -74,7 +76,7 @@
  * 行业趋势弹窗组件
  * 功能：
  * - 根据选中的东财行业板块代码弹出趋势看板 K 线图
- * - 支持最近 1 年、3 年、5 年快捷切换
+ * - 支持最近 1 年、3 年、5 年、10 年、20 年快捷切换
  * - 展示最新收盘价、涨跌幅、成交额等摘要信息
  * 参数：
  * - modelValue(boolean): 是否显示弹窗
@@ -92,7 +94,7 @@ import { fetchDcDaily } from '@/services/dcDailyApi'
 import type { StockHistoryDataItem } from '@/services/stockHistoryApi'
 import type { IndustryMaBreadthIdxType } from '@/services/strategyBreadthApi'
 
-type TrendShortcut = '1y' | '3y' | '5y'
+type TrendShortcut = '1y' | '3y' | '5y' | '10y' | '20y'
 
 interface Props {
   modelValue: boolean
@@ -165,13 +167,13 @@ function formatAmount(value: unknown): string {
 
 /**
  * 工具：应用板块趋势快捷时间范围
- * 功能：根据最近1年、3年、5年的快捷选项计算东财板块K线查询区间
+ * 功能：根据最近1年、3年、5年、10年、20年的快捷选项计算东财板块K线查询区间
  * 参数：range(TrendShortcut) 快捷时间范围
  * 返回值：无
  * 事件：更新 trendDateRange
  */
 const applyTrendShortcut = (range: TrendShortcut) => {
-  const yearMap: Record<TrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const yearMap: Record<TrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5, '10y': 10, '20y': 20 }
   const end = new Date()
   const start = new Date()
   start.setFullYear(end.getFullYear() - yearMap[range])
@@ -238,7 +240,7 @@ const loadTrendData = async () => {
 
 /**
  * 事件：切换板块趋势快捷范围
- * 功能：响应最近1年、3年、5年快捷范围切换并重新加载K线数据
+ * 功能：响应最近1年、3年、5年、10年、20年快捷范围切换并重新加载K线数据
  * 参数：range(TrendShortcut) 快捷时间范围
  * 返回值：无
  * 事件：更新趋势查询区间并刷新图表
