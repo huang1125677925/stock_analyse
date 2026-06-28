@@ -1,6 +1,7 @@
-w<template>
+<template>
   <el-select 
     :model-value="modelValue" 
+    :disabled="disabled"
     @update:model-value="$emit('update:modelValue', $event)"
     @change="$emit('change', $event)"
     placeholder="选择资金流指标" 
@@ -32,6 +33,7 @@ import { FUND_FLOW_METRICS, FundFlowMetricType } from '@/services/industry-fund-
  * 
  * Props:
  * @param {FundFlowMetricType} modelValue - 当前选中的资金流指标类型
+ * @param {boolean} disabled - 是否禁用选择器
  * 
  * Events:
  * @event update:modelValue - 选择值变化时触发，用于v-model双向绑定
@@ -40,6 +42,7 @@ import { FUND_FLOW_METRICS, FundFlowMetricType } from '@/services/industry-fund-
 
 interface Props {
   modelValue: FundFlowMetricType
+  disabled?: boolean
 }
 
 interface Emits {
@@ -47,7 +50,7 @@ interface Emits {
   (e: 'change', value: FundFlowMetricType): void
 }
 
-const { modelValue } = defineProps<Props>()
+const { modelValue, disabled = false } = defineProps<Props>()
 defineEmits<Emits>()
 </script>
 

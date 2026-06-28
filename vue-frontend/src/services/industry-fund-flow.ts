@@ -5,10 +5,35 @@
  * 2. 支持时间范围查询
  * 3. 返回格式化的资金流向数据结构
  */
-import axios from './axiosConfig';
+import axios from './axiosConfig'
+import type { EastMoneyIndustryLevel, IndustryMaBreadthIdxType } from './strategyBreadthApi'
 
 // API基础URL
-const API_BASE_URL = '/django/api/stock';
+const API_BASE_URL = '/django/api/stock'
+
+interface AxiosLikeResponse<T> {
+  status?: number
+  statusText?: string
+  data: T
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object'
+}
+
+function unwrapBusinessData<T>(
+  payload: ApiResponse<T> | AxiosLikeResponse<ApiResponse<T> | T> | T
+): T {
+  if (isRecord(payload) && 'status' in payload && 'data' in payload) {
+    return unwrapBusinessData((payload as unknown as AxiosLikeResponse<ApiResponse<T> | T>).data)
+  }
+
+  if (isRecord(payload) && 'code' in payload && 'data' in payload) {
+    return (payload as unknown as ApiResponse<T>).data
+  }
+
+  return payload as T
+}
 
 // 行业代码和名称映射接口
 export interface SwCodeName {
@@ -37,6 +62,8 @@ export interface IndustryFundFlowData {
   dates: string[]
   swCodeNames: SwCodeName[]
   congestions: Record<string, IndustryFundFlowDataItem[]>
+  idx_type?: IndustryMaBreadthIdxType
+  level?: EastMoneyIndustryLevel
 }
 
 // API响应接口定义
@@ -44,7 +71,7 @@ export interface ApiResponse<T = any> {
   code: number
   message: string
   timestamp: string
-  data?: T
+  data: T
 }
 
 // 行业资金流响应接口定义
@@ -53,6 +80,14 @@ export interface IndustryFundFlowResponse {
   message: string
   timestamp: string
   data: IndustryFundFlowData
+}
+
+export interface IndustryFundFlowQuery {
+  startDate?: string
+  endDate?: string
+  weekFlag?: boolean
+  idxType?: IndustryMaBreadthIdxType
+  level?: EastMoneyIndustryLevel
 }
 
 // 资金流指标类型枚举
@@ -186,27 +221,28 @@ export const FUND_FLOW_METRICS: Record<FundFlowMetricType, FundFlowMetricConfig>
 
 /**
  * 获取行业资金流数据
- * @param startDate 开始日期，格式：YYYY-MM-DD，默认为30天前
- * @param endDate 结束日期，格式：YYYY-MM-DD，默认为当前日期
- * @param weekFlag 数据周期标志，false为按天，true为按周，默认为false
+ * @param query 查询参数，支持日期范围、日/周聚合、东财板块类型与行业层级
  * @returns Promise<IndustryFundFlowData | null> 行业资金流数据
  */
 export async function fetchIndustryFundFlowData(
-  startDate?: string,
-  endDate?: string,
-  weekFlag?: boolean
+  query: IndustryFundFlowQuery = {}
 ): Promise<IndustryFundFlowData | null> {
   try {
     const params: any = {}
-    if (startDate) params.start_date = startDate
-    if (endDate) params.end_date = endDate
-    if (weekFlag !== undefined) params.week_flag = weekFlag
+    if (query.startDate) params.start_date = query.startDate
+    if (query.endDate) params.end_date = query.endDate
+    if (query.weekFlag !== undefined) params.week_flag = query.weekFlag
+    params.idx_type = query.idxType ?? '行业板块'
+    if (query.level) params.level = query.level
 
-    const response = await axios.get<IndustryFundFlowData>(`${API_BASE_URL}/industry/fund-flow/data/`, {
+    const response = await axios.get<
+      ApiResponse<IndustryFundFlowData> | IndustryFundFlowData,
+      ApiResponse<IndustryFundFlowData> | AxiosLikeResponse<ApiResponse<IndustryFundFlowData> | IndustryFundFlowData> | IndustryFundFlowData
+    >(`${API_BASE_URL}/industry/fund-flow/data/`, {
       params
     })
-    
-    return response.data
+
+    return unwrapBusinessData(response)
   } catch (error) {
     console.error('获取行业资金流数据失败:', error)
     throw error

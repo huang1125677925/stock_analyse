@@ -280,7 +280,10 @@ const fetchData = async () => {
     startDate.setDate(today.getDate() - days)
     const formattedStartDate = startDate.toISOString().split('T')[0]
     
-    const response = await fetchIndustryFundFlowData(formattedStartDate, endDate)
+    const response = await fetchIndustryFundFlowData({
+      startDate: formattedStartDate,
+      endDate
+    })
     
     if (response) {
       fundFlowData.value = response

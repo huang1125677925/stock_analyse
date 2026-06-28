@@ -1,13 +1,28 @@
 <template>
   <div class="turnover-analysis">
     <div class="controls">
+      <el-select
+        v-model="selectedLevel"
+        placeholder="行业层级"
+        :disabled="loading"
+        @change="updateChart"
+        style="width: 160px;"
+      >
+        <el-option
+          v-for="option in levelOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
       <!-- 日期范围选择 -->
       <DateRangeSelector 
         v-model="selectedDateRange" 
+        :disabled="loading"
         @change="updateChart" 
         style="margin-right: 10px;"
       />
-      <el-button @click="sortByLastColumn" type="primary">按最后一列排序</el-button>
+      <el-button @click="sortByLastColumn" type="primary" :disabled="loading">按最后一列排序</el-button>
     </div>
     
     <div class="chart-container">
@@ -27,15 +42,21 @@
 <script setup lang="ts">
 /**
  * 成交金额占比分位数分析组件
- * 功能：显示行业成交金额占比分位数热力图
+ * 功能：
+ * - 按东财行业层级查询并展示行业成交金额占比分位数热力图
+ * - 支持日期范围切换和按最后一列排序
+ * 参数：无
  * 返回值：无
- * 事件：chart-ready, chart-click
+ * 事件：
+ * - chart-ready: 热力图实例初始化完成
+ * - chart-click: 点击热力图行业单元格后跳转股票列表
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryTurnoverPercentile } from '@/services/industry-turnover-percentile'
 import type { IndustryTurnoverPercentileItem } from '@/services/industry-turnover-percentile'
+import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
 import DateRangeSelector from '@/components/DateRangeSelector.vue'
 import TurnoverHeatmap from '@/components/TurnoverHeatmap.vue'
 
@@ -56,6 +77,12 @@ const sortMetric = ref('amount')
 const selectedDateRange = ref('20')
 const sortAscending = ref(true)
 const loading = ref(false)
+const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
+  { label: '东财一级行业', value: '东财一级行业' },
+  { label: '东财二级行业', value: '东财二级行业' },
+  { label: '东财三级行业', value: '东财三级行业' }
+]
+const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
 
 // 数据存储
 const allIndustries = ref<IndustryData[]>([])
@@ -76,13 +103,16 @@ const fetchTurnoverData = async () => {
     const formattedStartDate = startDate.toISOString().split('T')[0]
     
     // 使用stockApi中的函数获取数据
-    const response = await fetchIndustryTurnoverPercentile(formattedStartDate, endDate)
-    
+    const response = await fetchIndustryTurnoverPercentile({
+      startDate: formattedStartDate,
+      endDate,
+      idxType: '行业板块',
+      level: selectedLevel.value
+    })
+
     if (response) {
-      // 处理API返回的数据
       const apiData = response.data
-      
-      // 确保apiData是数组
+
       if (!Array.isArray(apiData)) {
         console.error('API返回的数据不是数组:', apiData)
         throw new Error('API返回的数据格式不正确')
@@ -116,9 +146,10 @@ const fetchTurnoverData = async () => {
         }
         
         // 更新对应日期的数据
+        const amountPercentile = item.amount_percentile ?? item.turnover_ratio_percentile ?? 0
         industryData.data[dateIndex] = {
-          turnoverRateFQuantile: item.turnover_ratio_percentile,
-          amountCongestionQuantile: item.turnover_ratio_percentile
+          turnoverRateFQuantile: amountPercentile,
+          amountCongestionQuantile: amountPercentile
         }
       })
       

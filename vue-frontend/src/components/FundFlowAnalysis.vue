@@ -1,11 +1,25 @@
 <template>
   <div class="fund-flow-analysis">
     <div class="controls">
-      
+      <el-select
+        v-model="selectedLevel"
+        placeholder="行业层级"
+        :disabled="loading"
+        @change="updateChart"
+        style="width: 160px; margin-right: 10px;"
+      >
+        <el-option
+          v-for="option in levelOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+
       <!-- 数据周期选择 -->
       <el-select 
         v-model="weekFlag" 
-        @change="updateChart" 
+        :disabled="loading"
         placeholder="数据周期" 
         style="width: 120px; margin-right: 10px;"
       >
@@ -17,6 +31,7 @@
       <FundFlowMetricSelector 
         v-model="selectedFundFlowMetric" 
         @change="updateChart" 
+        :disabled="loading"
         style="margin-right: 10px;"
       />
       
@@ -24,6 +39,7 @@
       <DateRangeSelector 
         v-model="selectedDateRange" 
         :week-flag="weekFlag"
+        :disabled="loading"
         @change="updateChart" 
       />
       
@@ -31,6 +47,7 @@
       <el-select 
         v-model="valueFilter" 
         @change="updateChart" 
+        :disabled="loading"
         placeholder="数值过滤" 
         style="width: 120px; margin-right: 10px;"
       >
@@ -39,7 +56,7 @@
         <el-option label="仅负值" value="negative" />
       </el-select>
       
-      <el-button @click="sortByLastColumn" type="primary">按最后一列排序</el-button>
+      <el-button @click="sortByLastColumn" type="primary" :disabled="loading">按最后一列排序</el-button>
     </div>
     
     <div class="chart-container">
@@ -59,11 +76,16 @@
 <script setup lang="ts">
 /**
  * 行业资金流分析组件
- * 功能：显示行业资金流热力图，支持多种资金流指标和日期范围选择
+ * 功能：
+ * - 按东财行业层级查询并展示行业资金流热力图
+ * - 支持日/周周期切换、多种资金流指标、日期范围和正负值过滤
+ * 参数：无
  * 返回值：无
- * 事件：chart-ready, chart-click
+ * 事件：
+ * - chart-ready: 热力图实例初始化完成
+ * - chart-click: 点击热力图行业单元格后跳转股票列表
  */
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -73,6 +95,7 @@ import FundFlowHeatmap from './FundFlowHeatmap.vue'
 import { FundFlowMetricType } from '@/services/industry-fund-flow'
 import { fetchIndustryFundFlowData } from '@/services/industry-fund-flow'
 import type { IndustryFundFlowData } from '@/services/industry-fund-flow'
+import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
 
 // 响应式变量
 const router = useRouter()
@@ -82,6 +105,12 @@ const weekFlag = ref(false) // 数据周期标志，false为按天，true为按�
 const valueFilter = ref<'all' | 'positive' | 'negative'>('all')
 const sortAscending = ref(true)
 const loading = ref(false)
+const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
+  { label: '东财一级行业', value: '东财一级行业' },
+  { label: '东财二级行业', value: '东财二级行业' },
+  { label: '东财三级行业', value: '东财三级行业' }
+]
+const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
 
 // 数据存储
 const industryFundFlowData = ref<IndustryFundFlowData | null>(null)
@@ -109,7 +138,13 @@ const fetchFundFlowData = async () => {
     startDate.setDate(today.getDate() - days)
     const formattedStartDate = startDate.toISOString().split('T')[0]
     
-    const response = await fetchIndustryFundFlowData(formattedStartDate, endDate, weekFlag.value)
+    const response = await fetchIndustryFundFlowData({
+      startDate: formattedStartDate,
+      endDate,
+      weekFlag: weekFlag.value,
+      idxType: '行业板块',
+      level: selectedLevel.value
+    })
     
     if (response) {
       industryFundFlowData.value = response

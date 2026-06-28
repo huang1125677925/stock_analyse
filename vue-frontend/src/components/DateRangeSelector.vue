@@ -1,6 +1,7 @@
 <template>
   <el-select 
     :model-value="modelValue" 
+    :disabled="disabled"
     @update:model-value="$emit('update:modelValue', $event)"
     @change="$emit('change', $event)"
     placeholder="选择日期范围" 
@@ -45,6 +46,7 @@
  * Props:
  * @param {string} modelValue - 当前选中的日期范围值
  * @param {boolean} weekFlag - 周期标志，false为按天，true为按周
+ * @param {boolean} disabled - 是否禁用选择器
  * 
  * Events:
  * @event update:modelValue - 选择值变化时触发，用于v-model双向绑定
@@ -54,6 +56,7 @@
 interface Props {
   modelValue: string
   weekFlag?: boolean
+  disabled?: boolean
 }
 
 interface Emits {
@@ -61,7 +64,7 @@ interface Emits {
   (e: 'change', value: string): void
 }
 
-const { modelValue, weekFlag = false } = defineProps<Props>()
+const { modelValue, weekFlag = false, disabled = false } = defineProps<Props>()
 defineEmits<Emits>()
 </script>
 
