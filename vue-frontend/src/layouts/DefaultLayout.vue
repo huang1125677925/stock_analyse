@@ -22,7 +22,7 @@
                 :offset="0"
               >
                 <template #reference>
-                  <div class="mega-menu-trigger" :class="{ 'is-active': $route.path.startsWith(item.path) }">
+                  <div class="mega-menu-trigger" :class="{ 'is-active': isMegaMenuActive(item.path) }">
                     <el-icon>
                       <component :is="item.icon" />
                     </el-icon>
@@ -417,8 +417,8 @@ interface MenuItem {
 const menuItems = computed(() => {
   const baseMenuItems: MenuItem[] = [
     {
-      path: '/',
-      title: '大盘估值',
+      path: '/market-overview',
+      title: '大盘概览',
       icon: 'DataAnalysis',
     },
     {
@@ -447,6 +447,16 @@ const menuItems = computed(() => {
 
   return baseMenuItems
 })
+
+const marketOverviewMegaMenuSections = [
+  {
+    title: '大盘概览',
+    items: [
+      { title: '大盘指数估值', path: '/' },
+      { title: '大盘指数RPS', path: '/major-index-rps' },
+    ],
+  },
+]
 
 // ETF/指数大导航结构（悬停展开的 mega menu）
 const etfIndexMegaMenuSections = [
@@ -518,11 +528,22 @@ function goPath(path?: string) {
 }
 
 function hasMegaMenu(path: string) {
-  return ['/analysis', '/stock-picker', '/etf', '/quant'].includes(path)
+  return ['/market-overview', '/analysis', '/stock-picker', '/etf', '/quant'].includes(path)
+}
+
+function isMegaMenuActive(path: string) {
+  switch (path) {
+    case '/market-overview':
+      return route.path === '/' || route.path === '/major-index-rps'
+    default:
+      return route.path.startsWith(path)
+  }
 }
 
 function getMegaMenuSections(path: string) {
   switch (path) {
+    case '/market-overview':
+      return marketOverviewMegaMenuSections
     case '/stock-picker':
       return stockPickerMegaMenuSections
     case '/etf':
