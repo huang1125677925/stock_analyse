@@ -28,7 +28,7 @@
  * - chart-click: 点击热力图单元格时触发，返回行业、日期、值和原始图表参数
  */
 
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import * as echarts from 'echarts'
 import HeatmapChart from './HeatmapChart.vue'
 
@@ -66,11 +66,6 @@ interface MetricConfig {
   labelFormatter: (value: number) => string
 }
 
-interface SelectedCell {
-  date: string
-  sectorCode: string
-}
-
 const props = withDefaults(defineProps<Props>(), {
   sortAscending: false
 })
@@ -79,8 +74,6 @@ const emit = defineEmits<{
   'chart-ready': [chart: echarts.ECharts]
   'chart-click': [payload: { industry?: { name: string; sectorCode: string }, date?: string, value?: number, metric: TurnoverMetricType, rawParams: any }]
 }>()
-
-const selectedCell = ref<SelectedCell | null>(null)
 
 const formatAmount = (value: number) => {
   const numericValue = Number.isFinite(value) ? value : 0
@@ -151,25 +144,6 @@ const processedIndustries = computed(() => {
   })
 })
 
-const isSelectedAmountCell = (dateIndex: number, industryIndex: number) => {
-  if (props.metric !== 'amount' || !selectedCell.value) {
-    return false
-  }
-
-  const date = props.dates[dateIndex]
-  const industry = processedIndustries.value[industryIndex]
-
-  return date === selectedCell.value.date && industry?.sectorCode === selectedCell.value.sectorCode
-}
-
-watch(
-  () => [props.metric, props.dates, props.industries],
-  () => {
-    selectedCell.value = null
-  },
-  { deep: true }
-)
-
 const chartOption = computed((): echarts.EChartsOption => {
   const heatmapData: [number, number, number][] = []
 
@@ -192,7 +166,7 @@ const chartOption = computed((): echarts.EChartsOption => {
     },
     tooltip: {
       position: 'top',
-      triggerOn: props.metric === 'amount' ? 'click' : 'mousemove|click',
+      triggerOn: 'mousemove|click',
       formatter: (params: any) => {
         const [dateIndex, industryIndex, value] = params.data
         const date = props.dates[dateIndex]
@@ -267,20 +241,16 @@ const chartOption = computed((): echarts.EChartsOption => {
         type: 'heatmap',
         data: heatmapData,
         label: {
-          show: true,
+          show: props.metric !== 'amount',
           fontSize: 9,
-          formatter: (params: any) => {
-            if (props.metric !== 'amount') {
-              return activeMetricConfig.value.labelFormatter(params.data[2])
-            }
-
-            const [dateIndex, industryIndex, value] = params.data as [number, number, number]
-            return isSelectedAmountCell(dateIndex, industryIndex)
-              ? activeMetricConfig.value.labelFormatter(value)
-              : ''
-          }
+          formatter: (params: any) => activeMetricConfig.value.labelFormatter(params.data[2])
         },
         emphasis: {
+          label: {
+            show: props.metric === 'amount',
+            fontSize: 9,
+            formatter: (params: any) => activeMetricConfig.value.labelFormatter(params.data[2])
+          },
           itemStyle: {
             shadowBlur: 10,
             shadowColor: 'rgba(0, 0, 0, 0.5)'
@@ -300,13 +270,6 @@ const handleChartClick = (params: any) => {
   const [dateIndex, industryIndex, value] = dataPoint ?? []
   const industry = typeof industryIndex === 'number' ? processedIndustries.value[industryIndex] : undefined
   const date = typeof dateIndex === 'number' ? props.dates[dateIndex] : undefined
-
-  selectedCell.value = industry && date
-    ? {
-        sectorCode: industry.sectorCode,
-        date
-      }
-    : null
 
   emit('chart-click', {
     industry: industry ? { name: industry.name, sectorCode: industry.sectorCode } : undefined,
