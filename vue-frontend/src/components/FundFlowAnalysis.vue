@@ -106,8 +106,8 @@ import type { IndustryFundFlowData } from '@/services/industry-fund-flow'
 import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
 
 // 响应式变量
-const selectedFundFlowMetric = ref(FundFlowMetricType.MAIN_NET_INFLOW_AMOUNT)
-const selectedDateRange = ref('5') // 修改默认值为5（按天时为5天，按周时为5周）
+const selectedFundFlowMetric = ref(FundFlowMetricType.TOTAL_NET_INFLOW_AMOUNT)
+const selectedDateRange = ref('20') // 默认按天查看最近20天，按周模式切换时重置为5周
 const weekFlag = ref(false) // 数据周期标志，false为按天，true为按周
 const valueFilter = ref<'all' | 'positive' | 'negative'>('all')
 const sortAscending = ref(true)
@@ -122,7 +122,7 @@ const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndus
   { label: '东财二级行业', value: '东财二级行业' },
   { label: '东财三级行业', value: '东财三级行业' }
 ]
-const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
+const selectedLevel = ref<EastMoneyIndustryLevel>('东财二级行业')
 
 // 数据存储
 const industryFundFlowData = ref<IndustryFundFlowData | null>(null)
@@ -176,9 +176,9 @@ const updateChart = () => {
   fetchFundFlowData()
 }
 
-// 监听周期标志变化，重置日期范围为默认值
+// 监听周期标志变化，按当前周期重置为对应默认范围
 watch(weekFlag, (newWeekFlag: boolean) => {
-  selectedDateRange.value = '5' // 重置为默认值5（按天时为5天，按周时为5周）
+  selectedDateRange.value = newWeekFlag ? '5' : '20'
   updateChart() // 更新图表
 })
 

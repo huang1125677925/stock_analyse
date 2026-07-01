@@ -224,7 +224,7 @@ const emit = defineEmits<{
 const FIXED_RANGE_DAYS = 20
 const loading = ref(false)
 const endDate = ref<string>(formatDate(new Date()))
-const maWindow = ref<number>(20)
+const maWindow = ref<number>(10)
 const sortByLastColumn = ref(true)
 const maWindowOptions = [5, 10, 20, 30, 60, 90, 250]
 const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
@@ -233,7 +233,7 @@ const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndus
   { label: '东财二级行业', value: '东财二级行业' },
   { label: '东财三级行业', value: '东财三级行业' }
 ]
-const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
+const selectedLevel = ref<EastMoneyIndustryLevel>('东财二级行业')
 const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendShortcut = ref<TrendShortcut>('1y')

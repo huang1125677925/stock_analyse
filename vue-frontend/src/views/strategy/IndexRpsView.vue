@@ -38,6 +38,12 @@
                     :value="level"
                   />
                 </el-select>
+                <el-button
+                  class="control-item control-toggle"
+                  @click="toggleTodayChangeColumn"
+                >
+                  {{ showTodayChange ? '隐藏当日涨跌幅' : '显示当日涨跌幅' }}
+                </el-button>
               </div>
               <div class="table-summary">
                 <el-tag type="info" effect="plain">共 {{ filteredRpsData.length }} 条</el-tag>
@@ -147,6 +153,7 @@
           </el-table-column>
 
           <el-table-column
+            v-if="showTodayChange"
             prop="pct_change"
             label="当日涨跌幅"
             min-width="110"
@@ -653,18 +660,10 @@ const rpsFilterGroups: Array<{ field: RpsField; label: string }> = rpsPeriods.ma
   field: `RPS_${period}` as RpsField,
   label: `RPS_${period}强度`
 }))
-const changeFilterGroups: Array<{ field: MainChangeField; label: string }> = [
-  { field: 'pct_change', label: '当日涨跌幅' },
-  ...rpsPeriods.map((period) => ({
-    field: `return_${period}` as ReturnField,
-    label: `${period}日涨跌幅`
-  }))
-]
-
 function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
   return industryLevelOptions.includes(value as DcIndustryLevel)
     ? value as DcIndustryLevel
-    : '东财一级行业'
+    : '东财二级行业'
 }
 
 /**
@@ -695,6 +694,7 @@ const queryTime = ref('')
 
 // 搜索关键词
 const searchKeyword = ref('')
+const showTodayChange = ref(false)
 
 // 成分股RPS对话框状态
 const indexTrendDialogVisible = ref(false)
@@ -746,8 +746,18 @@ const selectedRpsRanks = reactive<Record<RpsField, RpsRankLabel[]>>(
     return accumulator
   }, {} as Record<RpsField, RpsRankLabel[]>)
 )
+const baseChangeFilterGroups: Array<{ field: MainChangeField; label: string }> = [
+  { field: 'pct_change', label: '当日涨跌幅' },
+  ...rpsPeriods.map((period) => ({
+    field: `return_${period}` as ReturnField,
+    label: `${period}日涨跌幅`
+  }))
+]
+const changeFilterGroups = computed<Array<{ field: MainChangeField; label: string }>>(() => (
+  baseChangeFilterGroups.filter(({ field }) => showTodayChange.value || field !== 'pct_change')
+))
 const selectedChangeDirections = reactive<Record<MainChangeField, ChangeDirectionLabel[]>>(
-  changeFilterGroups.reduce((accumulator, { field }) => {
+  baseChangeFilterGroups.reduce((accumulator, { field }) => {
     accumulator[field] = []
     return accumulator
   }, {} as Record<MainChangeField, ChangeDirectionLabel[]>)
@@ -1018,6 +1028,20 @@ const toggleChangeDirection = (field: MainChangeField, direction: ChangeDirectio
 }
 
 /**
+ * 事件：切换主表当日涨跌幅列显示状态
+ * 功能：在指数 RPS 主表中按需展示或隐藏“当日涨跌幅”列及对应筛选项
+ * 参数：无
+ * 返回值：无
+ * 事件：更新 showTodayChange，并在隐藏时清空当日涨跌幅筛选
+ */
+const toggleTodayChangeColumn = () => {
+  showTodayChange.value = !showTodayChange.value
+  if (!showTodayChange.value) {
+    selectedChangeDirections.pct_change = []
+  }
+}
+
+/**
  * 工具：切换成分股涨跌幅方向标签
  * 功能：在成分股弹窗中对指定字段执行上涨/平盘/下跌标签的选中与取消
  * 参数：
@@ -1059,7 +1083,7 @@ const resetRpsFilters = () => {
  * 事件：重置 selectedChangeDirections，触发表格过滤结果重算
  */
 const resetChangeFilters = () => {
-  changeFilterGroups.forEach(({ field }) => {
+  changeFilterGroups.value.forEach(({ field }) => {
     selectedChangeDirections[field] = []
   })
 }
@@ -1114,7 +1138,7 @@ const matchesRpsFilters = (item: IndexRpsItem): boolean => {
  * 事件：无
  */
 const matchesChangeFilters = (item: IndexRpsItem): boolean => {
-  return changeFilterGroups.every(({ field }) => {
+  return changeFilterGroups.value.every(({ field }) => {
     if (!hasSelectedChangeDirections(field)) {
       return true
     }
@@ -1161,7 +1185,7 @@ const hasActiveRpsFilter = computed(() => {
 })
 
 const hasActiveChangeFilter = computed(() => {
-  return changeFilterGroups.some(({ field }) => hasSelectedChangeDirections(field))
+  return changeFilterGroups.value.some(({ field }) => hasSelectedChangeDirections(field))
 })
 
 const memberRpsFilterGroups = computed<Array<{ field: DynamicRpsField; label: string }>>(() => ([

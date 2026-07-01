@@ -117,7 +117,7 @@ interface IndustryData {
 
 const selectedDateRange = ref('40')
 const endDate = ref(new Date().toISOString().split('T')[0])
-const selectedMetric = ref<TurnoverMetricType>('amount_percentile')
+const selectedMetric = ref<TurnoverMetricType>('amount')
 const sortAscending = ref(true)
 const loading = ref(false)
 const trendDialogVisible = ref(false)
@@ -134,7 +134,7 @@ const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndus
   { label: '东财二级行业', value: '东财二级行业' },
   { label: '东财三级行业', value: '东财三级行业' }
 ]
-const selectedLevel = ref<EastMoneyIndustryLevel>('东财一级行业')
+const selectedLevel = ref<EastMoneyIndustryLevel>('东财二级行业')
 const metricOptions: Array<{ label: string; value: TurnoverMetricType }> = [
   { label: '成交额百分位排名热力图', value: 'amount_percentile' },
   { label: '板块成交额热力图', value: 'amount' },
