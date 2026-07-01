@@ -43,7 +43,7 @@ const router = createRouter({
     {
       path: '/stock-picker',
       name: 'stock-picker',
-      meta: { title: '智能选股' },
+      meta: { title: '股票实战' },
       children: [
         {
           path: '/stock-viewer',
@@ -111,7 +111,7 @@ const router = createRouter({
     {
       path: '/analysis',
       name: 'analysis',
-      meta: { title: '股票分析' },
+      meta: { title: '行业跟踪' },
       children: [
         {
           path: '/analysis/technical',
@@ -282,7 +282,7 @@ const router = createRouter({
     {
       path: '/stock-data',
       name: 'stock-data',
-      meta: { title: '个股数据' },
+      meta: { title: '股票实战' },
       children: [
         {
           path: '/stock-limit-step',
@@ -294,19 +294,13 @@ const router = createRouter({
           path: '/stock-limit-board-analysis',
           name: 'stock-limit-board-analysis',
           component: () => import('@/views/indival_stock_data/LimitBoardAnalysisView.vue'),
-          meta: { title: '打板' }
-        },
-        {
-          path: '/stock-value-practice',
-          name: 'stock-value-practice',
-          component: () => import('@/views/indival_stock_data/StockValuePracticeView.vue'),
-          meta: { title: '价值' }
+          meta: { title: '打板分析选股' }
         },
         {
           path: '/stock-swing-practice',
           name: 'stock-swing-practice',
           component: () => import('@/views/indival_stock_data/StockSwingPracticeView.vue'),
-          meta: { title: '波段' }
+          meta: { title: '波段趋势选股' }
         },
       ]
     },

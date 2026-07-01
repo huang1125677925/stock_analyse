@@ -6,7 +6,7 @@
       <template #header>
         <div class="card-header">
           <div>
-            <h2>波段交易参考</h2>
+            <h2>波段趋势选股</h2>
             <p>基于波段分析接口生成趋势、位置、量能、波动和风险提示。</p>
           </div>
           <el-button type="primary" :loading="analysisLoading || klineLoading" :disabled="!canAnalyze" @click="refreshAnalysis">

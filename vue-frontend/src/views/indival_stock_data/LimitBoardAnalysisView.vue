@@ -3,7 +3,7 @@
     <el-card class="query-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span>打板</span>
+          <span>打板分析选股</span>
           <el-tag v-if="lastQueryTime" type="info" effect="plain">更新时间 {{ lastQueryTime }}</el-tag>
         </div>
       </template>
