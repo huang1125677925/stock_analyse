@@ -35,7 +35,20 @@
         </div>
         <div class="control-group">
           <span class="control-label">时间范围：</span>
-          <el-input value="最近20天" disabled style="width: 160px" />
+          <el-select
+            v-model="selectedDateRange"
+            placeholder="选择时间范围"
+            :disabled="loading"
+            style="width: 160px"
+            @change="handleParamsChange"
+          >
+            <el-option
+              v-for="option in dateRangeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
         </div>
         <div class="control-group">
           <span class="control-label">结束日期：</span>
@@ -224,14 +237,21 @@ const emit = defineEmits<{
   }]
 }>()
 
-const FIXED_RANGE_DAYS = 20
+type DateRangeOption = 20 | 60 | 120
+
 const loading = ref(false)
 const endDate = ref<string>(formatDate(new Date()))
 const sortByLastColumn = ref(true)
 const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
 const selectedLevel = ref<EastMoneyIndustryLevel>('东财二级行业')
+const selectedDateRange = ref<DateRangeOption>(20)
 const selectedMetric = ref<UpDownMetric>('up_ratio')
 const rawData = ref<IndustryUpDownRatioItem[]>([])
+const dateRangeOptions: Array<{ label: string; value: DateRangeOption }> = [
+  { label: '最近20天', value: 20 },
+  { label: '最近60天', value: 60 },
+  { label: '最近120天', value: 120 }
+]
 const metricOptions: MetricOption[] = [
   { label: '上涨比例热力图', value: 'up_ratio' },
   { label: '下跌比例热力图', value: 'down_ratio' },
@@ -583,7 +603,7 @@ const toggleLastColumnSort = () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const [start, end] = computeDateRangeByEndDate(endDate.value, FIXED_RANGE_DAYS)
+    const [start, end] = computeDateRangeByEndDate(endDate.value, selectedDateRange.value)
     const data = await fetchIndustryUpDownRatio({
       startDate: start,
       endDate: end,
