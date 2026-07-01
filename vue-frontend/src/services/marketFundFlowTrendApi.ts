@@ -2,7 +2,7 @@
  * 大盘资金趋势分析 API 服务
  * 功能：
  * - 请求大盘资金趋势数据接口 `/django/api/market/fund-flow/trend/`
- * - 兼容数组、`list`、`data.list` 等常见返回结构
+ * - 兼容数组、`list`、`records`、`data.records` 等常见返回结构
  * - 提供金额与比例维度的对象配置和通用格式化方法
  */
 import axios from './axiosConfig'
@@ -89,6 +89,7 @@ function unwrapList(payload: unknown): Record<string, unknown>[] {
 
   const candidates = [
     (payload as Record<string, unknown>).list,
+    (payload as Record<string, unknown>).records,
     (payload as Record<string, unknown>).results,
     (payload as Record<string, unknown>).rows,
     (payload as Record<string, unknown>).data,
@@ -104,6 +105,9 @@ function unwrapList(payload: unknown): Record<string, unknown>[] {
       if (Array.isArray(nested.list)) {
         return nested.list as Record<string, unknown>[]
       }
+      if (Array.isArray(nested.records)) {
+        return nested.records as Record<string, unknown>[]
+      }
       if (Array.isArray(nested.results)) {
         return nested.results as Record<string, unknown>[]
       }
@@ -118,21 +122,21 @@ function unwrapList(payload: unknown): Record<string, unknown>[] {
 
 function normalizeItem(item: Record<string, unknown>): MarketFundFlowTrendItem {
   return {
-    date: String(item.date ?? ''),
-    main_net_inflow_amount: normalizeNumber(item.main_net_inflow_amount),
-    super_large_net_inflow_amount: normalizeNumber(item.super_large_net_inflow_amount),
-    large_net_inflow_amount: normalizeNumber(item.large_net_inflow_amount),
-    medium_net_inflow_amount: normalizeNumber(item.medium_net_inflow_amount),
-    small_net_inflow_amount: normalizeNumber(item.small_net_inflow_amount),
-    main_net_inflow_ratio: normalizeNumber(item.main_net_inflow_ratio),
-    super_large_net_inflow_ratio: normalizeNumber(item.super_large_net_inflow_ratio),
-    large_net_inflow_ratio: normalizeNumber(item.large_net_inflow_ratio),
-    medium_net_inflow_ratio: normalizeNumber(item.medium_net_inflow_ratio),
-    small_net_inflow_ratio: normalizeNumber(item.small_net_inflow_ratio),
-    shanghai_close_price: normalizeNumber(item.shanghai_close_price),
-    shanghai_change_rate: normalizeNumber(item.shanghai_change_rate),
-    shenzhen_close_price: normalizeNumber(item.shenzhen_close_price),
-    shenzhen_change_rate: normalizeNumber(item.shenzhen_change_rate),
+    date: String(item.date ?? item.trade_date ?? ''),
+    main_net_inflow_amount: normalizeNumber(item.main_net_inflow_amount ?? item.net_amount),
+    super_large_net_inflow_amount: normalizeNumber(item.super_large_net_inflow_amount ?? item.buy_elg_amount),
+    large_net_inflow_amount: normalizeNumber(item.large_net_inflow_amount ?? item.buy_lg_amount),
+    medium_net_inflow_amount: normalizeNumber(item.medium_net_inflow_amount ?? item.buy_md_amount),
+    small_net_inflow_amount: normalizeNumber(item.small_net_inflow_amount ?? item.buy_sm_amount),
+    main_net_inflow_ratio: normalizeNumber(item.main_net_inflow_ratio ?? item.net_amount_rate),
+    super_large_net_inflow_ratio: normalizeNumber(item.super_large_net_inflow_ratio ?? item.buy_elg_amount_rate),
+    large_net_inflow_ratio: normalizeNumber(item.large_net_inflow_ratio ?? item.buy_lg_amount_rate),
+    medium_net_inflow_ratio: normalizeNumber(item.medium_net_inflow_ratio ?? item.buy_md_amount_rate),
+    small_net_inflow_ratio: normalizeNumber(item.small_net_inflow_ratio ?? item.buy_sm_amount_rate),
+    shanghai_close_price: normalizeNumber(item.shanghai_close_price ?? item.close_sh),
+    shanghai_change_rate: normalizeNumber(item.shanghai_change_rate ?? item.pct_change_sh),
+    shenzhen_close_price: normalizeNumber(item.shenzhen_close_price ?? item.close_sz),
+    shenzhen_change_rate: normalizeNumber(item.shenzhen_change_rate ?? item.pct_change_sz),
   }
 }
 
