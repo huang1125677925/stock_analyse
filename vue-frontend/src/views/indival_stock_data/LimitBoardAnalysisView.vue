@@ -9,7 +9,7 @@
       </template>
 
       <el-form :inline="true" class="query-form">
-        <el-form-item label="交易日期">
+        <el-form-item v-if="activeTab !== 'industryTrend'" label="交易日期">
           <el-date-picker
             v-model="tradeDate"
             type="date"
@@ -18,7 +18,25 @@
             :clearable="false"
           />
         </el-form-item>
-        <el-form-item label="返回数量">
+        <el-form-item v-if="activeTab === 'industryTrend'" label="开始日期">
+          <el-date-picker
+            v-model="trendStartDate"
+            type="date"
+            value-format="YYYYMMDD"
+            placeholder="选择开始日期"
+            :clearable="false"
+          />
+        </el-form-item>
+        <el-form-item v-if="activeTab === 'industryTrend'" label="结束日期">
+          <el-date-picker
+            v-model="trendEndDate"
+            type="date"
+            value-format="YYYYMMDD"
+            placeholder="选择结束日期"
+            :clearable="false"
+          />
+        </el-form-item>
+        <el-form-item v-if="activeTab !== 'industryTrend'" label="返回数量">
           <el-input-number v-model="topN" :min="5" :max="100" :step="5" controls-position="right" />
         </el-form-item>
         <el-form-item>
@@ -272,28 +290,96 @@
           <SourceCounts :counts="hotMoneyData?.source_counts" />
         </section>
       </el-tab-pane>
+
+      <el-tab-pane label="涨停趋势" name="industryTrend">
+        <section v-loading="loading.industryTrend" class="tab-panel">
+          <div v-if="industryTrendData" class="summary-grid compact">
+            <div v-for="item in industryTrendSummaryCards" :key="item.key" class="metric-card">
+              <div class="metric-label">{{ item.label }}</div>
+              <div class="metric-value">{{ formatValue(item.value, item.suffix) }}</div>
+            </div>
+          </div>
+
+          <el-card shadow="never" class="trend-card" v-if="industryTrendRecords.length">
+            <template #header>行业日度趋势强度热力图</template>
+            <LimitBoardIndustryTrendHeatmap :records="industryTrendRecords" />
+          </el-card>
+
+          <el-card shadow="never" class="trend-card" v-if="topIndustryRows.length">
+            <template #header>区间强势行业排行</template>
+            <el-table :data="topIndustryRows" border stripe empty-text="暂无行业排行">
+              <el-table-column prop="industry" label="行业" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="trade_day_count" label="上榜交易日" min-width="110" align="center" sortable />
+              <el-table-column prop="total_limit_up_count" label="累计涨停家数" min-width="120" align="center" sortable />
+              <el-table-column prop="avg_daily_limit_up_count" label="日均涨停家数" min-width="120" align="right" sortable>
+                <template #default="{ row }">{{ formatValue(row.avg_daily_limit_up_count) }}</template>
+              </el-table-column>
+              <el-table-column prop="total_amount" label="累计成交额" min-width="140" align="right" sortable>
+                <template #default="{ row }">{{ formatMoney(row.total_amount) }}</template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+
+          <SourceCounts :counts="industryTrendData?.source_counts" />
+          <el-empty v-if="!loading.industryTrend && !industryTrendData" description="请选择日期区间查询涨停趋势" />
+        </section>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * 打板分析选股页面
+ * 功能：
+ * - 汇总展示打板策略相关的情绪总览、连板天梯、竞价候选、题材梯队、炸板回封、游资复盘和涨停趋势分析
+ * - 支持按交易日查询单日打板结果，并对涨停趋势模块提供区间查询
+ * - 复用统一格式化方法展示金融数据和统计指标
+ * 参数：无
+ * 返回值：无
+ * 事件：
+ * - tab-change: 切换分析 tab 时按需加载对应数据
+ * - click: 点击查询或刷新按钮时重新拉取当前或全部 tab 数据
+ */
 import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import LimitBoardIndustryTrendHeatmap from '@/components/LimitBoardIndustryTrendHeatmap.vue'
 import {
   fetchAuctionCandidates,
   fetchBreakReseal,
   fetchDailySentiment,
   fetchHotMoneyReview,
+  fetchIndustryTrendStrength,
   fetchThemeLadder,
   type AuctionCandidatesData,
   type BreakResealData,
   type DailySentimentData,
   type HotMoneyReviewData,
+  type IndustryTrendStrengthData,
   type ThemeLadderData
 } from '@/services/limitBoardStrategyApi'
 import { fetchLimitStep, type LimitStepData } from '@/services/limitStepApi'
 
-type TabName = 'sentiment' | 'ladder' | 'auction' | 'theme' | 'break' | 'hotMoney'
+type TabName = 'sentiment' | 'ladder' | 'auction' | 'theme' | 'break' | 'hotMoney' | 'industryTrend'
 
+interface SummaryCardItem {
+  key: string
+  label: string
+  value: unknown
+  suffix?: string
+  className?: string
+}
+
+/**
+ * 数据来源计数组件
+ * 功能：
+ * - 以标签形式展示接口返回的各数据源记录数
+ * - 在多个 tab 中复用统一的来源统计样式
+ * 参数：
+ * @param {Record<string, number> | undefined} counts 数据源记录数字典
+ * 返回值：VNode | null
+ * 事件：无
+ */
 const SourceCounts = defineComponent({
   name: 'SourceCounts',
   props: {
@@ -319,6 +405,8 @@ const SourceCounts = defineComponent({
 
 const activeTab = ref<TabName>('sentiment')
 const tradeDate = ref(getRecentTradeDate())
+const trendEndDate = ref(getRecentTradeDate())
+const trendStartDate = ref(getShiftedDate(trendEndDate.value, -20))
 const topN = ref(20)
 const loadingAll = ref(false)
 const lastQueryTime = ref('')
@@ -329,7 +417,8 @@ const loading = reactive<Record<TabName, boolean>>({
   auction: false,
   theme: false,
   break: false,
-  hotMoney: false
+  hotMoney: false,
+  industryTrend: false
 })
 
 const loaded = reactive<Record<TabName, boolean>>({
@@ -338,7 +427,8 @@ const loaded = reactive<Record<TabName, boolean>>({
   auction: false,
   theme: false,
   break: false,
-  hotMoney: false
+  hotMoney: false,
+  industryTrend: false
 })
 
 const pagination = reactive({
@@ -353,10 +443,11 @@ const auctionData = ref<AuctionCandidatesData | null>(null)
 const themeData = ref<ThemeLadderData | null>(null)
 const breakData = ref<BreakResealData | null>(null)
 const hotMoneyData = ref<HotMoneyReviewData | null>(null)
+const industryTrendData = ref<IndustryTrendStrengthData | null>(null)
 
 const activeLoading = computed(() => loading[activeTab.value])
 
-const sentimentSummaryCards = computed(() => {
+const sentimentSummaryCards = computed<SummaryCardItem[]>(() => {
   const s = sentimentData.value?.summary || {}
   return [
     { key: 'limit_up_count', label: '涨停家数', value: s.limit_up_count, className: 'text-red' },
@@ -370,7 +461,7 @@ const sentimentSummaryCards = computed(() => {
   ]
 })
 
-const breakSummaryCards = computed(() => {
+const breakSummaryCards = computed<SummaryCardItem[]>(() => {
   const s = breakData.value?.summary || {}
   return [
     { key: 'limit_up_count', label: '最终涨停', value: s.limit_up_count },
@@ -381,12 +472,24 @@ const breakSummaryCards = computed(() => {
   ]
 })
 
+const industryTrendSummaryCards = computed<SummaryCardItem[]>(() => {
+  const s = industryTrendData.value?.summary || {}
+  return [
+    { key: 'trade_day_count', label: '交易日数量', value: s.trade_day_count },
+    { key: 'industry_count', label: '行业数量', value: s.industry_count },
+    { key: 'record_count', label: '明细记录数', value: s.record_count },
+    { key: 'total_limit_up_count', label: '累计涨停家数', value: s.total_limit_up_count }
+  ]
+})
+
 const auctionCandidates = computed(() => auctionData.value?.top_candidates || auctionData.value?.candidates || [])
 const auctionRows = computed(() => paginateRows(auctionCandidates.value, pagination.auction.page, pagination.auction.pageSize))
 const themeList = computed(() => themeData.value?.themes || [])
 const themeRows = computed(() => paginateRows(themeList.value, pagination.theme.page, pagination.theme.pageSize))
 const hotMoneyRecords = computed(() => hotMoneyData.value?.records || [])
 const hotMoneyRows = computed(() => paginateRows(hotMoneyRecords.value, pagination.hotMoney.page, pagination.hotMoney.pageSize))
+const industryTrendRecords = computed(() => industryTrendData.value?.data || [])
+const topIndustryRows = computed(() => industryTrendData.value?.summary?.top_industries || [])
 const ladderLevels = computed(() => {
   const groups = new Map<number, Record<string, any>[]>()
   ladderData.value.forEach(stock => {
@@ -426,7 +529,8 @@ async function loadAllTabs() {
       loadTab('auction', true),
       loadTab('theme', true),
       loadTab('break', true),
-      loadTab('hotMoney', true)
+      loadTab('hotMoney', true),
+      loadTab('industryTrend', true)
     ])
   } finally {
     loadingAll.value = false
@@ -434,8 +538,17 @@ async function loadAllTabs() {
 }
 
 async function loadTab(tab: TabName, force = false) {
-  if (!tradeDate.value || loading[tab]) return
+  if (loading[tab]) return
   if (loaded[tab] && !force) return
+  if (tab === 'industryTrend') {
+    if (!trendStartDate.value || !trendEndDate.value) return
+    if (trendStartDate.value > trendEndDate.value) {
+      ElMessage.warning('开始日期不能晚于结束日期')
+      return
+    }
+  } else if (!tradeDate.value) {
+    return
+  }
 
   loading[tab] = true
   try {
@@ -459,6 +572,12 @@ async function loadTab(tab: TabName, force = false) {
       hotMoneyData.value = await fetchHotMoneyReview({ trade_date: tradeDate.value, top_n: topN.value })
       pagination.hotMoney.page = 1
       lastQueryTime.value = hotMoneyData.value.query_time || lastQueryTime.value
+    } else if (tab === 'industryTrend') {
+      industryTrendData.value = await fetchIndustryTrendStrength({
+        start_date: trendStartDate.value,
+        end_date: trendEndDate.value
+      })
+      lastQueryTime.value = industryTrendData.value.query_time || lastQueryTime.value
     }
     loaded[tab] = true
   } finally {
@@ -495,6 +614,19 @@ function getRecentTradeDate(): string {
   } else if (day === 6) {
     date.setDate(date.getDate() - 1)
   }
+  return formatDate(date)
+}
+
+function parseDateString(value: string): Date {
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(4, 6))
+  const day = Number(value.slice(6, 8))
+  return new Date(year, month - 1, day)
+}
+
+function getShiftedDate(value: string, offsetDays: number): string {
+  const date = parseDateString(value)
+  date.setDate(date.getDate() + offsetDays)
   return formatDate(date)
 }
 
@@ -740,6 +872,10 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+.trend-card {
+  margin-bottom: 12px;
 }
 
 .text-red {

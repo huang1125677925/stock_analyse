@@ -16,6 +16,12 @@ export interface LimitBoardTopParams extends LimitBoardBaseParams {
   top_n?: number
 }
 
+export interface LimitBoardRangeParams {
+  start_date: string
+  end_date: string
+  token?: string
+}
+
 export interface AuctionCandidatesParams extends LimitBoardTopParams {
   auction_max_retries?: number
   auction_base_wait?: number
@@ -65,6 +71,43 @@ export interface HotMoneyReviewData {
   query_time?: string
 }
 
+export interface IndustryTrendStrengthItem {
+  trade_date: string
+  industry: string
+  limit_up_count?: number
+  avg_turnover_ratio?: number
+  avg_first_limit_minutes?: number
+  total_amount?: number
+  avg_open_times?: number
+  avg_limit_times?: number
+  avg_up_stat_n?: number
+  avg_up_stat_t?: number
+  avg_up_stat_ratio_pct?: number
+}
+
+export interface IndustryTrendStrengthSummary {
+  trade_day_count?: number
+  industry_count?: number
+  record_count?: number
+  total_limit_up_count?: number
+  top_industries?: Array<{
+    industry: string
+    trade_day_count?: number
+    total_limit_up_count?: number
+    avg_daily_limit_up_count?: number
+    total_amount?: number
+  }>
+}
+
+export interface IndustryTrendStrengthData {
+  start_date: string
+  end_date: string
+  summary?: IndustryTrendStrengthSummary
+  data?: IndustryTrendStrengthItem[]
+  source_counts?: Record<string, number>
+  query_time?: string
+}
+
 function parseLimitBoardResponse(data: unknown): unknown {
   if (typeof data !== 'string') return data
   if (!data.trim()) return data
@@ -99,4 +142,8 @@ export function fetchBreakReseal(params: LimitBoardTopParams): Promise<BreakRese
 
 export function fetchHotMoneyReview(params: LimitBoardTopParams): Promise<HotMoneyReviewData> {
   return getLimitBoard<HotMoneyReviewData>('/django/api/strategy/limit-board/hot-money-review/', params)
+}
+
+export function fetchIndustryTrendStrength(params: LimitBoardRangeParams): Promise<IndustryTrendStrengthData> {
+  return getLimitBoard<IndustryTrendStrengthData>('/django/api/strategy/limit-board/industry-trend-strength/', params)
 }
