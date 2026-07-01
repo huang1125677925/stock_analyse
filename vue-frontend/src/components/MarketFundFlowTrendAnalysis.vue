@@ -28,15 +28,15 @@
         </el-form-item>
         <el-form-item>
           <el-button-group>
-            <el-button @click="applyPresetRange(20)">最近20天</el-button>
-            <el-button @click="applyPresetRange(40)">最近40天</el-button>
-            <el-button @click="applyPresetRange(60)">最近60天</el-button>
-            <el-button @click="applyPresetRange(120)">最近120天</el-button>
+            <el-button
+              v-for="preset in presetRanges"
+              :key="preset"
+              :type="activePresetDays === preset ? 'primary' : 'default'"
+              @click="applyPresetRange(preset)"
+            >
+              最近{{ preset }}天
+            </el-button>
           </el-button-group>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="fetchData">查询</el-button>
-          <el-button @click="resetFilters">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -94,7 +94,7 @@
  * 返回值：无
  * 事件（emits）：无
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { EChartsOption } from 'echarts'
 import HeatmapChart from '@/components/HeatmapChart.vue'
@@ -111,12 +111,16 @@ import {
 type ValueFilter = 'all' | 'positive' | 'negative'
 
 const DEFAULT_RANGE_DAYS = 20
+const PRESET_RANGE_DAYS = [20, 40, 60, 120] as const
+type PresetDays = typeof PRESET_RANGE_DAYS[number]
 
 const loading = ref(false)
 const trendRows = ref<MarketFundFlowTrendItem[]>([])
 const selectedMetricGroup = ref<MarketFundFlowMetricGroup>('amount')
 const valueFilter = ref<ValueFilter>('all')
+const activePresetDays = ref<PresetDays | null>(DEFAULT_RANGE_DAYS)
 const dateRange = ref<[string, string]>(buildRecentDateRange(DEFAULT_RANGE_DAYS))
+const presetRanges: PresetDays[] = [...PRESET_RANGE_DAYS]
 
 const selectedObjects = computed<MarketFundFlowObjectOption[]>(() => {
   return MARKET_FUND_FLOW_OBJECT_GROUPS[selectedMetricGroup.value]
@@ -257,14 +261,8 @@ async function fetchData() {
   }
 }
 
-function resetFilters() {
-  selectedMetricGroup.value = 'amount'
-  valueFilter.value = 'all'
-  dateRange.value = buildRecentDateRange(DEFAULT_RANGE_DAYS)
-  fetchData()
-}
-
-function applyPresetRange(days: number) {
+function applyPresetRange(days: PresetDays) {
+  activePresetDays.value = days
   dateRange.value = buildRecentDateRange(days)
 }
 
@@ -275,6 +273,35 @@ function buildRecentDateRange(days: number): [string, string] {
 
   return [formatDate(endDateValue(startDate)), formatDate(endDateValue(endDate))]
 }
+
+function diffDays(range: [string, string]): number {
+  const [start, end] = range
+  if (!start || !end) {
+    return 0
+  }
+  const startTime = new Date(start).getTime()
+  const endTime = new Date(end).getTime()
+  if (Number.isNaN(startTime) || Number.isNaN(endTime)) {
+    return 0
+  }
+  return Math.round((endTime - startTime) / (24 * 60 * 60 * 1000)) + 1
+}
+
+// 时间范围表单手动修改时，自动取消与快捷按钮的联动高亮，
+// 避免“按了 20 天再去改日期”出现按钮和表单不一致的情况。
+watch(dateRange, (next) => {
+  const matched = PRESET_RANGE_DAYS.find((days) => diffDays(next) === days)
+  activePresetDays.value = matched ?? null
+})
+
+// 任意筛选条件变化都自动刷新热力图
+watch(
+  [dateRange, selectedMetricGroup, valueFilter],
+  () => {
+    fetchData()
+  },
+  { deep: true }
+)
 
 function endDateValue(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -329,6 +356,7 @@ function getChangeClass(value: number | null | undefined): string {
 }
 
 onMounted(() => {
+  // 初次进入页面时按默认范围（最近 20 天）拉取数据
   fetchData()
 })
 </script>
