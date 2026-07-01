@@ -168,6 +168,12 @@ const router = createRouter({
           meta: { title: '市场宽度分析' }
         },
         {
+          path: '/analysis/congestion/up-down-ratio',
+          name: 'congestion-up-down-ratio',
+          component: () => import('@/views/industry-stock-data/CongestionUpDownRatioView.vue'),
+          meta: { title: '行业涨跌比分析' }
+        },
+        {
           path: '/analysis/congestion/index-rps',
           name: 'congestion-index-rps',
           component: () => import('@/views/industry-stock-data/CongestionIndexRpsView.vue'),
