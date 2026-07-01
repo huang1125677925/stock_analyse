@@ -327,7 +327,7 @@ const menuItems = computed(() => {
 
 const marketOverviewMegaMenuSections = [
   {
-    title: '大盘概览',
+    title: '',
     items: [
       { title: '大盘指数估值', path: '/' },
       { title: '大盘指数RPS', path: '/major-index-rps' },

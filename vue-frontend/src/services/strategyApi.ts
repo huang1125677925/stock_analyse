@@ -72,6 +72,41 @@ export interface DcBoardMemberRpsData {
   query_time: string
 }
 
+export interface StockRpsItem {
+  ts_code: string
+  symbol: string
+  name: string
+  industry: string | null
+  market: string | null
+  list_date: string
+  delist_date: string
+  list_status: string
+  trade_date: string
+  pct_change: number | null
+  RPS_today: number | null
+  [key: `return_${number}`]: number | string | null
+  [key: `RPS_${number}`]: number | string | null
+}
+
+export interface StockRpsData {
+  total: number
+  data: StockRpsItem[]
+  periods: number[]
+  trade_date: string
+  exchange: string | null
+  market: string | null
+  errors: string[]
+  query_time: string
+}
+
+export interface StockRpsParams {
+  periods?: string
+  trade_date?: string
+  exchange?: string
+  market?: string
+  token?: string
+}
+
 export interface IndexRpsResponse {
   code: number
   message: string
@@ -218,6 +253,26 @@ export async function getDcBoardMemberRps(
     return response.data
   } catch (error) {
     console.error('获取东财板块成分股RPS排名失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 获取全市场股票 RPS 强度排名
+ * @param params 查询参数，支持周期、交易日、交易所、市场和 token
+ * @returns Promise<StockRpsData>
+ */
+export async function getStockRps(
+  params: StockRpsParams = {}
+): Promise<StockRpsData> {
+  try {
+    const response = await axios.get<StockRpsData>(
+      '/django/api/strategy/stock-rps/',
+      { params }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取股票RPS排名失败:', error)
     throw error
   }
 }
