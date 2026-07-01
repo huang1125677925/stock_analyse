@@ -7,10 +7,6 @@
             <h2>波段趋势选股</h2>
             <p>基于全市场股票 RPS 接口展示强势股榜单，支持按交易所、市场板块与周期筛选。</p>
           </div>
-          <div class="header-actions">
-            <el-button @click="resetFilters">重置条件</el-button>
-            <el-button type="primary" :loading="loading" @click="loadStockRpsData">刷新榜单</el-button>
-          </div>
         </div>
       </template>
 
@@ -29,15 +25,18 @@
 
           <el-col :xs="24" :md="8" :lg="6">
             <el-form-item label="交易日">
-              <el-date-picker
-                v-model="filters.tradeDate"
-                type="date"
-                clearable
-                format="YYYY-MM-DD"
-                value-format="YYYYMMDD"
-                placeholder="默认最近可用交易日"
-                class="full-width"
-              />
+              <div class="trade-date-switcher">
+                <el-button circle :icon="ArrowLeft" @click="changeTradeDate(-1)" />
+                <el-button class="trade-date-display" @click="resetTradeDateToLatest">
+                  {{ formatCompactDate(filters.tradeDate) }}
+                </el-button>
+                <el-button
+                  circle
+                  :icon="ArrowRight"
+                  :disabled="filters.tradeDate >= latestSelectableTradeDate"
+                  @click="changeTradeDate(1)"
+                />
+              </div>
             </el-form-item>
           </el-col>
 
@@ -85,6 +84,7 @@
 
       <div class="hint-row">
         <el-tag type="danger" effect="plain">默认按首个周期的 RPS 倒序展示</el-tag>
+        <el-tag type="success" effect="plain">交易日支持左右切换，条件变更后自动刷新</el-tag>
         <el-tag type="info" effect="plain">点击股票名称可查看前复权趋势图</el-tag>
         <span class="hint-text">RPS 越高，表示该股票在当前股票池中相对更强。</span>
       </div>
@@ -360,9 +360,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Search } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import { getStockRps, type StockRpsData, type StockRpsItem } from '@/services/strategyApi'
@@ -388,12 +388,12 @@ interface StockRpsFilters {
  * 参数：无。
  * 返回值：无，组件返回股票 RPS 筛选面板、汇总卡片、数据表格和趋势弹窗。
  * 事件：
- *  - 点击“刷新榜单”时重新请求股票 RPS 数据；
- *  - 点击“重置条件”时恢复默认筛选条件并重新加载；
+ *  - 切换交易日、交易所、市场板块或 RPS 周期时自动请求最新榜单；
  *  - 点击股票名称时打开趋势弹窗并请求对应股票历史 K 线数据。
  */
 
 const defaultPeriods = [5, 20, 60]
+const latestSelectableTradeDate = getRecentTradeDate()
 const periodOptions = [5, 10, 20, 60, 120, 250]
 const exchangeOptions = [
   { label: '上交所', value: 'SSE' },
@@ -412,14 +412,16 @@ const changeDirectionOptions: ChangeDirectionLabel[] = ['上涨', '平盘', '下
 const filters = reactive<StockRpsFilters>({
   searchKeyword: '',
   periods: [...defaultPeriods],
-  tradeDate: '',
-  exchange: '',
+  tradeDate: latestSelectableTradeDate,
+  exchange: 'SSE',
   market: '主板'
 })
 
 const loading = ref(false)
 const stockRpsData = ref<StockRpsData | null>(null)
 const stockRpsRows = ref<StockRpsItem[]>([])
+let stockRpsRequestId = 0
+let autoRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
 const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
@@ -437,6 +439,36 @@ const selectedTrendStock = reactive({
   market: ''
 })
 let trendRequestId = 0
+
+/**
+ * 工具：将 `Date` 对象格式化为 `YYYYMMDD`。
+ * 参数：date 为待格式化日期。
+ * 返回值：紧凑日期字符串。
+ * 事件：无。
+ */
+const formatDateToCompact = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}${month}${day}`
+}
+
+/**
+ * 工具：获取最近一个可选交易日。
+ * 参数：无。
+ * 返回值：按工作日规则回退后的 `YYYYMMDD` 日期字符串。
+ * 事件：无。
+ */
+function getRecentTradeDate(): string {
+  const date = new Date()
+  const day = date.getDay()
+  if (day === 0) {
+    date.setDate(date.getDate() - 2)
+  } else if (day === 6) {
+    date.setDate(date.getDate() - 1)
+  }
+  return formatDateToCompact(date)
+}
 
 /**
  * 工具：将任意接口值安全转换为数字。
@@ -765,6 +797,48 @@ const buildPeriodsParam = (periods: number[]): string => {
 }
 
 /**
+ * 工具：按工作日规则移动交易日。
+ * 参数：
+ *  - currentDate 为当前 `YYYYMMDD` 交易日；
+ *  - step 为移动方向，`-1` 表示上一交易日，`1` 表示下一交易日。
+ * 返回值：移动后的 `YYYYMMDD` 交易日字符串。
+ * 事件：无。
+ */
+const shiftTradeDateByStep = (currentDate: string, step: -1 | 1): string => {
+  const year = Number(currentDate.slice(0, 4))
+  const month = Number(currentDate.slice(4, 6)) - 1
+  const day = Number(currentDate.slice(6, 8))
+  const date = new Date(year, month, day)
+
+  do {
+    date.setDate(date.getDate() + step)
+  } while (date.getDay() === 0 || date.getDay() === 6)
+
+  const nextDate = formatDateToCompact(date)
+  return step > 0 && nextDate > latestSelectableTradeDate ? latestSelectableTradeDate : nextDate
+}
+
+/**
+ * 事件：按方向切换交易日。
+ * 参数：step 为切换方向，`-1` 表示上一交易日，`1` 表示下一交易日。
+ * 返回值：void。
+ * 事件：更新 `filters.tradeDate`，触发榜单自动刷新。
+ */
+const changeTradeDate = (step: -1 | 1): void => {
+  filters.tradeDate = shiftTradeDateByStep(filters.tradeDate, step)
+}
+
+/**
+ * 事件：恢复到最近可选交易日。
+ * 参数：无。
+ * 返回值：void。
+ * 事件：更新 `filters.tradeDate`，触发榜单自动刷新。
+ */
+const resetTradeDateToLatest = (): void => {
+  filters.tradeDate = latestSelectableTradeDate
+}
+
+/**
  * 工具：格式化趋势弹窗的日期范围。
  * 参数：range 为快捷区间值。
  * 返回值：无。
@@ -793,14 +867,16 @@ const formatDateForHistoryApi = (dateText: string): string => dateText.replace(/
  * 数据请求：加载股票 RPS 榜单。
  * 参数：无，直接读取当前筛选条件。
  * 返回值：Promise<void>。
- * 事件：更新 `stockRpsData`、`stockRpsRows`、`loading`。
+ * 事件：更新 `stockRpsData`、`stockRpsRows`、`loading`，并在多次请求并发时忽略过期响应。
  */
 const loadStockRpsData = async () => {
   if (!filters.periods.length) {
-    ElMessage.warning('请至少选择一个 RPS 周期')
+    stockRpsData.value = null
+    stockRpsRows.value = []
     return
   }
 
+  const requestId = ++stockRpsRequestId
   loading.value = true
   try {
     const response = await getStockRps({
@@ -809,34 +885,37 @@ const loadStockRpsData = async () => {
       exchange: filters.exchange || undefined,
       market: filters.market
     })
+    if (requestId !== stockRpsRequestId) return
     stockRpsData.value = response
     stockRpsRows.value = response.data || []
     syncFilterFields()
   } catch (error) {
+    if (requestId !== stockRpsRequestId) return
     console.error('加载股票RPS数据失败:', error)
     stockRpsData.value = null
     stockRpsRows.value = []
     ElMessage.error('加载股票RPS数据失败，请稍后重试')
   } finally {
-    loading.value = false
+    if (requestId === stockRpsRequestId) {
+      loading.value = false
+    }
   }
 }
 
 /**
- * 事件：重置筛选条件。
+ * 事件：根据核心筛选条件自动刷新榜单。
  * 参数：无。
- * 返回值：Promise<void>。
- * 事件：恢复默认筛选后重新加载股票 RPS 榜单。
+ * 返回值：void。
+ * 事件：在短暂防抖后请求最新股票 RPS 榜单，避免连续操作造成重复请求。
  */
-const resetFilters = async () => {
-  filters.searchKeyword = ''
-  filters.periods = [...defaultPeriods]
-  filters.tradeDate = ''
-  filters.exchange = ''
-  filters.market = '主板'
-  resetRpsFilters()
-  resetChangeFilters()
-  await loadStockRpsData()
+const scheduleStockRpsReload = (): void => {
+  if (autoRefreshTimer) {
+    clearTimeout(autoRefreshTimer)
+  }
+
+  autoRefreshTimer = setTimeout(() => {
+    loadStockRpsData()
+  }, 250)
 }
 
 /**
@@ -961,10 +1040,21 @@ const tableRowClassName = ({ row }: { row: StockRpsItem }): string => {
   return ''
 }
 
-onMounted(() => {
-  syncFilterFields()
-  loadStockRpsData()
-})
+watch(
+  () => [filters.tradeDate, filters.exchange, filters.market, [...filters.periods].sort((a, b) => a - b).join(',')],
+  () => {
+    scheduleStockRpsReload()
+  },
+  { immediate: true }
+)
+
+watch(
+  currentPeriods,
+  () => {
+    syncFilterFields()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
@@ -1005,7 +1095,6 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.header-actions,
 .table-summary {
   display: flex;
   align-items: center;
@@ -1015,6 +1104,18 @@ onMounted(() => {
 
 .full-width {
   width: 100%;
+}
+
+.trade-date-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.trade-date-display {
+  flex: 1;
+  min-width: 0;
 }
 
 .hint-row {
