@@ -56,7 +56,7 @@
 
           <el-col :xs="24" :md="8" :lg="6">
             <el-form-item label="市场板块">
-              <el-select v-model="filters.market" clearable placeholder="全部市场板块" class="full-width">
+              <el-select v-model="filters.market" placeholder="请选择市场板块" class="full-width">
                 <el-option
                   v-for="item in marketOptions"
                   :key="item.value"
@@ -141,6 +141,62 @@
             <el-tag type="info" effect="plain">共 {{ filteredRows.length }} 条</el-tag>
             <el-tag v-if="stockRpsData?.market" type="success" effect="light">{{ stockRpsData.market }}</el-tag>
           </div>
+        </div>
+        <div class="rps-filter-panel">
+          <div
+            v-for="filterGroup in rpsFilterGroups"
+            :key="filterGroup.field"
+            class="rps-filter-group"
+          >
+            <span class="rps-filter-label">{{ filterGroup.label }}</span>
+            <div class="rps-filter-tags">
+              <el-check-tag
+                v-for="tag in rpsRankOptions"
+                :key="`${filterGroup.field}-${tag}`"
+                :checked="(selectedRpsRanks[filterGroup.field] || []).includes(tag)"
+                @change="toggleRpsRank(filterGroup.field, tag)"
+              >
+                {{ tag }}
+              </el-check-tag>
+            </div>
+          </div>
+          <el-button
+            v-if="hasActiveRpsFilter"
+            link
+            type="primary"
+            class="rps-filter-reset"
+            @click="resetRpsFilters"
+          >
+            清空强度筛选
+          </el-button>
+        </div>
+        <div class="rps-filter-panel">
+          <div
+            v-for="filterGroup in changeFilterGroups"
+            :key="filterGroup.field"
+            class="rps-filter-group"
+          >
+            <span class="rps-filter-label">{{ filterGroup.label }}</span>
+            <div class="rps-filter-tags">
+              <el-check-tag
+                v-for="tag in changeDirectionOptions"
+                :key="`${filterGroup.field}-${tag}`"
+                :checked="(selectedChangeDirections[filterGroup.field] || []).includes(tag)"
+                @change="toggleChangeDirection(filterGroup.field, tag)"
+              >
+                {{ tag }}
+              </el-check-tag>
+            </div>
+          </div>
+          <el-button
+            v-if="hasActiveChangeFilter"
+            link
+            type="primary"
+            class="rps-filter-reset"
+            @click="resetChangeFilters"
+          >
+            清空涨跌幅筛选
+          </el-button>
         </div>
       </template>
 
@@ -315,6 +371,8 @@ type StockRpsValue = number | string | null | undefined
 type TrendShortcut = '1y' | '3y' | '5y'
 type DynamicReturnField = `return_${number}`
 type DynamicRpsField = `RPS_${number}`
+type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
+type ChangeDirectionLabel = '上涨' | '平盘' | '下跌'
 
 interface StockRpsFilters {
   searchKeyword: string
@@ -348,13 +406,15 @@ const marketOptions = [
   { label: '科创板', value: '科创板' },
   { label: '北交所', value: '北交所' }
 ]
+const rpsRankOptions: RpsRankLabel[] = ['极强', '强势', '良好', '一般', '弱势']
+const changeDirectionOptions: ChangeDirectionLabel[] = ['上涨', '平盘', '下跌']
 
 const filters = reactive<StockRpsFilters>({
   searchKeyword: '',
   periods: [...defaultPeriods],
   tradeDate: '',
   exchange: '',
-  market: ''
+  market: '主板'
 })
 
 const loading = ref(false)
@@ -500,6 +560,26 @@ const currentPeriodsText = computed(() => {
   return currentPeriods.value.join(' / ')
 })
 
+const rpsFilterGroups = computed<Array<{ field: DynamicRpsField; label: string }>>(() => {
+  return currentPeriods.value.map((period) => ({
+    field: getRpsProp(period),
+    label: `RPS_${period}强度`
+  }))
+})
+
+const changeFilterGroups = computed<Array<{ field: 'pct_change' | DynamicReturnField; label: string }>>(() => {
+  return [
+    { field: 'pct_change', label: '当日涨跌幅' },
+    ...currentPeriods.value.map((period) => ({
+      field: getReturnProp(period),
+      label: `${period}日涨跌幅`
+    }))
+  ]
+})
+
+const selectedRpsRanks = reactive<Record<string, RpsRankLabel[]>>({})
+const selectedChangeDirections = reactive<Record<string, ChangeDirectionLabel[]>>({})
+
 const defaultSortProp = computed(() => {
   const firstPeriod = currentPeriods.value[0]
   return firstPeriod ? getRpsProp(firstPeriod) : 'RPS_today'
@@ -507,21 +587,167 @@ const defaultSortProp = computed(() => {
 
 const warningMessages = computed(() => stockRpsData.value?.errors || [])
 
+/**
+ * 工具：根据涨跌幅数值返回方向标签。
+ * 参数：value 为涨跌幅字段。
+ * 返回值：上涨、平盘或下跌标签。
+ * 事件：无。
+ */
+const getChangeDirection = (value: StockRpsValue): ChangeDirectionLabel => {
+  const numericValue = getNumericValue(value)
+  if (numericValue > 0) return '上涨'
+  if (numericValue < 0) return '下跌'
+  return '平盘'
+}
+
+/**
+ * 工具：同步主表筛选字段。
+ * 参数：无。
+ * 返回值：无。
+ * 事件：初始化并清理 `selectedRpsRanks`、`selectedChangeDirections` 中的动态字段。
+ */
+const syncFilterFields = (): void => {
+  const activeRpsFields = new Set(rpsFilterGroups.value.map((item) => item.field))
+  const activeChangeFields = new Set(changeFilterGroups.value.map((item) => item.field))
+
+  Object.keys(selectedRpsRanks).forEach((field) => {
+    if (!activeRpsFields.has(field as DynamicRpsField)) {
+      delete selectedRpsRanks[field]
+    }
+  })
+  rpsFilterGroups.value.forEach(({ field }) => {
+    selectedRpsRanks[field] = selectedRpsRanks[field] || []
+  })
+
+  Object.keys(selectedChangeDirections).forEach((field) => {
+    if (!activeChangeFields.has(field as 'pct_change' | DynamicReturnField)) {
+      delete selectedChangeDirections[field]
+    }
+  })
+  changeFilterGroups.value.forEach(({ field }) => {
+    selectedChangeDirections[field] = selectedChangeDirections[field] || []
+  })
+}
+
+/**
+ * 事件：切换 RPS 强度标签。
+ * 参数：
+ *  - field 为 RPS 字段名；
+ *  - rank 为强度标签。
+ * 返回值：void。
+ * 事件：更新 `selectedRpsRanks`。
+ */
+const toggleRpsRank = (field: DynamicRpsField, rank: RpsRankLabel): void => {
+  const ranks = selectedRpsRanks[field] || []
+  const index = ranks.indexOf(rank)
+  if (index >= 0) {
+    ranks.splice(index, 1)
+    selectedRpsRanks[field] = ranks
+    return
+  }
+  ranks.push(rank)
+  selectedRpsRanks[field] = ranks
+}
+
+/**
+ * 事件：切换涨跌方向标签。
+ * 参数：
+ *  - field 为涨跌幅字段名；
+ *  - direction 为方向标签。
+ * 返回值：void。
+ * 事件：更新 `selectedChangeDirections`。
+ */
+const toggleChangeDirection = (field: 'pct_change' | DynamicReturnField, direction: ChangeDirectionLabel): void => {
+  const directions = selectedChangeDirections[field] || []
+  const index = directions.indexOf(direction)
+  if (index >= 0) {
+    directions.splice(index, 1)
+    selectedChangeDirections[field] = directions
+    return
+  }
+  directions.push(direction)
+  selectedChangeDirections[field] = directions
+}
+
+/**
+ * 工具：清空 RPS 强度筛选。
+ * 参数：无。
+ * 返回值：void。
+ * 事件：重置 `selectedRpsRanks`。
+ */
+const resetRpsFilters = (): void => {
+  Object.keys(selectedRpsRanks).forEach((field) => {
+    selectedRpsRanks[field] = []
+  })
+}
+
+/**
+ * 工具：清空涨跌幅方向筛选。
+ * 参数：无。
+ * 返回值：void。
+ * 事件：重置 `selectedChangeDirections`。
+ */
+const resetChangeFilters = (): void => {
+  Object.keys(selectedChangeDirections).forEach((field) => {
+    selectedChangeDirections[field] = []
+  })
+}
+
+const hasActiveRpsFilter = computed(() => {
+  return Object.values(selectedRpsRanks).some((items) => items.length > 0)
+})
+
+const hasActiveChangeFilter = computed(() => {
+  return Object.values(selectedChangeDirections).some((items) => items.length > 0)
+})
+
+/**
+ * 工具：判断单条记录是否满足 RPS 强度筛选。
+ * 参数：item 为股票 RPS 记录。
+ * 返回值：`true` 表示命中当前强度筛选。
+ * 事件：无。
+ */
+const matchesRpsFilters = (item: StockRpsItem): boolean => {
+  return rpsFilterGroups.value.every(({ field }) => {
+    const selectedRanks = selectedRpsRanks[field] || []
+    if (!selectedRanks.length) return true
+    return selectedRanks.includes(getRpsRankText(getNumericValue(getRowFieldValue(item, field))) as RpsRankLabel)
+  })
+}
+
+/**
+ * 工具：判断单条记录是否满足涨跌幅方向筛选。
+ * 参数：item 为股票 RPS 记录。
+ * 返回值：`true` 表示命中当前方向筛选。
+ * 事件：无。
+ */
+const matchesChangeFilters = (item: StockRpsItem): boolean => {
+  return changeFilterGroups.value.every(({ field }) => {
+    const selectedDirections = selectedChangeDirections[field] || []
+    if (!selectedDirections.length) return true
+    return selectedDirections.includes(getChangeDirection(getRowFieldValue(item, field)))
+  })
+}
+
 const filteredRows = computed<StockRpsItem[]>(() => {
   const keyword = filters.searchKeyword.trim().toLowerCase()
-  if (!keyword) {
-    return stockRpsRows.value
+  let result = stockRpsRows.value
+
+  if (keyword) {
+    result = result.filter((item) => {
+      return [
+        item.name,
+        item.symbol,
+        item.ts_code,
+        item.industry || '',
+        item.market || ''
+      ].some((field) => field.toLowerCase().includes(keyword))
+    })
   }
 
-  return stockRpsRows.value.filter((item) => {
-    return [
-      item.name,
-      item.symbol,
-      item.ts_code,
-      item.industry || '',
-      item.market || ''
-    ].some((field) => field.toLowerCase().includes(keyword))
-  })
+  result = result.filter(matchesRpsFilters)
+  result = result.filter(matchesChangeFilters)
+  return result
 })
 
 const latestTrendPoint = computed(() => {
@@ -581,10 +807,11 @@ const loadStockRpsData = async () => {
       periods: buildPeriodsParam(filters.periods),
       trade_date: filters.tradeDate || undefined,
       exchange: filters.exchange || undefined,
-      market: filters.market || undefined
+      market: filters.market
     })
     stockRpsData.value = response
     stockRpsRows.value = response.data || []
+    syncFilterFields()
   } catch (error) {
     console.error('加载股票RPS数据失败:', error)
     stockRpsData.value = null
@@ -606,7 +833,9 @@ const resetFilters = async () => {
   filters.periods = [...defaultPeriods]
   filters.tradeDate = ''
   filters.exchange = ''
-  filters.market = ''
+  filters.market = '主板'
+  resetRpsFilters()
+  resetChangeFilters()
   await loadStockRpsData()
 }
 
@@ -733,6 +962,7 @@ const tableRowClassName = ({ row }: { row: StockRpsItem }): string => {
 }
 
 onMounted(() => {
+  syncFilterFields()
   loadStockRpsData()
 })
 </script>
@@ -860,6 +1090,38 @@ onMounted(() => {
 
 .methodology p + p {
   margin-top: 6px;
+}
+
+.rps-filter-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.rps-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rps-filter-label {
+  color: #6b7280;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rps-filter-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rps-filter-reset {
+  padding: 0;
 }
 
 .stock-name-cell {
