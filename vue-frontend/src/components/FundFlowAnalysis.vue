@@ -62,7 +62,7 @@
     <div class="chart-container">
       <!-- 资金流热力图 -->
       <FundFlowHeatmap 
-        :data="industryFundFlowData"
+        :data="filteredFundFlowData"
         :selected-metric="selectedFundFlowMetric"
         :sort-ascending="sortAscending"
         :value-filter="valueFilter"
@@ -93,7 +93,7 @@
  * - chart-ready: 热力图实例初始化完成
  * - chart-click: 点击热力图行业单元格后弹出趋势看板
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import FundFlowMetricSelector from './FundFlowMetricSelector.vue'
@@ -126,6 +126,29 @@ const selectedLevel = ref<EastMoneyIndustryLevel>('东财二级行业')
 
 // 数据存储
 const industryFundFlowData = ref<IndustryFundFlowData | null>(null)
+
+interface Props {
+  selectedIndustries: string[]
+}
+
+const props = defineProps<Props>()
+
+/**
+ * 过滤后的行业资金流数据：当selectedIndustries为空时显示全部，否则只显示选中的行业
+ */
+const filteredFundFlowData = computed<IndustryFundFlowData | null>(() => {
+  if (!industryFundFlowData.value) return null
+  if (!props.selectedIndustries || props.selectedIndustries.length === 0) {
+    return industryFundFlowData.value
+  }
+  const selectedSet = new Set(props.selectedIndustries)
+  return {
+    ...industryFundFlowData.value,
+    swCodeNames: industryFundFlowData.value.swCodeNames.filter(
+      item => selectedSet.has(item.indexName)
+    )
+  }
+})
 
 // 获取行业资金流数据
 const fetchFundFlowData = async () => {

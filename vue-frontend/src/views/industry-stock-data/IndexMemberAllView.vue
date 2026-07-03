@@ -4,6 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>申万行业成分构成</span>
+          <IndustryFilter v-model="selectedIndustries" />
         </div>
       </template>
 
@@ -31,7 +32,7 @@
       <el-skeleton v-if="loading && !error" rows="6" animated />
 
       <div v-else>
-        <div v-if="tableData.records && tableData.records.length" class="table-wrapper">
+        <div v-if="filteredRecords.length" class="table-wrapper">
           <el-table :data="paginatedRecords" border height="520" stripe style="width: 100%">
             <el-table-column prop="l1_code" label="一级代码" min-width="100" />
             <el-table-column prop="l1_name" label="一级名称" min-width="100" />
@@ -75,6 +76,7 @@
  */
 import { reactive, ref, onMounted, computed } from 'vue'
 import axios from '@/services/axiosConfig'
+import IndustryFilter from '@/components/IndustryFilter.vue'
 
 interface ApiResponse<T = unknown> {
   code: number
@@ -93,6 +95,7 @@ const loading = ref(false)
 const error = ref('')
 const hint = ref('')
 const tableData = reactive<TableData>({})
+const selectedIndustries = ref<string[]>([])
 
 // 分页相关状态
 const currentPage = ref(1)
@@ -104,10 +107,22 @@ const query = reactive({
   l3_code: ''
 })
 
-const total = computed(() => tableData.records?.length || 0)
+const total = computed(() => filteredRecords.value.length || 0)
+
+/**
+ * 过滤后的记录：当selectedIndustries为空时显示全部，否则只显示包含选中行业的记录
+ */
+const filteredRecords = computed(() => {
+  const records = tableData.records || []
+  if (!selectedIndustries.value.length) return records
+  const selectedSet = new Set(selectedIndustries.value)
+  return records.filter((record: Record<string, any>) => {
+    return selectedSet.has(record.l1_name) || selectedSet.has(record.l2_name) || selectedSet.has(record.l3_name)
+  })
+})
 
 const paginatedRecords = computed(() => {
-  const records = tableData.records || []
+  const records = filteredRecords.value
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   return records.slice(start, end)

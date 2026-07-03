@@ -78,7 +78,7 @@
         <div class="control-group">
           <el-button 
             type="default" 
-            :disabled="loading || !rawData.length" 
+            :disabled="loading || !filteredRawData.length" 
             @click="toggleLastColumnSort"
             :icon="sortByLastColumn ? 'SortDown' : 'Sort'"
           >
@@ -410,6 +410,23 @@ const openTrendDialog = (sectorCode: string, sectorName: string, idxType: Indust
 
 const rawData = ref<IndustryMaBreadthItem[]>([])
 
+interface Props {
+  selectedIndustries: string[]
+}
+
+const props = defineProps<Props>()
+
+/**
+ * 过滤后的原始数据：当selectedIndustries为空时显示全部，否则只显示选中的行业
+ */
+const filteredRawData = computed(() => {
+  if (!props.selectedIndustries || props.selectedIndustries.length === 0) {
+    return rawData.value
+  }
+  const selectedSet = new Set(props.selectedIndustries)
+  return rawData.value.filter(item => selectedSet.has(item.sector_name))
+})
+
 const selectedBoardLabel = computed(() => {
   return selectedIdxType.value === '行业板块'
     ? selectedLevel.value
@@ -435,7 +452,7 @@ const toggleLastColumnSort = () => {
 
 // 计算行业与日期维度
 const industries = computed<string[]>(() => {
-  const names = Array.from(new Set(rawData.value.map(d => d.sector_name)))
+  const names = Array.from(new Set(filteredRawData.value.map(d => d.sector_name)))
   
   // 如果启用按最后一列排序
   if (sortByLastColumn.value && dates.value.length > 0) {
@@ -443,7 +460,7 @@ const industries = computed<string[]>(() => {
     
     // 获取每个行业在最后一个日期的数据
     const industryLastValues = new Map<string, number>()
-    rawData.value.forEach(item => {
+    filteredRawData.value.forEach(item => {
       if (item.date === lastDate && names.includes(item.sector_name)) {
         const val = typeof item.breadth_ratio === 'number' ? item.breadth_ratio : Number(item.breadth_ratio)
         industryLastValues.set(item.sector_name, Number.isNaN(val) ? 0 : val)
@@ -462,7 +479,7 @@ const industries = computed<string[]>(() => {
 })
 
 const dates = computed<string[]>(() => {
-  const ds = Array.from(new Set(rawData.value.map(d => d.date))).sort()
+  const ds = Array.from(new Set(filteredRawData.value.map(d => d.date))).sort()
   return ds
 })
 
@@ -471,7 +488,7 @@ const heatmapData = computed<[number, number, number][]>(() => {
   const dateIndex = new Map(dates.value.map((d, i) => [d, i]))
   const industryIndex = new Map(industries.value.map((n, i) => [n, i]))
   const points: [number, number, number][] = []
-  rawData.value.forEach(item => {
+  filteredRawData.value.forEach(item => {
     const di = dateIndex.get(item.date)
     const ii = industryIndex.get(item.sector_name)
     if (di !== undefined && ii !== undefined) {
@@ -564,7 +581,7 @@ const onChartClick = (params: any) => {
   const [x, y, v] = (params?.data ?? []) as [number, number, number]
   const date = typeof x === 'number' ? dates.value[x] : ''
   const industry = typeof y === 'number' ? industries.value[y] : ''
-  const matchedRecord = rawData.value.find((item) => item.date === date && item.sector_name === industry)
+  const matchedRecord = filteredRawData.value.find((item) => item.date === date && item.sector_name === industry)
   const payload = {
     date,
     industry,

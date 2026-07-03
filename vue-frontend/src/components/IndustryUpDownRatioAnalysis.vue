@@ -86,7 +86,7 @@
           <el-button type="primary" :loading="loading" @click="fetchData">刷新</el-button>
         </div>
         <div class="control-group">
-          <el-button type="default" :disabled="loading || !rawData.length" @click="toggleLastColumnSort">
+          <el-button type="default" :disabled="loading || !filteredRawData.length" @click="toggleLastColumnSort">
             {{ sortByLastColumn ? '取消排序' : '按最后一列排序' }}
           </el-button>
         </div>
@@ -247,6 +247,23 @@ const selectedLevel = ref<EastMoneyIndustryLevel>('东财二级行业')
 const selectedDateRange = ref<DateRangeOption>(20)
 const selectedMetric = ref<UpDownMetric>('up_ratio')
 const rawData = ref<IndustryUpDownRatioItem[]>([])
+
+interface Props {
+  selectedIndustries: string[]
+}
+
+const props = defineProps<Props>()
+
+/**
+ * 过滤后的原始数据：当selectedIndustries为空时显示全部，否则只显示选中的行业
+ */
+const filteredRawData = computed(() => {
+  if (!props.selectedIndustries || props.selectedIndustries.length === 0) {
+    return rawData.value
+  }
+  const selectedSet = new Set(props.selectedIndustries)
+  return rawData.value.filter(item => selectedSet.has(item.sector_name))
+})
 const dateRangeOptions: Array<{ label: string; value: DateRangeOption }> = [
   { label: '最近20天', value: 20 },
   { label: '最近60天', value: 60 },
@@ -500,16 +517,16 @@ const trendEmptyText = computed(() => {
 })
 
 const dates = computed<string[]>(() => {
-  return Array.from(new Set(rawData.value.map((item) => item.date))).sort()
+  return Array.from(new Set(filteredRawData.value.map((item) => item.date))).sort()
 })
 
 const industries = computed<string[]>(() => {
-  const names = Array.from(new Set(rawData.value.map((item) => item.sector_name)))
+  const names = Array.from(new Set(filteredRawData.value.map((item) => item.sector_name)))
 
   if (sortByLastColumn.value && dates.value.length > 0) {
     const lastDate = dates.value[dates.value.length - 1]
     const metricMap = new Map<string, number>()
-    rawData.value.forEach((item) => {
+    filteredRawData.value.forEach((item) => {
       if (item.date === lastDate) {
         metricMap.set(item.sector_name, getMetricValue(item))
       }
@@ -525,7 +542,7 @@ const heatmapData = computed<[number, number, number][]>(() => {
   const industryIndex = new Map(industries.value.map((item, index) => [item, index]))
   const points: [number, number, number][] = []
 
-  rawData.value.forEach((item) => {
+  filteredRawData.value.forEach((item) => {
     const x = dateIndex.get(item.date)
     const y = industryIndex.get(item.sector_name)
     if (x !== undefined && y !== undefined) {
@@ -551,7 +568,7 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
         const [x, y, value] = params?.data ?? []
         const date = typeof x === 'number' ? dates.value[x] : ''
         const industry = typeof y === 'number' ? industries.value[y] : ''
-        const matchedRecord = rawData.value.find((item) => item.date === date && item.sector_name === industry)
+        const matchedRecord = filteredRawData.value.find((item) => item.date === date && item.sector_name === industry)
         if (!matchedRecord) return `${date}<br/>${industry}`
 
         return [
@@ -623,7 +640,7 @@ const handleParamsChange = () => {
 }
 
 const handleMetricChange = () => {
-  if (!rawData.value.length) return
+  if (!filteredRawData.value.length) return
 }
 
 const handleIdxTypeChange = () => {
@@ -638,7 +655,7 @@ const onChartClick = (params: any) => {
   const [x, y, value] = (params?.data ?? []) as [number, number, number]
   const date = typeof x === 'number' ? dates.value[x] : ''
   const industry = typeof y === 'number' ? industries.value[y] : ''
-  const matchedRecord = rawData.value.find((item) => item.date === date && item.sector_name === industry)
+  const matchedRecord = filteredRawData.value.find((item) => item.date === date && item.sector_name === industry)
   const payload = {
     date,
     industry,

@@ -8,6 +8,7 @@
             <span class="header-subtitle">一屏查看估值分层、行业差异和当前更适合的跟踪方向</span>
           </div>
           <div class="toolbar">
+            <IndustryFilter v-model="selectedIndustries" />
             <el-select v-model="query.level" placeholder="选择分级" class="level-select">
               <el-option label="一级行业" value="L1" />
               <el-option label="二级行业" value="L2" />
@@ -27,7 +28,7 @@
         <div class="summary-grid">
           <section class="summary-card emphasis">
             <div class="summary-label">当前样本</div>
-            <div class="summary-value">{{ boardItems.length }}</div>
+            <div class="summary-value">{{ filteredBoardItems.length }}</div>
             <div class="summary-meta">
               {{ levelLabel }} · {{ rangeLabel }}
               <span v-if="latestTradeDate"> · {{ latestTradeDate }}</span>
@@ -53,7 +54,7 @@
           </section>
         </div>
 
-        <div v-if="boardItems.length" class="board-layout">
+        <div v-if="filteredBoardItems.length" class="board-layout">
           <aside class="insight-panel">
             <section class="insight-card">
               <div class="insight-title">方向指引</div>
@@ -112,7 +113,7 @@
 
             <div class="board-list">
               <article
-                v-for="item in boardItems"
+                v-for="item in filteredBoardItems"
                 :key="item.ts_code"
                 class="board-row"
                 :class="item.toneClass"
@@ -272,6 +273,7 @@ import { getSwValuationAnalysis, type SwValuationAnalysisItem } from '@/services
 import { fetchSwIndexClassify, type SwIndexClassifyItem } from '@/services/swIndexClassifyApi'
 import SwIndustryTrendChart from './components/SwIndustryTrendChart.vue'
 import SwIndustryMembersTab from './components/SwIndustryMembersTab.vue'
+import IndustryFilter from '@/components/IndustryFilter.vue'
 
 type DirectionType = 'success' | 'warning' | 'danger'
 
@@ -301,6 +303,7 @@ interface DialogChildRow extends SwIndexClassifyItem {
 const loading = ref(false)
 const tableData = ref<SwValuationAnalysisItem[]>([])
 const selectedRangeYears = ref(10)
+const selectedIndustries = ref<string[]>([])
 
 const industryDialogVisible = ref(false)
 const industryDialogLoading = ref(false)
@@ -425,9 +428,18 @@ const boardItems = computed<BoardItem[]>(() => {
     .sort((a, b) => a.avgPercentile - b.avgPercentile)
 })
 
+/**
+ * 过滤后的行业看板：当selectedIndustries为空时显示全部，否则只显示选中的行业
+ */
+const filteredBoardItems = computed<BoardItem[]>(() => {
+  if (!selectedIndustries.value.length) return boardItems.value
+  const selectedSet = new Set(selectedIndustries.value)
+  return boardItems.value.filter(item => selectedSet.has(item.name))
+})
+
 const valuationSummary = computed(() => {
   const summary = { low: 0, neutral: 0, high: 0 }
-  for (const item of boardItems.value) {
+  for (const item of filteredBoardItems.value) {
     if (item.avgPercentile <= 20) summary.low += 1
     else if (item.avgPercentile < 70) summary.neutral += 1
     else summary.high += 1
@@ -435,8 +447,8 @@ const valuationSummary = computed(() => {
   return summary
 })
 
-const lowestItems = computed(() => boardItems.value.slice(0, 3))
-const highestItems = computed(() => [...boardItems.value].reverse().slice(0, 3))
+const lowestItems = computed(() => filteredBoardItems.value.slice(0, 3))
+const highestItems = computed(() => [...filteredBoardItems.value].reverse().slice(0, 3))
 
 const dialogChildTableData = computed<DialogChildRow[]>(() => {
   return dialogChildren.value.map(item => {

@@ -3,8 +3,9 @@
     <el-card>
       <div class="header-controls">
         <h3>行业涨跌比分析</h3>
+        <IndustryFilter v-model="selectedIndustries" />
       </div>
-      <IndustryUpDownRatioAnalysis />
+      <IndustryUpDownRatioAnalysis :selected-industries="selectedIndustries" />
     </el-card>
   </div>
 </template>
@@ -14,12 +15,17 @@
  * 行业涨跌比分析页面
  * 功能：
  * - 承载行业涨跌比分析组件
+ * - 提供行业筛选功能，支持多选只看关注的行业
  * - 统一提供页面级标题与布局容器
  * 参数：无
  * 返回值：无
  * 事件：无
  */
+import { ref } from 'vue'
 import IndustryUpDownRatioAnalysis from '@/components/IndustryUpDownRatioAnalysis.vue'
+import IndustryFilter from '@/components/IndustryFilter.vue'
+
+const selectedIndustries = ref<string[]>([])
 </script>
 
 <style scoped lang="scss">

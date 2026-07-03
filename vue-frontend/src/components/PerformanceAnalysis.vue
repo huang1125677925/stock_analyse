@@ -21,7 +21,7 @@
     <div class="chart-container">
       <!-- 业绩指标热力图 -->
       <PerformanceHeatmap 
-        :data="industryHeatmapData"
+        :data="filteredHeatmapData"
         :selected-metric="selectedMetric"
         :sort-ascending="sortAscending"
         @chart-ready="handleChartReady"
@@ -38,7 +38,7 @@
  * 返回值：无
  * 事件：chart-ready, chart-click
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndustryHeatmapData, HeatmapMetricType } from '@/services/industry-heatmap'
@@ -46,6 +46,12 @@ import type { IndustryHeatmapData } from '@/services/industry-heatmap'
 import MetricSelector from '@/components/MetricSelector.vue'
 import ReportTypeSelector from '@/components/ReportTypeSelector.vue'
 import PerformanceHeatmap from '@/components/PerformanceHeatmap.vue'
+
+interface Props {
+  selectedIndustries: string[]
+}
+
+const props = defineProps<Props>()
 
 // 响应式变量
 const router = useRouter()
@@ -56,6 +62,23 @@ const loading = ref(false)
 
 // 数据存储
 const industryHeatmapData = ref<IndustryHeatmapData | null>(null)
+
+/**
+ * 过滤后的热力图数据：当selectedIndustries为空时显示全部，否则只显示选中的行业
+ */
+const filteredHeatmapData = computed<IndustryHeatmapData | null>(() => {
+  if (!industryHeatmapData.value) return null
+  if (!props.selectedIndustries || props.selectedIndustries.length === 0) {
+    return industryHeatmapData.value
+  }
+  const selectedSet = new Set(props.selectedIndustries)
+  return {
+    ...industryHeatmapData.value,
+    swCodeNames: industryHeatmapData.value.swCodeNames.filter(
+      item => selectedSet.has(item.indexName)
+    )
+  }
+})
 
 // 获取行业业绩数据
 const fetchPerformanceData = async () => {

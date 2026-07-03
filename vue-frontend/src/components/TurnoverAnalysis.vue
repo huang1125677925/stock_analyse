@@ -60,7 +60,7 @@
 
     <div class="chart-container" v-loading="loading">
       <TurnoverHeatmap
-        :industries="allIndustries"
+        :industries="filteredIndustries"
         :dates="allDates"
         :metric="selectedMetric"
         :sort-ascending="sortAscending"
@@ -143,6 +143,23 @@ const metricOptions: Array<{ label: string; value: TurnoverMetricType }> = [
 
 const allIndustries = ref<IndustryData[]>([])
 const allDates = ref<string[]>([])
+
+interface Props {
+  selectedIndustries: string[]
+}
+
+const props = defineProps<Props>()
+
+/**
+ * 过滤后的行业数据：当selectedIndustries为空时显示全部，否则只显示选中的行业
+ */
+const filteredIndustries = computed(() => {
+  if (!props.selectedIndustries || props.selectedIndustries.length === 0) {
+    return allIndustries.value
+  }
+  const selectedSet = new Set(props.selectedIndustries)
+  return allIndustries.value.filter(item => selectedSet.has(item.name))
+})
 
 const sortButtonText = computed(() => (sortAscending.value ? '按最后一列升序' : '按最后一列降序'))
 

@@ -20,6 +20,10 @@
         </select>
       </div>
       
+      <div class="industry-filter-wrapper">
+        <IndustryFilter v-model="selectedIndustries" />
+      </div>
+
       <div class="refresh-controls">
         <button @click="refreshData" :disabled="loading" class="refresh-btn">
           <span v-if="loading">刷新中...</span>
@@ -100,6 +104,7 @@
 import { ref, onMounted, computed, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { fetchIndustryStatistics, type IndustryStatistics } from '@/services/industryApi'
+import IndustryFilter from '@/components/IndustryFilter.vue'
 
 /**
  * 行业矩形树图分析页面组件
@@ -115,6 +120,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const industryData = ref<IndustryStatistics[]>([])
 const selectedMetric = ref('total_market_cap_sum')
+const selectedIndustries = ref<string[]>([])
 const lastUpdateTime = ref<Date | null>(null)
 const treemapChart = ref<HTMLElement>()
 let chartInstance: echarts.ECharts | null = null
@@ -140,16 +146,25 @@ const currentMetricLabel = computed(() => {
   return metric?.label || ''
 })
 
-const totalIndustries = computed(() => industryData.value?.length || 0)
+/**
+ * 过滤后的行业数据：当selectedIndustries为空时显示全部，否则只显示选中的行业
+ */
+const filteredIndustryData = computed(() => {
+  if (!selectedIndustries.value.length) return industryData.value
+  const selectedSet = new Set(selectedIndustries.value)
+  return industryData.value.filter(item => selectedSet.has(item.industry))
+})
+
+const totalIndustries = computed(() => filteredIndustryData.value?.length || 0)
 
 const maxValue = computed(() => {
-  if (!industryData.value || industryData.value.length === 0) return 0
-  return Math.max(...industryData.value.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
+  if (!filteredIndustryData.value || filteredIndustryData.value.length === 0) return 0
+  return Math.max(...filteredIndustryData.value.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
 })
 
 const minValue = computed(() => {
-  if (!industryData.value || industryData.value.length === 0) return 0
-  return Math.min(...industryData.value.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
+  if (!filteredIndustryData.value || filteredIndustryData.value.length === 0) return 0
+  return Math.min(...filteredIndustryData.value.map(item => item[selectedMetric.value as keyof IndustryStatistics] as number))
 })
 
 // 方法定义
@@ -203,7 +218,7 @@ function updateTreemap() {
     return
   }
   
-  if (!industryData.value || industryData.value.length === 0) {
+  if (!filteredIndustryData.value || filteredIndustryData.value.length === 0) {
     console.error('industryData为空或未定义')
     return
   }
@@ -219,7 +234,7 @@ function updateTreemap() {
   console.log('当前选择的指标:', metric)
   
   // 将后端数据稳健地转换为数值，避免 NaN/字符串导致空图
-  const baseData = industryData.value.map(item => {
+  const baseData = filteredIndustryData.value.map(item => {
     const raw = item[selectedMetric.value as keyof IndustryStatistics] as unknown
     const num = typeof raw === 'number' ? raw : Number(raw)
     const originalValue = Number.isNaN(num) ? 0 : num
@@ -445,6 +460,10 @@ onMounted(async () => {
   border-color: #1890ff;
   outline: none;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.industry-filter-wrapper {
+  margin-left: 16px;
 }
 
 .refresh-controls {
