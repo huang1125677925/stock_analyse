@@ -73,12 +73,28 @@
           </el-select>
         </div>
         <div class="control-group">
+          <span class="control-label">宽度递增：</span>
+          <el-select
+            v-model="consecutiveIncreaseDays"
+            placeholder="筛选连续递增"
+            :disabled="loading"
+            style="width: 160px"
+          >
+            <el-option
+              v-for="option in consecutiveIncreaseDaysOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </div>
+        <div class="control-group">
           <el-button type="primary" :loading="loading" @click="fetchData">刷新</el-button>
         </div>
         <div class="control-group">
           <el-button 
             type="default" 
-            :disabled="loading || !filteredRawData.length" 
+            :disabled="loading || !increasingFilterRawData.length" 
             @click="toggleLastColumnSort"
             :icon="sortByLastColumn ? 'SortDown' : 'Sort'"
           >
@@ -200,7 +216,7 @@
  * - chartReady(chart): 图表初始化完成
  * - chartClick(payload): 图表点击事件，包含 { industry, sectorCode, date, value, idxType }
  */
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import HeatmapChart from '@/components/HeatmapChart.vue'
@@ -219,6 +235,7 @@ type TrendShortcut = '1y' | '3y' | '5y' | '10y' | '20y'
 const emit = defineEmits<{
   chartReady: [chart: echarts.ECharts]
   chartClick: [payload: { industry: string; sectorCode: string; date: string; value: number; idxType: IndustryMaBreadthIdxType }]
+  industriesLoaded: [industries: string[]]
 }>()
 
 const FIXED_RANGE_DAYS = 20
@@ -227,6 +244,14 @@ const endDate = ref<string>(formatDate(new Date()))
 const maWindow = ref<number>(10)
 const sortByLastColumn = ref(true)
 const maWindowOptions = [5, 10, 20, 30, 60, 90, 250]
+const consecutiveIncreaseDaysOptions = [
+  { label: '不筛选', value: 0 },
+  { label: '连续2天递增', value: 2 },
+  { label: '连续3天递增', value: 3 },
+  { label: '连续5天递增', value: 5 },
+  { label: '连续10天递增', value: 10 }
+]
+const consecutiveIncreaseDays = ref<number>(0)
 const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
@@ -410,6 +435,20 @@ const openTrendDialog = (sectorCode: string, sectorName: string, idxType: Indust
 
 const rawData = ref<IndustryMaBreadthItem[]>([])
 
+/**
+ * 从获取到的原始数据中提取唯一的行业名称列表（已排序），
+ * 用于驱动筛选组件的下拉选项，确保与实际数据一致。
+ */
+const rawIndustryNames = computed<string[]>(() => {
+  const names = Array.from(new Set(rawData.value.map(d => d.sector_name)))
+  names.sort()
+  return names
+})
+
+watch(rawIndustryNames, (names) => {
+  emit('industriesLoaded', names)
+}, { immediate: true })
+
 interface Props {
   selectedIndustries: string[]
 }
@@ -425,6 +464,49 @@ const filteredRawData = computed(() => {
   }
   const selectedSet = new Set(props.selectedIndustries)
   return rawData.value.filter(item => selectedSet.has(item.sector_name))
+})
+
+/**
+ * 连续递增筛选：在行业筛选基础上，进一步筛选出最近 N 天宽度值连续递增的行业。
+ * 逻辑：取该行业按日期排序后最后 N+1 个数据点，检查每对相邻值是否严格递增。
+ * 当 consecutiveIncreaseDays 为 0 时不做递增筛选，直接透传。
+ */
+const increasingFilterRawData = computed(() => {
+  const n = consecutiveIncreaseDays.value
+  if (n === 0) return filteredRawData.value
+
+  const source = filteredRawData.value
+
+  // 获取所有日期并排序，取最后 N+1 个交易日
+  const allDates = Array.from(new Set(source.map(d => d.date))).sort()
+  if (allDates.length < n + 1) return []
+  const lastNDates = allDates.slice(-(n + 1))
+  const lastNDatesSet = new Set(lastNDates)
+
+  // 按行业分组，收集最近 N+1 天的宽度值
+  const sectorMap = new Map<string, Array<{ date: string; value: number }>>()
+  source.forEach(item => {
+    if (!lastNDatesSet.has(item.date)) return
+    if (!sectorMap.has(item.sector_name)) {
+      sectorMap.set(item.sector_name, [])
+    }
+    const val = typeof item.breadth_ratio === 'number' ? item.breadth_ratio : Number(item.breadth_ratio)
+    sectorMap.get(item.sector_name)!.push({ date: item.date, value: Number.isNaN(val) ? 0 : val })
+  })
+
+  // 判断哪些行业满足连续 N 天递增
+  const qualifiedSectors = new Set<string>()
+  sectorMap.forEach((points, sector) => {
+    if (points.length < n + 1) return
+    points.sort((a, b) => a.date.localeCompare(b.date))
+    const tail = points.slice(-(n + 1))
+    for (let i = 1; i < tail.length; i++) {
+      if (tail[i].value <= tail[i - 1].value) return
+    }
+    qualifiedSectors.add(sector)
+  })
+
+  return source.filter(item => qualifiedSectors.has(item.sector_name))
 })
 
 const selectedBoardLabel = computed(() => {
@@ -452,7 +534,7 @@ const toggleLastColumnSort = () => {
 
 // 计算行业与日期维度
 const industries = computed<string[]>(() => {
-  const names = Array.from(new Set(filteredRawData.value.map(d => d.sector_name)))
+  const names = Array.from(new Set(increasingFilterRawData.value.map(d => d.sector_name)))
   
   // 如果启用按最后一列排序
   if (sortByLastColumn.value && dates.value.length > 0) {
@@ -460,7 +542,7 @@ const industries = computed<string[]>(() => {
     
     // 获取每个行业在最后一个日期的数据
     const industryLastValues = new Map<string, number>()
-    filteredRawData.value.forEach(item => {
+    increasingFilterRawData.value.forEach(item => {
       if (item.date === lastDate && names.includes(item.sector_name)) {
         const val = typeof item.breadth_ratio === 'number' ? item.breadth_ratio : Number(item.breadth_ratio)
         industryLastValues.set(item.sector_name, Number.isNaN(val) ? 0 : val)
@@ -479,7 +561,7 @@ const industries = computed<string[]>(() => {
 })
 
 const dates = computed<string[]>(() => {
-  const ds = Array.from(new Set(filteredRawData.value.map(d => d.date))).sort()
+  const ds = Array.from(new Set(increasingFilterRawData.value.map(d => d.date))).sort()
   return ds
 })
 
@@ -488,7 +570,7 @@ const heatmapData = computed<[number, number, number][]>(() => {
   const dateIndex = new Map(dates.value.map((d, i) => [d, i]))
   const industryIndex = new Map(industries.value.map((n, i) => [n, i]))
   const points: [number, number, number][] = []
-  filteredRawData.value.forEach(item => {
+  increasingFilterRawData.value.forEach(item => {
     const di = dateIndex.get(item.date)
     const ii = industryIndex.get(item.sector_name)
     if (di !== undefined && ii !== undefined) {
@@ -581,7 +663,7 @@ const onChartClick = (params: any) => {
   const [x, y, v] = (params?.data ?? []) as [number, number, number]
   const date = typeof x === 'number' ? dates.value[x] : ''
   const industry = typeof y === 'number' ? industries.value[y] : ''
-  const matchedRecord = filteredRawData.value.find((item) => item.date === date && item.sector_name === industry)
+  const matchedRecord = increasingFilterRawData.value.find((item) => item.date === date && item.sector_name === industry)
   const payload = {
     date,
     industry,

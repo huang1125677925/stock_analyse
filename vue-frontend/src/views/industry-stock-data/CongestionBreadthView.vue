@@ -3,9 +3,12 @@
     <el-card>
       <div class="header-controls">
         <h3>市场宽度分析</h3>
-        <IndustryFilter v-model="selectedIndustries" />
+        <IndustryFilter v-model="selectedIndustries" :industries="availableIndustries" />
       </div>
-      <IndustryBreadthAnalysis :selected-industries="selectedIndustries" />
+      <IndustryBreadthAnalysis
+        :selected-industries="selectedIndustries"
+        @industries-loaded="onIndustriesLoaded"
+      />
     </el-card>
   </div>
 </template>
@@ -16,6 +19,7 @@
  * 功能：
  * - 承载市场宽度热力图分析组件
  * - 提供行业筛选功能，支持多选只看关注的行业
+ * - 筛选列表由获取到的实际数据驱动，而非独立接口
  * - 统一提供页面级标题与布局容器
  * 参数：无
  * 返回值：无
@@ -26,6 +30,19 @@ import IndustryBreadthAnalysis from '@/components/IndustryBreadthAnalysis.vue'
 import IndustryFilter from '@/components/IndustryFilter.vue'
 
 const selectedIndustries = ref<string[]>([])
+const availableIndustries = ref<string[]>([])
+
+/**
+ * 当数据加载完成后，更新可用的行业列表，
+ * 并清除已选中但不再存在于新列表中的行业（比如切换板块类型后）。
+ */
+const onIndustriesLoaded = (industries: string[]) => {
+  availableIndustries.value = industries
+  if (selectedIndustries.value.length > 0) {
+    const validSet = new Set(industries)
+    selectedIndustries.value = selectedIndustries.value.filter(name => validSet.has(name))
+  }
+}
 </script>
 
 <style scoped lang="scss">
