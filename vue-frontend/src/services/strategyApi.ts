@@ -83,6 +83,9 @@ export interface StockRpsItem {
   list_status: string
   trade_date: string
   pct_change: number | null
+  latest_price: number | null
+  total_mv: number | null
+  circ_mv: number | null
   RPS_today: number | null
   [key: `return_${number}`]: number | string | null
   [key: `RPS_${number}`]: number | string | null

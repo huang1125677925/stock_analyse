@@ -198,6 +198,34 @@
             清空涨跌幅筛选
           </el-button>
         </div>
+        <div class="rps-filter-panel">
+          <div
+            v-for="filterGroup in valueFilterGroups"
+            :key="filterGroup.field"
+            class="rps-filter-group"
+          >
+            <span class="rps-filter-label">{{ filterGroup.label }}</span>
+            <div class="rps-filter-tags">
+              <el-check-tag
+                v-for="option in filterGroup.options"
+                :key="`${filterGroup.field}-${option.label}`"
+                :checked="(selectedValueRanges[filterGroup.field] || []).includes(option.label)"
+                @change="toggleValueRange(filterGroup.field, option.label)"
+              >
+                {{ option.label }}
+              </el-check-tag>
+            </div>
+          </div>
+          <el-button
+            v-if="hasActiveValueFilter"
+            link
+            type="primary"
+            class="rps-filter-reset"
+            @click="resetValueFilters"
+          >
+            清空股价市值筛选
+          </el-button>
+        </div>
       </template>
 
       <div class="methodology">
@@ -244,6 +272,18 @@
           <template #default="{ row }">
             <span :class="getChangeClass(row.pct_change)">{{ formatPercent(row.pct_change) }}</span>
           </template>
+        </el-table-column>
+
+        <el-table-column prop="latest_price" label="最新股价" min-width="110" align="center" sortable="custom">
+          <template #default="{ row }">{{ formatPrice(row.latest_price) }}</template>
+        </el-table-column>
+
+        <el-table-column prop="total_mv" label="总市值" min-width="120" align="center" sortable="custom">
+          <template #default="{ row }">{{ formatMarketCap(row.total_mv) }}</template>
+        </el-table-column>
+
+        <el-table-column prop="circ_mv" label="流通市值" min-width="120" align="center" sortable="custom">
+          <template #default="{ row }">{{ formatMarketCap(row.circ_mv) }}</template>
         </el-table-column>
 
         <el-table-column prop="RPS_today" label="RPS_today" min-width="140" align="center" sortable="custom">
@@ -373,6 +413,13 @@ type DynamicReturnField = `return_${number}`
 type DynamicRpsField = `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
 type ChangeDirectionLabel = '上涨' | '平盘' | '下跌'
+type ValueRangeField = 'latest_price' | 'total_mv' | 'circ_mv'
+
+interface RangeOption {
+  label: string
+  min: number
+  max: number | null
+}
 
 interface StockRpsFilters {
   searchKeyword: string
@@ -408,6 +455,27 @@ const marketOptions = [
 ]
 const rpsRankOptions: RpsRankLabel[] = ['极强', '强势', '良好', '一般', '弱势']
 const changeDirectionOptions: ChangeDirectionLabel[] = ['上涨', '平盘', '下跌']
+
+const YI = 1e8
+const priceRangeOptions: RangeOption[] = [
+  { label: '0-10', min: 0, max: 10 },
+  { label: '10-30', min: 10, max: 30 },
+  { label: '30-50', min: 30, max: 50 },
+  { label: '50-100', min: 50, max: 100 },
+  { label: '100+', min: 100, max: null }
+]
+const marketCapRangeOptions: RangeOption[] = [
+  { label: '<50亿', min: 0, max: 50 * YI },
+  { label: '50-100亿', min: 50 * YI, max: 100 * YI },
+  { label: '100-500亿', min: 100 * YI, max: 500 * YI },
+  { label: '500-1000亿', min: 500 * YI, max: 1000 * YI },
+  { label: '1000亿+', min: 1000 * YI, max: null }
+]
+const valueFilterGroups: Array<{ field: ValueRangeField; label: string; options: RangeOption[] }> = [
+  { field: 'latest_price', label: '最新股价', options: priceRangeOptions },
+  { field: 'total_mv', label: '总市值', options: marketCapRangeOptions },
+  { field: 'circ_mv', label: '流通市值', options: marketCapRangeOptions }
+]
 
 const filters = reactive<StockRpsFilters>({
   searchKeyword: '',
@@ -504,6 +572,32 @@ const formatRpsValue = (value: StockRpsValue): string => {
   const numericValue = typeof value === 'number' ? value : Number.parseFloat(String(value))
   if (!Number.isFinite(numericValue)) return '-'
   return numericValue.toFixed(1)
+}
+
+/**
+ * 工具：格式化最新股价文本。
+ * 参数：value 为接口原始股价字段。
+ * 返回值：两位小数的字符串；无效值返回 `-`。
+ * 事件：无。
+ */
+const formatPrice = (value: StockRpsValue): string => {
+  const numericValue = typeof value === 'number' ? value : Number.parseFloat(String(value))
+  if (!Number.isFinite(numericValue)) return '-'
+  return numericValue.toFixed(2)
+}
+
+/**
+ * 工具：格式化市值文本（单位：元）。
+ * 参数：value 为接口原始市值字段（单位元）。
+ * 返回值：按亿/万元换算后的可读字符串；无效值返回 `-`。
+ * 事件：无。
+ */
+const formatMarketCap = (value: StockRpsValue): string => {
+  const numericValue = typeof value === 'number' ? value : Number.parseFloat(String(value))
+  if (!Number.isFinite(numericValue)) return '-'
+  if (Math.abs(numericValue) >= YI) return `${(numericValue / YI).toFixed(2)}亿`
+  if (Math.abs(numericValue) >= 1e4) return `${(numericValue / 1e4).toFixed(2)}万`
+  return numericValue.toFixed(2)
 }
 
 /**
@@ -611,6 +705,11 @@ const changeFilterGroups = computed<Array<{ field: 'pct_change' | DynamicReturnF
 
 const selectedRpsRanks = reactive<Record<string, RpsRankLabel[]>>({})
 const selectedChangeDirections = reactive<Record<string, ChangeDirectionLabel[]>>({})
+const selectedValueRanges = reactive<Record<ValueRangeField, string[]>>({
+  latest_price: [],
+  total_mv: [],
+  circ_mv: []
+})
 
 const defaultSortProp = computed(() => {
   const firstPeriod = currentPeriods.value[0]
@@ -725,12 +824,48 @@ const resetChangeFilters = (): void => {
   })
 }
 
+/**
+ * 事件：切换市值/股价区间标签。
+ * 参数：
+ *  - field 为区间字段名（latest_price、total_mv、circ_mv）；
+ *  - rangeLabel 为区间标签。
+ * 返回值：void。
+ * 事件：更新 `selectedValueRanges`。
+ */
+const toggleValueRange = (field: ValueRangeField, rangeLabel: string): void => {
+  const ranges = selectedValueRanges[field] || []
+  const index = ranges.indexOf(rangeLabel)
+  if (index >= 0) {
+    ranges.splice(index, 1)
+    selectedValueRanges[field] = ranges
+    return
+  }
+  ranges.push(rangeLabel)
+  selectedValueRanges[field] = ranges
+}
+
+/**
+ * 工具：清空市值/股价区间筛选。
+ * 参数：无。
+ * 返回值：void。
+ * 事件：重置 `selectedValueRanges`。
+ */
+const resetValueFilters = (): void => {
+  ;(Object.keys(selectedValueRanges) as ValueRangeField[]).forEach((field) => {
+    selectedValueRanges[field] = []
+  })
+}
+
 const hasActiveRpsFilter = computed(() => {
   return Object.values(selectedRpsRanks).some((items) => items.length > 0)
 })
 
 const hasActiveChangeFilter = computed(() => {
   return Object.values(selectedChangeDirections).some((items) => items.length > 0)
+})
+
+const hasActiveValueFilter = computed(() => {
+  return Object.values(selectedValueRanges).some((items) => items.length > 0)
 })
 
 /**
@@ -761,6 +896,29 @@ const matchesChangeFilters = (item: StockRpsItem): boolean => {
   })
 }
 
+/**
+ * 工具：判断单条记录是否满足股价/市值区间筛选。
+ * 参数：item 为股票 RPS 记录。
+ * 返回值：`true` 表示命中当前区间筛选。
+ * 事件：无。
+ */
+const matchesValueFilters = (item: StockRpsItem): boolean => {
+  return valueFilterGroups.every(({ field, options }) => {
+    const selectedLabels = selectedValueRanges[field] || []
+    if (!selectedLabels.length) return true
+    const rawValue = Reflect.get(item, field) as StockRpsValue
+    if (rawValue === null || rawValue === undefined || rawValue === '') return false
+    const numericValue = getNumericValue(rawValue)
+    return selectedLabels.some((label) => {
+      const range = options.find((option) => option.label === label)
+      if (!range) return false
+      const aboveMin = numericValue >= range.min
+      const belowMax = range.max === null || numericValue < range.max
+      return aboveMin && belowMax
+    })
+  })
+}
+
 const filteredRows = computed<StockRpsItem[]>(() => {
   const keyword = filters.searchKeyword.trim().toLowerCase()
   let result = stockRpsRows.value
@@ -779,6 +937,7 @@ const filteredRows = computed<StockRpsItem[]>(() => {
 
   result = result.filter(matchesRpsFilters)
   result = result.filter(matchesChangeFilters)
+  result = result.filter(matchesValueFilters)
   return result
 })
 
