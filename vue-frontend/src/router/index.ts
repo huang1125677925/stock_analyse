@@ -16,6 +16,12 @@ const router = createRouter({
       meta: { title: '大盘概览' },
       children: [
         {
+          path: '/market-overview/index-valuation',
+          name: 'market-index-valuation',
+          component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
+          meta: { title: '大盘指数估值' }
+        },
+        {
           path: '/major-index-rps',
           name: 'major-index-rps',
           component: () => import('@/views/markt_data/MajorIndexRpsView.vue'),
