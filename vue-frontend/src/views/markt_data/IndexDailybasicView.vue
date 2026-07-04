@@ -68,35 +68,51 @@
     </el-card>
 
     <div class="chart-section" v-loading="loading">
-      <el-card v-for="dataset in datasets" :key="dataset.value" class="index-card">
-        <template #header>
-          <div class="card-header">
-            <div class="header-title">
-              <span>{{ dataset.label }}（{{ dataset.totalCount }} 条数据）</span>
-              <el-tag v-if="dataset.valuation" :type="dataset.valuation.type" effect="dark" class="valuation-tag">
-                当前{{ metricLabel }}分位: {{ dataset.valuation.percentile.toFixed(2) }}% - {{ dataset.valuation.status }}
-              </el-tag>
-            </div>
-          </div>
-        </template>
-        <div :ref="el => setChartRef(dataset.value, el)" class="chart-container"></div>
-      </el-card>
+      <div class="chart-carousel-toolbar">
+        <div class="chart-carousel-summary">
+          <span class="chart-carousel-title">指数趋势图</span>
+          <span v-if="activeDataset" class="chart-carousel-counter">
+            {{ activeChartIndex + 1 }} / {{ datasets.length }} · {{ activeDataset.label }}
+          </span>
+        </div>
+        <div class="chart-carousel-actions">
+          <el-button :disabled="activeChartIndex === 0" @click="showPrevChart">上一张</el-button>
+          <el-button type="primary" :disabled="activeChartIndex === datasets.length - 1" @click="showNextChart">下一张</el-button>
+        </div>
+      </div>
+
+      <div class="chart-carousel-viewport">
+        <div class="chart-carousel-track" :style="carouselTrackStyle">
+          <el-card v-for="dataset in datasets" :key="dataset.value" class="index-card chart-slide">
+            <template #header>
+              <div class="card-header">
+                <div class="header-title">
+                  <span>{{ dataset.label }}（{{ dataset.totalCount }} 条数据）</span>
+                  <el-tag v-if="dataset.valuation" :type="dataset.valuation.type" effect="dark" class="valuation-tag">
+                    当前{{ metricLabel }}分位: {{ dataset.valuation.percentile.toFixed(2) }}% - {{ dataset.valuation.status }}
+                  </el-tag>
+                </div>
+              </div>
+            </template>
+            <div :ref="el => setChartRef(dataset.value, el)" class="chart-container"></div>
+          </el-card>
+        </div>
+      </div>
+
+      <div class="chart-carousel-dots">
+        <button
+          v-for="(dataset, index) in datasets"
+          :key="dataset.value"
+          type="button"
+          class="chart-dot"
+          :class="{ 'is-active': index === activeChartIndex }"
+          @click="goToChart(index)"
+        >
+          {{ dataset.label }}
+        </button>
+      </div>
     </div>
 
-    <el-card class="related-page-card" shadow="hover">
-      <template #header>
-        <div class="header-content">
-          <span>相关页面</span>
-        </div>
-      </template>
-      <div class="related-page-content">
-        <div>
-          <div class="related-page-title">大盘指数RPS</div>
-          <div class="related-page-desc">查看国内与国际主要指数的多周期涨跌幅和 RPS 强度排名，辅助判断当前全球主要指数的相对强弱。</div>
-        </div>
-        <el-button type="primary" @click="router.push('/major-index-rps')">进入页面</el-button>
-      </div>
-    </el-card>
   </div>
 </template>
 
@@ -113,14 +129,12 @@
  * - loaded: 数据加载完成时触发，传递记录数
  */
 import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchIndexDailybasic, fetchMarketCombinedDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
 import * as echarts from 'echarts'
 
 // emits：对外发出 loaded 事件
 const emit = defineEmits<{ (e: 'loaded', count: number): void }>()
-const router = useRouter()
 
 // 加载状态
 const loading = ref(false)
@@ -198,6 +212,11 @@ const datasets = ref<IndexDataset[]>(indexOptions.map(item => ({
   totalCount: 0,
   valuation: null,
 })))
+const activeChartIndex = ref(0)
+const activeDataset = computed(() => datasets.value[activeChartIndex.value] ?? null)
+const carouselTrackStyle = computed(() => ({
+  transform: `translateX(-${activeChartIndex.value * 100}%)`
+}))
 
 const comparisonRows = computed<ComparisonRow[]>(() => datasets.value.map(dataset => {
   const latestRecord = dataset.records[dataset.records.length - 1]
@@ -305,6 +324,19 @@ function setYearRange(years: number) {
   lookbackYears.value = years
 }
 
+function goToChart(index: number) {
+  if (index < 0 || index >= datasets.value.length) return
+  activeChartIndex.value = index
+}
+
+function showPrevChart() {
+  goToChart(activeChartIndex.value - 1)
+}
+
+function showNextChart() {
+  goToChart(activeChartIndex.value + 1)
+}
+
 function formatMetricValue(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
     return '--'
@@ -346,11 +378,15 @@ async function fetchData() {
     }))
 
     datasets.value = loaded
+    if (activeChartIndex.value > loaded.length - 1) {
+      activeChartIndex.value = Math.max(loaded.length - 1, 0)
+    }
     totalCount.value = loaded.reduce((sum, item) => sum + item.totalCount, 0)
     emit('loaded', totalCount.value)
     await nextTick()
     initCharts()
     updateChart()
+    handleResize()
   } catch (e: any) {
     ElMessage.error(e?.message || '数据加载失败')
   } finally {
@@ -461,6 +497,11 @@ watch([endDate, lookbackYears], () => {
   fetchData()
 })
 
+watch(activeChartIndex, async () => {
+  await nextTick()
+  handleResize()
+})
+
 onMounted(() => {
   const [, defaultEndDate] = buildDefaultDateRange()
   endDate.value = defaultEndDate
@@ -482,16 +523,38 @@ onUnmounted(() => {
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .header-title { display: flex; align-items: center; gap: 10px; }
 .valuation-tag { margin-left: 10px; font-weight: bold; }
-.chart-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.index-card { width: 100%; min-width: 0; }
+.chart-section { display: flex; flex-direction: column; gap: 16px; }
+.chart-carousel-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.chart-carousel-summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.chart-carousel-title { font-size: 18px; font-weight: 600; }
+.chart-carousel-counter { color: var(--el-text-color-secondary); }
+.chart-carousel-actions { display: flex; gap: 12px; }
+.chart-carousel-viewport { overflow: hidden; }
+.chart-carousel-track { display: flex; transition: transform 0.3s ease; will-change: transform; }
+.index-card { width: 100%; min-width: 100%; flex: 0 0 100%; box-sizing: border-box; }
+.chart-slide { scroll-snap-align: start; }
 .chart-container { width: 100%; height: 420px; }
+.chart-carousel-dots { display: flex; gap: 10px; flex-wrap: wrap; }
+.chart-dot {
+  border: 1px solid var(--el-border-color);
+  background: var(--el-fill-color-blank);
+  color: var(--el-text-color-regular);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.chart-dot.is-active {
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
 .range-buttons { margin-left: 8px; }
 .range-text { margin-left: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
-.related-page-card { margin-top: 20px; }
-.related-page-content { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.related-page-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
-.related-page-desc { color: var(--el-text-color-secondary); line-height: 1.6; }
 @media (max-width: 768px) {
-  .related-page-content { flex-direction: column; align-items: flex-start; }
+  .chart-carousel-toolbar { flex-direction: column; align-items: flex-start; }
+  .chart-carousel-actions { width: 100%; }
+  .chart-carousel-actions :deep(.el-button) { flex: 1; }
+  .chart-container { height: 360px; }
 }
 </style>
