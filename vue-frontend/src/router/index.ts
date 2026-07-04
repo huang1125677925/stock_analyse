@@ -118,7 +118,7 @@ const router = createRouter({
         {
           path: '/stock-picker/limit-board-analysis',
           name: 'stock-limit-board-analysis',
-          component: () => import('@/views/analysis/StockPickerView.vue'),
+          component: () => import('@/views/indival_stock_data/LimitBoardAnalysisView.vue'),
           meta: { title: '打板分析选股' }
         },
         {
