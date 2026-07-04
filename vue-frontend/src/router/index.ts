@@ -6,9 +6,15 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
-      meta: { title: '大盘指数估值' }
+      component: DefaultLayout,
+      children: [
+        {
+          path: '',
+          name: 'home',
+          component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
+          meta: { title: '大盘指数估值' }
+        }
+      ]
     },
     {
       path: '/feature-updates',

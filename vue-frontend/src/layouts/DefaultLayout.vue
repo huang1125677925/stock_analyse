@@ -410,6 +410,8 @@ watch(
 
 <style scoped>
 .layout-container {
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   height: 100dvh;
   width: 100vw;
@@ -555,6 +557,9 @@ watch(
 }
 
 .main-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
   overflow: auto;
   background: #f5f7fa;
 }
