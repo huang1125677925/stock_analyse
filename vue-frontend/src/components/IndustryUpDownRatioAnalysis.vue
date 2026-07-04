@@ -392,7 +392,7 @@ const applyTrendShortcut = (range: TrendShortcut) => {
 
 /**
  * 工具：加载东财板块趋势K线数据
- * 功能：调用 /django/api/tasks/dc-daily/ 获取当前选中板块日线，并转换为K线组件需要的数据结构
+ * 功能：调用 /django/api/strategy/dc-daily/ 获取当前选中板块日线，并转换为K线组件需要的数据结构
  * 参数：无
  * 返回值：Promise<void>
  * 事件：更新 trendData、trendLoading

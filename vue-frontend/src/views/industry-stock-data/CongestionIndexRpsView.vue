@@ -1,7 +1,5 @@
 <template>
-  <div class="congestion-page">
-    <IndexRpsView />
-  </div>
+  <IndexRpsView />
 </template>
 
 <script setup lang="ts">
@@ -14,8 +12,3 @@
  */
 import IndexRpsView from '@/views/strategy/IndexRpsView.vue'
 </script>
-
-<style scoped lang="scss">
-.congestion-page { padding: 20px; }
-@media (max-width: 768px) { .congestion-page { padding:12px; } }
-</style>

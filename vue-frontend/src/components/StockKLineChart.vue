@@ -48,6 +48,16 @@ interface OverlayLine {
   width?: number
   type?: 'solid' | 'dashed' | 'dotted'
   showSymbol?: boolean
+  /**
+   * 使用的 y 轴索引：
+   * - 0 或省略：与 K 线共用左侧价格轴
+   * - 1：使用右侧副轴（用于量纲不同的指标，如 0~1 的市场宽度比例）
+   */
+  yAxisIndex?: number
+  /**
+   * 副轴数值格式化：'percent' 表示按百分比展示（value * 100）
+   */
+  valueFormat?: 'percent' | 'raw'
 }
 
 interface PatternMarker {
@@ -210,9 +220,11 @@ const updateChart = () => {
         }
       })
 
+      const isPercent = line.valueFormat === 'percent'
       return {
         name: line.name,
         type: 'line',
+        yAxisIndex: line.yAxisIndex ?? 0,
         data: dates.map(date => {
           const value = pointMap.get(normalizeDate(date))
           return value === undefined ? null : Number(value.toFixed(3))
@@ -231,10 +243,20 @@ const updateChart = () => {
           color: line.color || '#2563eb'
         },
         tooltip: {
-          valueFormatter: (value: number | string) => typeof value === 'number' ? value.toFixed(2) : value
+          valueFormatter: (value: number | string) =>
+            typeof value === 'number'
+              ? isPercent
+                ? `${(value * 100).toFixed(2)}%`
+                : value.toFixed(2)
+              : value
         }
       }
     })
+
+  // 是否存在使用副轴（右侧）的叠加线，用于渲染量纲不同的指标（如市场宽度比例）
+  const hasSecondaryAxisLine = (props.overlayLines || []).some(
+    line => (line.yAxisIndex ?? 0) === 1 && Array.isArray(line.points) && line.points.length > 0
+  )
 
 // 生成交易信号标记
 const generateTradeSignals = (signals: TradeSignal[], type: 'buy' | 'sell') => {
@@ -340,23 +362,42 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
       formatter: (params: any) => {
         const date = params[0].axisValue
         let res = `<div style="font-weight:bold;margin-bottom:5px;">${date}</div>`
-        
+
+        // 记录使用百分比展示的叠加线名称，用于tooltip格式化
+        const percentLineNames = new Set(
+          (props.overlayLines || [])
+            .filter(line => line.valueFormat === 'percent')
+            .map(line => line.name)
+        )
+
         params.forEach((param: any) => {
           const color = param.color
           const seriesName = param.seriesName
           const value = param.value
-          
+
           if (seriesName === 'K线') {
             res += `<div style="color:${color};">${seriesName}</div>`
             res += `<div>开盘价: ${value[1]}</div>`
             res += `<div>收盘价: ${value[2]}</div>`
             res += `<div>最低价: ${value[4]}</div>`
             res += `<div>最高价: ${value[3]}</div>`
+          } else if (value !== null && value !== undefined) {
+            const numeric = Array.isArray(value) ? value[1] : value
+            if (numeric === null || numeric === undefined) return
+            const display = percentLineNames.has(seriesName)
+              ? `${(Number(numeric) * 100).toFixed(2)}%`
+              : Number(numeric).toFixed(2)
+            res += `<div style="color:${color};">${seriesName}: ${display}</div>`
           }
         })
-        
+
         return res
       }
+    },
+    legend: {
+      show: overlayLineSeries.length > 0,
+      top: 24,
+      data: ['K线', ...overlayLineSeries.map(line => line.name)]
     },
     grid: {
       left: '10%',
@@ -371,12 +412,27 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
       axisLine: { onZero: false },
       splitLine: { show: false }
     },
-    yAxis: {
-      scale: true,
-      splitArea: {
-        show: true
-      }
-    },
+    yAxis: [
+      {
+        scale: true,
+        splitArea: {
+          show: true
+        }
+      },
+      ...(hasSecondaryAxisLine
+        ? [{
+            type: 'value',
+            scale: true,
+            min: 0,
+            max: 1,
+            position: 'right',
+            axisLabel: {
+              formatter: (value: number) => `${(value * 100).toFixed(0)}%`
+            },
+            splitLine: { show: false }
+          }]
+        : [])
+    ],
     dataZoom: [
       {
         type: 'inside',

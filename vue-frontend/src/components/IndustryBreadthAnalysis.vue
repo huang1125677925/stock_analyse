@@ -190,6 +190,7 @@
             :stock-code="trendBoard.code"
             :stock-name="trendBoard.name"
             :kline-data="trendData"
+            :overlay-lines="trendOverlayLines"
             height="420px"
           />
           <el-empty
@@ -263,6 +264,7 @@ const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendShortcut = ref<TrendShortcut>('1y')
 const trendData = ref<StockHistoryDataItem[]>([])
+const trendBreadthPoints = ref<Array<{ date: string; value: number }>>([])
 const trendBoard = reactive({
   code: '',
   name: '',
@@ -341,7 +343,7 @@ const applyTrendShortcut = (range: TrendShortcut) => {
 
 /**
  * 工具：加载东财板块趋势K线数据
- * 功能：调用 /django/api/tasks/dc-daily/ 获取当前选中板块日线，并转换为K线组件需要的数据结构
+ * 功能：调用 /django/api/strategy/dc-daily/ 获取当前选中板块日线，并转换为K线组件需要的数据结构
  * 参数：无
  * 返回值：Promise<void>
  * 事件：更新 trendData、trendLoading
@@ -356,15 +358,36 @@ const loadTrendData = async () => {
 
   trendLoading.value = true
   try {
-    const response = await fetchDcDaily({
-      ts_code: trendBoard.code,
-      idx_type: trendBoard.idxType,
-      start_date: formatDateForApi(trendDateRange.start),
-      end_date: formatDateForApi(trendDateRange.end),
-      fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate'
-    })
+    // 并行拉取：东财板块日线K线 + 该板块的市场宽度序列（单行业模式）
+    const [response, breadthData] = await Promise.all([
+      fetchDcDaily({
+        ts_code: trendBoard.code,
+        idx_type: trendBoard.idxType,
+        start_date: formatDateForApi(trendDateRange.start),
+        end_date: formatDateForApi(trendDateRange.end),
+        fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate'
+      }),
+      fetchIndustryMaBreadth({
+        sectorCode: trendBoard.code,
+        startDate: trendDateRange.start,
+        endDate: trendDateRange.end,
+        maWindow: maWindow.value
+      }).catch((breadthErr) => {
+        // 宽度序列失败不应阻断K线展示，降级为空数据
+        console.error('获取板块市场宽度序列失败:', breadthErr)
+        return null
+      })
+    ])
 
     if (requestId !== trendRequestId) return
+
+    trendBreadthPoints.value = (breadthData?.data ?? [])
+      .map((item) => ({
+        date: item.date,
+        value: typeof item.breadth_ratio === 'number' ? item.breadth_ratio : Number(item.breadth_ratio)
+      }))
+      .filter((point) => Number.isFinite(point.value))
+      .sort((a, b) => a.date.localeCompare(b.date))
 
     trendData.value = [...(response.records || [])]
       .sort((a, b) => a.trade_date.localeCompare(b.trade_date))
@@ -428,6 +451,7 @@ const openTrendDialog = (sectorCode: string, sectorName: string, idxType: Indust
   trendBoard.idxType = idxType
   trendShortcut.value = '1y'
   trendData.value = []
+  trendBreadthPoints.value = []
   applyTrendShortcut('1y')
   trendDialogVisible.value = true
   loadTrendData()
@@ -525,6 +549,26 @@ const trendEmptyText = computed(() => {
   return trendBoard.code
     ? '暂无该东财板块区间K线数据'
     : '请选择板块查看趋势看板'
+})
+
+/**
+ * K线叠加线：将该板块的市场宽度序列作为副轴（右侧 0~1）叠加在K线图上，
+ * 与价格走势对照观察。宽度为空时返回空数组，不影响K线展示。
+ */
+const trendOverlayLines = computed(() => {
+  if (!trendBreadthPoints.value.length) return []
+  return [
+    {
+      name: `市场宽度(MA${maWindow.value})`,
+      points: trendBreadthPoints.value,
+      color: '#8e44ad',
+      width: 1.5,
+      type: 'solid' as const,
+      showSymbol: false,
+      yAxisIndex: 1,
+      valueFormat: 'percent' as const
+    }
+  ]
 })
 
 // 切换按最后一列排序的状态

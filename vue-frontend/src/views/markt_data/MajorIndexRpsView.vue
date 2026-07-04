@@ -118,20 +118,17 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="source" label="来源" min-width="110" align="center" />
         <el-table-column prop="trade_date" label="交易日" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">
             {{ formatTradeDate(row.trade_date) }}
           </template>
         </el-table-column>
-        <el-table-column prop="pct_change" label="当日涨跌幅" min-width="120" align="center" sortable="custom">
+        <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" min-width="180" align="center" sortable="custom">
           <template #default="{ row }">
-            <span :class="getChangeClass(row.pct_change)">{{ formatPercent(row.pct_change) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="RPS_today" label="RPS_today" min-width="150" align="center" sortable="custom">
-          <template #default="{ row }">
-            <div class="rps-cell">
+            <div class="rps-cell rps-cell-with-change">
+              <span :class="getChangeClass(row.pct_change)" class="rps-change-text">
+                {{ formatPercent(row.pct_change) }}
+              </span>
               <el-progress
                 :percentage="getProgressValue(row.RPS_today)"
                 :color="getRpsColor(row.RPS_today)"
@@ -146,27 +143,17 @@
 
         <template v-for="period in availablePeriods" :key="period">
           <el-table-column
-            :prop="getReturnProp(period)"
-            :label="`${period}日涨跌幅`"
-            min-width="120"
-            align="center"
-            sortable="custom"
-          >
-            <template #default="{ row }">
-              <span :class="getChangeClass(row[getReturnProp(period)])">
-                {{ formatPercent(row[getReturnProp(period)]) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column
             :prop="getRpsProp(period)"
-            :label="`RPS_${period}`"
-            min-width="150"
+            :label="`${period}日涨跌幅 / RPS_${period}`"
+            min-width="180"
             align="center"
             sortable="custom"
           >
             <template #default="{ row }">
-              <div class="rps-cell">
+              <div class="rps-cell rps-cell-with-change">
+                <span :class="getChangeClass(row[getReturnProp(period)])" class="rps-change-text">
+                  {{ formatPercent(row[getReturnProp(period)]) }}
+                </span>
                 <el-progress
                   :percentage="getProgressValue(row[getRpsProp(period)])"
                   :color="getRpsColor(row[getRpsProp(period)])"
@@ -227,7 +214,7 @@ const rows = ref<MajorIndexRpsItem[]>([])
 const availablePeriods = ref<number[]>([...DEFAULT_PERIODS])
 const queryTime = ref('')
 const searchKeyword = ref('')
-const selectedMarket = ref<MarketFilter>('全部')
+const selectedMarket = ref<MarketFilter>('国内')
 const tradeDate = ref('')
 const sortState = ref<SortState>({
   prop: 'RPS_today',
@@ -243,7 +230,7 @@ const trendIndex = ref({
 const domesticCount = computed(() => rows.value.filter(item => item.market === '国内').length)
 const internationalCount = computed(() => rows.value.filter(item => item.market === '国际').length)
 const strongestIndexName = computed(() => {
-  const sorted = [...rows.value].sort((a, b) => getNumericValue(b.RPS_today) - getNumericValue(a.RPS_today))
+  const sorted = [...filteredRows.value].sort((a, b) => getNumericValue(b.RPS_today) - getNumericValue(a.RPS_today))
   return sorted[0]?.name || '--'
 })
 
@@ -371,7 +358,7 @@ async function fetchData() {
 
 function resetFilters() {
   searchKeyword.value = ''
-  selectedMarket.value = '全部'
+  selectedMarket.value = '国内'
   tradeDate.value = ''
   fetchData()
 }
@@ -505,6 +492,17 @@ onMounted(() => {
 
 .rps-cell {
   min-width: 120px;
+}
+
+.rps-cell-with-change {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rps-change-text {
+  font-size: 13px;
+  line-height: 1.2;
 }
 
 .up-text {

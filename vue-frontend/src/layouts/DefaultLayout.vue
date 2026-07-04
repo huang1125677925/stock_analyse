@@ -307,8 +307,8 @@ const marketOverviewMegaMenuSections = [
   {
     title: '',
     items: [
-      { title: '大盘指数估值', path: '/market-overview/index-valuation' },
       { title: '大盘指数RPS', path: '/major-index-rps' },
+      { title: '大盘指数估值', path: '/market-overview/index-valuation' },
       { title: '大盘资金分析', path: '/market-fund-flow' },
     ],
   },

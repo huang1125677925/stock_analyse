@@ -2,7 +2,7 @@ import axios from './axiosConfig'
 
 /**
  * 接口：东财板块日频行情（dc_daily）
- * 功能：封装 /django/api/tasks/dc-daily/ 接口调用，用于获取板块近 N 天的日频数据
+ * 功能：封装 /django/api/strategy/dc-daily/ 接口调用，用于获取板块近 N 天的日频数据
  * 参数：
  *  - tsCode: 板块代码（格式：xxxxx.DC）
  *  - idxType: 板块类型（概念板块/行业板块/地域板块）
@@ -50,7 +50,7 @@ export interface DcDailyQueryParams {
 }
 
 export async function fetchDcDaily(params: DcDailyQueryParams): Promise<DcDailyData> {
-  const res = await axios.get<ApiResponse<DcDailyData>, ApiResponse<DcDailyData>>('/django/api/tasks/dc-daily/', {
+  const res = await axios.get<ApiResponse<DcDailyData>, ApiResponse<DcDailyData>>('/django/api/strategy/dc-daily/', {
     params
   })
   return res.data

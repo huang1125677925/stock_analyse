@@ -85,11 +85,17 @@ export interface IndustryMaBreadthQuery {
   maWindow?: number
   idxType?: IndustryMaBreadthIdxType
   level?: EastMoneyIndustryLevel
+  /**
+   * 东财板块代码，例如 BK1462.DC。
+   * 传入后进入单行业模式：仅计算该板块并按成分股逐只拉取因子数据，
+   * 请求次数与时间跨度无关，适合长区间查询；此时忽略 idxType/level。
+   */
+  sectorCode?: string
 }
 
 /**
  * 获取行业MA宽度数据
- * @param query 查询参数，支持日期范围、均线窗口、板块类型与行业层级
+ * @param query 查询参数，支持日期范围、均线窗口、板块类型与行业层级；传入 sectorCode 时进入单行业模式
  * @returns IndustryMaBreadthData
  */
 export async function fetchIndustryMaBreadth(
@@ -99,8 +105,10 @@ export async function fetchIndustryMaBreadth(
   if (query.startDate) params.start_date = query.startDate
   if (query.endDate) params.end_date = query.endDate
   params.ma_window = query.maWindow ?? 20
+  // 单行业模式下 idx_type/level 会被后端忽略，此处保留传参不影响结果
   params.idx_type = query.idxType ?? '行业板块'
   if (query.level) params.level = query.level
+  if (query.sectorCode) params.sector_code = query.sectorCode
 
   const res = await axios.get<
     ApiResponse<IndustryMaBreadthData> | IndustryMaBreadthData,

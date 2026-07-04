@@ -146,51 +146,25 @@
           </el-table-column>
 
           <el-table-column
-            prop="pct_change"
-            label="当日涨跌幅"
-            min-width="110"
+            prop="RPS_today"
+            label="当日涨跌幅 / RPS_today"
+            min-width="150"
             sortable="custom"
             align="center"
           >
             <template #header>
               <div class="custom-header">
-                <span>当日涨跌幅</span>
-                <el-tooltip content="截止交易日当天涨跌幅" placement="top">
+                <span>当日涨跌幅 / RPS_today</span>
+                <el-tooltip content="上方为当日涨跌幅，下方为基于当天涨跌幅计算的 RPS 强度" placement="top">
                   <el-icon><InfoFilled /></el-icon>
                 </el-tooltip>
               </div>
             </template>
             <template #default="scope">
-              <div class="change-percent-cell">
-                <span :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
+              <div class="rps-cell rps-cell-with-change">
+                <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
                   {{ formatPercent(scope.row.pct_change) }}
                 </span>
-                <div class="trend-indicator">
-                  <el-icon v-if="getNumericValue(scope.row.pct_change) > 0"><CaretTop /></el-icon>
-                  <el-icon v-else-if="getNumericValue(scope.row.pct_change) < 0"><CaretBottom /></el-icon>
-                  <el-icon v-else><Minus /></el-icon>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column
-            prop="RPS_today"
-            label="RPS_today"
-            min-width="120"
-            sortable="custom"
-            align="center"
-          >
-            <template #header>
-              <div class="custom-header">
-                <span>RPS_today</span>
-                <el-tooltip content="基于当天涨跌幅计算的 RPS 强度" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="rps-cell">
                 <el-progress
                   :percentage="getNumericValue(scope.row.RPS_today)"
                   :color="getRpsColor(getNumericValue(scope.row.RPS_today))"
@@ -208,51 +182,25 @@
           
           <template v-for="period in rpsPeriods" :key="period">
             <el-table-column
-              :label="`${period}日涨跌幅`"
-              min-width="110"
-              sortable="custom"
-              :prop="getReturnProp(period)"
-              align="center"
-            >
-              <template #header>
-                <div class="custom-header">
-                  <span>{{ period }}日涨跌幅</span>
-                  <el-tooltip :content="`${period}日内的价格变化百分比`" placement="top">
-                    <el-icon><InfoFilled /></el-icon>
-                  </el-tooltip>
-                </div>
-              </template>
-              <template #default="scope">
-                <div class="change-percent-cell">
-                  <span :class="{ up: Number(scope.row[getReturnProp(period)]) > 0, down: Number(scope.row[getReturnProp(period)]) < 0 }">
-                    {{ formatPercent(scope.row[getReturnProp(period)]) }}
-                  </span>
-                  <div class="trend-indicator">
-                    <el-icon v-if="Number(scope.row[getReturnProp(period)]) > 0"><CaretTop /></el-icon>
-                    <el-icon v-else-if="Number(scope.row[getReturnProp(period)]) < 0"><CaretBottom /></el-icon>
-                    <el-icon v-else><Minus /></el-icon>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-
-            <el-table-column
-              :label="`RPS_${period}`"
-              min-width="120"
+              :label="`${period}日涨跌幅 / RPS_${period}`"
+              min-width="150"
               sortable="custom"
               :prop="getRpsProp(period)"
               align="center"
             >
               <template #header>
                 <div class="custom-header">
-                  <span>{{ `RPS_${period}` }}</span>
-                  <el-tooltip content="相对强度指标，值越高表示相对强度越强" placement="top">
+                  <span>{{ period }}日涨跌幅 / RPS_{{ period }}</span>
+                  <el-tooltip :content="`上方为${period}日内价格变化百分比，下方为${period}日相对强度指标`" placement="top">
                     <el-icon><InfoFilled /></el-icon>
                   </el-tooltip>
                 </div>
               </template>
               <template #default="scope">
-                <div class="rps-cell">
+                <div class="rps-cell rps-cell-with-change">
+                  <span class="rps-change-text" :class="{ up: Number(scope.row[getReturnProp(period)]) > 0, down: Number(scope.row[getReturnProp(period)]) < 0 }">
+                    {{ formatPercent(scope.row[getReturnProp(period)]) }}
+                  </span>
                   <el-progress
                     :percentage="Number(scope.row[getRpsProp(period)])"
                     :color="getRpsColor(Number(scope.row[getRpsProp(period)]))"
@@ -419,24 +367,12 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="pct_change" label="当日涨跌幅" min-width="110" sortable="custom" align="center">
+              <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" min-width="150" sortable="custom" align="center">
                 <template #default="scope">
-                  <div class="change-percent-cell">
-                    <span :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
+                  <div class="rps-cell rps-cell-with-change">
+                    <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
                       {{ formatPercent(scope.row.pct_change) }}
                     </span>
-                    <div class="trend-indicator">
-                      <el-icon v-if="getNumericValue(scope.row.pct_change) > 0"><CaretTop /></el-icon>
-                      <el-icon v-else-if="getNumericValue(scope.row.pct_change) < 0"><CaretBottom /></el-icon>
-                      <el-icon v-else><Minus /></el-icon>
-                    </div>
-                  </div>
-                </template>
-              </el-table-column>
-
-              <el-table-column prop="RPS_today" label="RPS_today" min-width="120" sortable="custom" align="center">
-                <template #default="scope">
-                  <div class="rps-cell">
                     <el-progress
                       :percentage="getNumericValue(scope.row.RPS_today)"
                       :color="getRpsColor(getNumericValue(scope.row.RPS_today))"
@@ -454,35 +390,17 @@
 
               <template v-for="period in memberRpsPeriods" :key="period">
                 <el-table-column
-                  :prop="getDynamicReturnProp(period)"
-                  :label="`${period}日涨跌幅`"
-                  min-width="110"
+                  :prop="getDynamicRpsProp(period)"
+                  :label="`${period}日涨跌幅 / RPS_${period}`"
+                  min-width="150"
                   sortable="custom"
                   align="center"
                 >
                   <template #default="scope">
-                    <div class="change-percent-cell">
-                      <span :class="{ up: getNumericValue(scope.row[getDynamicReturnProp(period)]) > 0, down: getNumericValue(scope.row[getDynamicReturnProp(period)]) < 0 }">
+                    <div class="rps-cell rps-cell-with-change">
+                      <span class="rps-change-text" :class="{ up: getNumericValue(scope.row[getDynamicReturnProp(period)]) > 0, down: getNumericValue(scope.row[getDynamicReturnProp(period)]) < 0 }">
                         {{ formatPercent(scope.row[getDynamicReturnProp(period)]) }}
                       </span>
-                      <div class="trend-indicator">
-                        <el-icon v-if="getNumericValue(scope.row[getDynamicReturnProp(period)]) > 0"><CaretTop /></el-icon>
-                        <el-icon v-else-if="getNumericValue(scope.row[getDynamicReturnProp(period)]) < 0"><CaretBottom /></el-icon>
-                        <el-icon v-else><Minus /></el-icon>
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-
-                <el-table-column
-                  :prop="getDynamicRpsProp(period)"
-                  :label="`RPS_${period}`"
-                  min-width="120"
-                  sortable="custom"
-                  align="center"
-                >
-                  <template #default="scope">
-                    <div class="rps-cell">
                       <el-progress
                         :percentage="getNumericValue(scope.row[getDynamicRpsProp(period)])"
                         :color="getRpsColor(getNumericValue(scope.row[getDynamicRpsProp(period)]))"
@@ -1305,7 +1223,7 @@ watch(() => route.query.level, (level) => {
 }
 
 .rps-card {
-  border-radius: 14px;
+  border-radius: 0;
 }
 
 :deep(.rps-card .el-card__header) {
@@ -1387,6 +1305,24 @@ watch(() => route.query.level, (level) => {
 .rps-cell {
   display: flex;
   flex-direction: column;
+}
+
+.rps-cell-with-change {
+  gap: 4px;
+}
+
+.rps-change-text {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rps-change-text.up {
+  color: #f56c6c;
+}
+
+.rps-change-text.down {
+  color: #67c23a;
 }
 
 .rps-rank {

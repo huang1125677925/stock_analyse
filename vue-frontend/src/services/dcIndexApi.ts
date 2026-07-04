@@ -2,7 +2,7 @@ import axios from './axiosConfig'
 
 /**
  * 接口：东方财富概念板块（dc_index）
- * 功能：封装 /django/api/tasks/dc-index/ 接口调用，用于获取概念板块的领涨数据（可按日期范围）
+ * 功能：封装 /django/api/strategy/dc-index/ 接口调用，用于获取概念板块的领涨数据（可按日期范围）
  * 参数：
  *  - ts_code?: 概念代码（支持多个，逗号分隔），优先使用
  *  - name?: 概念名称（例如：人形机器人），当没有 ts_code 时使用
@@ -48,7 +48,7 @@ export interface DcIndexQueryParams {
 }
 
 export async function fetchDcIndex(params: DcIndexQueryParams): Promise<DcIndexData> {
-  const res = await axios.get<ApiResponse<DcIndexData>, ApiResponse<DcIndexData>>('/django/api/tasks/dc-index/', {
+  const res = await axios.get<ApiResponse<DcIndexData>, ApiResponse<DcIndexData>>('/django/api/strategy/dc-index/', {
     params
   })
   return res.data
