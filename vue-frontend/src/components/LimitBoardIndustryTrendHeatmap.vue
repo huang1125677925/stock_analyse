@@ -262,6 +262,7 @@ const chartOption = computed((): echarts.EChartsOption => {
     yAxis: [
       {
         type: 'category',
+        inverse: true,
         data: processedIndustries.value.map((item) => item.industry),
         splitArea: { show: true },
         axisLabel: { fontSize: 11 }
@@ -269,6 +270,7 @@ const chartOption = computed((): echarts.EChartsOption => {
       {
         type: 'category',
         position: 'right',
+        inverse: true,
         data: processedIndustries.value.map((item) => item.industry),
         axisTick: { show: false },
         axisLine: { show: false },
