@@ -17,10 +17,26 @@ const router = createRouter({
       ]
     },
     {
-      path: '/feature-updates',
-      name: 'feature-updates',
-      component: () => import('@/views/HomeView.vue'),
-      meta: { title: '平台功能迭代' }
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/auth/LoginView.vue'),
+      meta: { title: '登录' }
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/auth/RegisterView.vue'),
+      meta: { title: '注册' }
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('@/views/auth/ResetPasswordView.vue'),
+      meta: { title: '重置密码' }
+    },
+    {
+      path: '/change-password',
+      redirect: '/reset-password'
     },
     {
       path: '/market-overview',
@@ -63,10 +79,6 @@ const router = createRouter({
           meta: { title: '行业成交额分析' }
         },
         {
-          path: '/analysis/industry-turnover-heatmap',
-          redirect: '/analysis/congestion/turnover'
-        },
-        {
           path: '/analysis/congestion/fundflow',
           name: 'congestion-fundflow',
           component: () => import('@/views/industry-stock-data/CongestionFundFlowView.vue'),
@@ -91,34 +103,10 @@ const router = createRouter({
           meta: { title: '指数RPS强度排名' }
         },
         {
-          path: '/analysis/sw-industry-tree',
-          name: 'sw-industry-tree',
-          component: () => import('@/views/industry-stock-data/SwIndustryTreeView.vue'),
-          meta: { title: '申万行业分类树状图' }
-        },
-        {
-          path: '/analysis/sw-industry-daily',
-          name: 'sw-industry-daily',
-          component: () => import('@/views/industry-stock-data/SwIndustryDailyView.vue'),
-          meta: { title: '申万行业日线行情' }
-        },
-        {
           path: '/analysis/sw-industry-valuation',
           name: 'sw-industry-valuation',
           component: () => import('@/views/industry-stock-data/SwIndustryValuationView.vue'),
           meta: { title: '申万行业估值分析' }
-        },
-        {
-          path: '/analysis/sw-index-member-all',
-          name: 'sw-index-member-all',
-          component: () => import('@/views/industry-stock-data/IndexMemberAllView.vue'),
-          meta: { title: '申万行业成分构成' }
-        },
-        {
-          path: '/analysis/industry-treemap',
-          name: 'industry-treemap',
-          component: () => import('@/views/analysis/IndustryTreemapView.vue'),
-          meta: { title: '行业矩形树图分析' }
         },
         {
           path: '/analysis/etf-tree',
