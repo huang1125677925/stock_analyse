@@ -1068,7 +1068,7 @@ watch(
 .filter-card,
 .table-card,
 .trend-preview-card {
-  border-radius: 14px;
+  border-radius: 4px;
 }
 
 .card-header,
