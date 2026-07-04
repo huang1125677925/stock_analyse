@@ -1,1 +1,0 @@
-import{i}from"./index-DNGHiZ3Y.js";const n="/django/api/individual_stock";async function f(o,r,s,a=""){try{const t={};return r&&(t.start_date=r),s&&(t.end_date=s),a&&(t.adjust=a),(await i.get(`${n}/stocks/${o}/history/`,{params:t})).data}catch(t){throw console.error(`获取股票 ${o} 历史数据失败:`,t),t}}export{f};

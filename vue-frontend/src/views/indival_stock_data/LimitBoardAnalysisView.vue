@@ -1,13 +1,6 @@
 <template>
   <div class="limit-board-page">
     <el-card class="query-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>打板分析选股</span>
-          <el-tag v-if="lastQueryTime" type="info" effect="plain">更新时间 {{ lastQueryTime }}</el-tag>
-        </div>
-      </template>
-
       <el-form :inline="true" class="query-form">
         <el-form-item v-if="activeTab !== 'industryTrend'" label="交易日期">
           <el-date-picker
@@ -127,44 +120,6 @@
             </div>
           </div>
           <el-empty v-else-if="!loading.ladder" description="该交易日暂无连板天梯数据" />
-        </section>
-      </el-tab-pane>
-
-      <el-tab-pane label="竞价候选" name="auction">
-        <section v-loading="loading.auction" class="tab-panel">
-          <el-table :data="auctionRows" border stripe empty-text="暂无竞价候选" height="620">
-            <el-table-column prop="code" label="代码" min-width="120" fixed />
-            <el-table-column prop="name" label="名称" min-width="120" fixed />
-            <el-table-column prop="enhanced_score" label="增强分" min-width="100" align="right" sortable />
-            <el-table-column prop="score" label="基础分" min-width="100" align="right" sortable />
-            <el-table-column prop="hot_score" label="热榜分" min-width="100" align="right" sortable />
-            <el-table-column prop="gap_pct" label="竞价涨幅" min-width="110" align="right" sortable>
-              <template #default="{ row }">
-                <span :class="pctClass(row.gap_pct)">{{ formatValue(row.gap_pct, '%') }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="auction_price" label="竞价价" min-width="100" align="right" />
-            <el-table-column prop="auction_amount" label="竞价额" min-width="120" align="right">
-              <template #default="{ row }">{{ formatMoney(row.auction_amount) }}</template>
-            </el-table-column>
-            <el-table-column prop="limit_times" label="昨日连板" min-width="100" align="center" />
-            <el-table-column prop="reason" label="涨停原因" min-width="220" show-overflow-tooltip />
-            <el-table-column label="题材标签" min-width="220">
-              <template #default="{ row }">
-                <el-tag v-for="tag in normalizeTags(row.tags)" :key="tag" class="tag-item" size="small" effect="plain">
-                  {{ tag }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            class="pagination"
-            v-model:current-page="pagination.auction.page"
-            v-model:page-size="pagination.auction.pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="auctionCandidates.length"
-            layout="total, sizes, prev, pager, next, jumper"
-          />
         </section>
       </el-tab-pane>
 
@@ -332,7 +287,7 @@
 /**
  * 打板分析选股页面
  * 功能：
- * - 汇总展示打板策略相关的情绪总览、连板天梯、竞价候选、题材梯队、炸板回封、游资复盘和涨停趋势分析
+ * - 汇总展示打板策略相关的情绪总览、连板天梯、题材梯队、炸板回封、游资复盘和涨停趋势分析
  * - 支持按交易日查询单日打板结果，并对涨停趋势模块提供区间查询
  * - 复用统一格式化方法展示金融数据和统计指标
  * 参数：无
@@ -345,13 +300,11 @@ import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import LimitBoardIndustryTrendHeatmap from '@/components/LimitBoardIndustryTrendHeatmap.vue'
 import {
-  fetchAuctionCandidates,
   fetchBreakReseal,
   fetchDailySentiment,
   fetchHotMoneyReview,
   fetchIndustryTrendStrength,
   fetchThemeLadder,
-  type AuctionCandidatesData,
   type BreakResealData,
   type DailySentimentData,
   type HotMoneyReviewData,
@@ -360,7 +313,7 @@ import {
 } from '@/services/limitBoardStrategyApi'
 import { fetchLimitStep, type LimitStepData } from '@/services/limitStepApi'
 
-type TabName = 'sentiment' | 'ladder' | 'auction' | 'theme' | 'break' | 'hotMoney' | 'industryTrend'
+type TabName = 'sentiment' | 'ladder' | 'theme' | 'break' | 'hotMoney' | 'industryTrend'
 
 interface SummaryCardItem {
   key: string
@@ -414,7 +367,6 @@ const lastQueryTime = ref('')
 const loading = reactive<Record<TabName, boolean>>({
   sentiment: false,
   ladder: false,
-  auction: false,
   theme: false,
   break: false,
   hotMoney: false,
@@ -424,7 +376,6 @@ const loading = reactive<Record<TabName, boolean>>({
 const loaded = reactive<Record<TabName, boolean>>({
   sentiment: false,
   ladder: false,
-  auction: false,
   theme: false,
   break: false,
   hotMoney: false,
@@ -432,14 +383,12 @@ const loaded = reactive<Record<TabName, boolean>>({
 })
 
 const pagination = reactive({
-  auction: { page: 1, pageSize: 20 },
   theme: { page: 1, pageSize: 10 },
   hotMoney: { page: 1, pageSize: 20 }
 })
 
 const sentimentData = ref<DailySentimentData | null>(null)
 const ladderData = ref<Record<string, any>[]>([])
-const auctionData = ref<AuctionCandidatesData | null>(null)
 const themeData = ref<ThemeLadderData | null>(null)
 const breakData = ref<BreakResealData | null>(null)
 const hotMoneyData = ref<HotMoneyReviewData | null>(null)
@@ -482,8 +431,6 @@ const industryTrendSummaryCards = computed<SummaryCardItem[]>(() => {
   ]
 })
 
-const auctionCandidates = computed(() => auctionData.value?.top_candidates || auctionData.value?.candidates || [])
-const auctionRows = computed(() => paginateRows(auctionCandidates.value, pagination.auction.page, pagination.auction.pageSize))
 const themeList = computed(() => themeData.value?.themes || [])
 const themeRows = computed(() => paginateRows(themeList.value, pagination.theme.page, pagination.theme.pageSize))
 const hotMoneyRecords = computed(() => hotMoneyData.value?.records || [])
@@ -526,7 +473,6 @@ async function loadAllTabs() {
     await Promise.all([
       loadTab('sentiment', true),
       loadTab('ladder', true),
-      loadTab('auction', true),
       loadTab('theme', true),
       loadTab('break', true),
       loadTab('hotMoney', true),
@@ -558,9 +504,6 @@ async function loadTab(tab: TabName, force = false) {
     } else if (tab === 'ladder') {
       const data = await fetchLimitStep({ trade_date: tradeDate.value })
       ladderData.value = normalizeLimitStepRows(data).filter(row => row.trade_date === tradeDate.value)
-    } else if (tab === 'auction') {
-      auctionData.value = await fetchAuctionCandidates({ trade_date: tradeDate.value, top_n: topN.value })
-      pagination.auction.page = 1
     } else if (tab === 'theme') {
       themeData.value = await fetchThemeLadder({ trade_date: tradeDate.value, top_n: topN.value })
       pagination.theme.page = 1
@@ -651,12 +594,6 @@ function pctClass(value: unknown): string {
   return ''
 }
 
-function normalizeTags(tags: unknown): string[] {
-  if (Array.isArray(tags)) return tags.filter(Boolean).map(String)
-  if (typeof tags === 'string') return tags.split(/[,\s，、]+/).filter(Boolean)
-  return []
-}
-
 function boardStatusLabel(status: string): string {
   const map: Record<string, string> = {
     limit_up: '涨停',
@@ -693,16 +630,11 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
-.card-header,
 .theme-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.card-header {
-  font-weight: 600;
 }
 
 .query-form {
