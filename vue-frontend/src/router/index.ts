@@ -111,6 +111,33 @@ const router = createRouter({
       ]
     },
     {
+      path: '/stock-picker',
+      component: DefaultLayout,
+      meta: { title: '股票实战' },
+      children: [
+        {
+          path: '/stock-picker/limit-board-analysis',
+          name: 'stock-limit-board-analysis',
+          component: () => import('@/views/analysis/StockPickerView.vue'),
+          meta: { title: '打板分析选股' }
+        },
+        {
+          path: '/stock-picker/swing-practice',
+          name: 'stock-swing-practice',
+          component: () => import('@/views/indival_stock_data/StockSwingPracticeView.vue'),
+          meta: { title: '波段趋势选股' }
+        }
+      ]
+    },
+    {
+      path: '/stock-limit-board-analysis',
+      redirect: '/stock-picker/limit-board-analysis'
+    },
+    {
+      path: '/stock-swing-practice',
+      redirect: '/stock-picker/swing-practice'
+    },
+    {
       path: '/personal/holdings',
       name: 'personal-center-holdings',
       component: () => import('@/views/personal-center/HoldingsView.vue'),

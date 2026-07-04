@@ -1,16 +1,13 @@
 <template>
   <el-container class="layout-container">
-    <!-- 顶栏布局 -->
     <el-header class="topbar">
       <div class="topbar-left" @click="$router.push('/')" style="cursor: pointer;">
         <h3 class="app-title">股票分析系统</h3>
       </div>
 
-      <!-- 桌面端：横向菜单 + 用户操作 -->
       <div class="topbar-right" v-if="!isMobile">
         <el-menu :default-active="$route.path" class="top-menu" mode="horizontal" router :ellipsis="false">
           <template v-for="item in menuItems" :key="item.path">
-            <!-- Mega Menu Logic using Popover for better layout control -->
             <template v-if="hasMegaMenu(item.path)">
               <el-popover
                 placement="bottom-start"
@@ -53,7 +50,6 @@
               </el-popover>
             </template>
 
-            <!-- 普通下拉菜单 -->
             <el-sub-menu v-else-if="item.children && item.children.length" :index="item.path" :key="item.path + ':sub'">
               <template #title>
                 <el-icon>
@@ -69,7 +65,6 @@
               </el-menu-item>
             </el-sub-menu>
 
-            <!-- 普通菜单项 -->
             <el-menu-item v-else :index="item.path" :key="item.path + ':item'">
               <el-icon>
                 <component :is="item.icon" />
@@ -105,13 +100,11 @@
         </div>
       </div>
 
-      <!-- 移动端：折叠按钮，仅展示系统名称 -->
       <el-button v-else class="mobile-menu-btn" type="text" @click="mobileMenuVisible = true">
         <el-icon><Menu /></el-icon>
       </el-button>
     </el-header>
 
-    <!-- 顶栏下方子栏：桌面端显示面包屑与风险提示 -->
     <div v-if="!isMobile" class="subbar">
       <div class="subbar-content">
         <div>
@@ -127,12 +120,10 @@
       </div>
     </div>
 
-    <!-- 主内容 -->
     <el-main class="main-content">
       <router-view />
     </el-main>
 
-    <!-- 移动端抽屉菜单 -->
     <el-drawer v-model="mobileMenuVisible" direction="rtl" size="100%" :with-header="false">
       <div class="mobile-drawer">
         <div class="mobile-drawer-header">
@@ -141,7 +132,6 @@
         </div>
         <el-menu :default-active="$route.path" router class="mobile-menu" @select="onMobileMenuSelect">
           <template v-for="item in menuItems" :key="item.path">
-            <!-- 移动端 Mega Menu 展示逻辑 -->
             <el-sub-menu v-if="hasMegaMenu(item.path)" :index="item.path">
               <template #title>
                 <el-icon>
@@ -158,7 +148,6 @@
               </template>
             </el-sub-menu>
 
-            <!-- 普通下拉菜单 -->
             <el-sub-menu v-else-if="item.children && item.children.length" :index="item.path">
               <template #title>
                 <el-icon>
@@ -243,12 +232,13 @@ import {
   Clock,
   Menu,
   ArrowDown,
+  Lock,
+  SwitchButton,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 
-// 初始化认证状态
 onMounted(() => {
   initAuth()
   updateIsMobile()
@@ -259,43 +249,39 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateIsMobile)
 })
 
-// 处理用户下拉菜单命令
-function handleCommand(command: string) {
+const isMobile = ref(false)
+const mobileMenuVisible = ref(false)
+
+function updateIsMobile() {
+  isMobile.value = window.innerWidth <= 768
+}
+
+async function handleCommand(command: string) {
   switch (command) {
+    case 'logout':
+      try {
+        await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        })
+        logout()
+        router.push('/')
+      } catch {
+      }
+      break
     case 'profile':
       router.push('/personal/holdings')
       break
     case 'inviteCode':
-      router.push('/settings')
+      router.push('/admin/invite-codes')
       break
     case 'changePassword':
-      ElMessageBox.alert('修改密码功能暂未实现', '提示', {
-        confirmButtonText: '确定',
-      })
-      break
-    case 'logout':
-      ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      })
-        .then(() => {
-          logout()
-          router.push('/login')
-        })
-        .catch(() => {})
+      router.push('/change-password')
       break
   }
 }
-// 响应式：是否为移动端与抽屉状态
-const isMobile = ref(false)
-const mobileMenuVisible = ref(false)
 
-const updateIsMobile = () => {
-  isMobile.value = window.innerWidth < 960
-}
-
-// 菜单项配置
 interface MenuItem {
   path: string
   title: string
@@ -336,12 +322,10 @@ const marketOverviewMegaMenuSections = [
   },
 ]
 
-// ETF/指数大导航结构（悬停展开的 mega menu）
 const etfIndexMegaMenuSections = [
   {
     title: '行业估值',
     items: [
-      // { title: '申万行业指数日线行情', path: '/analysis/sw-industry-daily' },
       { title: '申万行业估值分析', path: '/analysis/sw-industry-valuation' },
     ],
   },
@@ -363,13 +347,12 @@ const etfIndexMegaMenuSections = [
   },
 ]
 
-// 智能选股大导航结构（悬停展开的 mega menu）
 const stockPickerMegaMenuSections = [
   {
     title: '',
     items: [
-      { title: '打板分析选股', path: '/stock-limit-board-analysis' },
-      { title: '波段趋势选股', path: '/stock-swing-practice' },
+      { title: '打板分析选股', path: '/stock-picker/limit-board-analysis' },
+      { title: '波段趋势选股', path: '/stock-picker/swing-practice' },
     ],
   },
 ]
@@ -390,7 +373,7 @@ function isMegaMenuActive(path: string) {
     case '/etf':
       return route.matched.some((record) => record.path === '/analysis')
     case '/stock-picker':
-      return route.matched.some((record) => ['/stock-picker', '/stock-data'].includes(record.path))
+      return route.matched.some((record) => record.path === '/stock-picker') || route.path.startsWith('/stock-picker/')
     default:
       return route.path.startsWith(path)
   }
@@ -409,7 +392,6 @@ function getMegaMenuSections(path: string) {
   }
 }
 
-// 面包屑导航（桌面端显示）
 const breadcrumbs = computed(() => {
   const matched = route.matched.filter((item) => item.meta && item.meta.title)
   return matched.map((item) => ({
@@ -418,8 +400,7 @@ const breadcrumbs = computed(() => {
   }))
 })
 
-// 移动端：选择菜单或路由变化时自动关闭抽屉
-function onMobileMenuSelect(index: string, indexPath: string[]) {
+function onMobileMenuSelect(_index: string, _indexPath: string[]) {
   if (isMobile.value) {
     mobileMenuVisible.value = false
   }
@@ -494,7 +475,6 @@ watch(
   white-space: nowrap;
 }
 
-/* mega menu 触发器样式，保持与顶栏菜单一致 */
 .mega-menu-trigger {
   height: 60px;
   padding: 0 18px;
@@ -507,7 +487,9 @@ watch(
   outline: none;
   transition: color 0.2s;
 }
-.mega-menu-trigger:hover, .mega-menu-trigger.is-active {
+
+.mega-menu-trigger:hover,
+.mega-menu-trigger.is-active {
   color: var(--el-color-primary);
 }
 
@@ -517,56 +499,31 @@ watch(
   writing-mode: horizontal-tb;
 }
 
-/* Mega Menu Styles */
 .mega-menu-content {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 0;
-  padding: 10px 0;
-}
-
-.mega-column {
-  min-width: 160px;
-  display: flex;
-  flex-direction: column;
-  padding: 0 24px;
-  border-right: 1px solid #f0f0f0;
-}
-
-.mega-column:last-child {
-  border-right: none;
+  gap: 24px;
+  padding: 8px 4px;
 }
 
 .mega-column-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #303133;
-  margin-bottom: 16px;
-  line-height: 1.5;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #ebeef5;
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 8px;
 }
 
 .mega-column-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
-.mega-link {
-  font-size: 14px;
-  color: #606266;
-  justify-content: flex-start;
-  transition: all 0.2s;
-  line-height: 1.5;
+.mega-column-list li + li {
+  margin-top: 8px;
 }
 
-.mega-link:hover, .mega-link.is-active {
+.mega-link.is-active {
   color: var(--el-color-primary);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .header-right {
@@ -574,141 +531,93 @@ watch(
   align-items: center;
 }
 
-.user-info {
+.auth-buttons {
   display: flex;
+  gap: 8px;
+}
+
+.user-info {
+  display: inline-flex;
   align-items: center;
+  gap: 8px;
   cursor: pointer;
 }
 
 .username {
-  margin-left: 8px;
-  font-size: 14px;
+  color: #303133;
 }
 
-.auth-buttons {
-  display: flex;
-  gap: 10px;
+.subbar {
+  border-bottom: 1px solid #ebeef5;
+  background: #fff;
+  flex-shrink: 0;
 }
 
-.mobile-menu-btn {
-  color: #606266;
-  margin-left: auto;
-  min-width: 40px;
+.subbar-content {
   height: 40px;
-  font-size: 20px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .main-content {
-  background-color: #f5f5f5;
-  padding: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-width: 0;
+  overflow: auto;
+  background: #f5f7fa;
 }
 
-/* 抽屉样式 */
+.mobile-menu-btn {
+  margin-left: auto;
+}
+
 .mobile-drawer {
-  padding: 12px;
-  height: 100%;
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  height: 100%;
 }
 
 .mobile-drawer-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-}
-
-.mobile-auth {
-  margin-top: 12px;
-  flex-shrink: 0;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
 
 .mobile-menu {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  border-right: none;
+}
+
+.mobile-auth {
+  padding-top: 16px;
 }
 
 .mobile-user-menu {
-  margin-top: 20px;
-  border-top: 1px solid #ebeef5;
-  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .mobile-user-header {
   display: flex;
   align-items: center;
-  margin-bottom: 16px;
-  padding: 0 12px;
+  gap: 10px;
 }
 
 .mobile-user-actions {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
 .mobile-user-item {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
+  gap: 8px;
   cursor: pointer;
-  color: #606266;
-  font-size: 14px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.mobile-user-item:active {
-  background-color: #f5f7fa;
-}
-
-.mobile-user-item .el-icon {
-  margin-right: 10px;
-  font-size: 16px;
 }
 
 .mobile-user-item.logout {
   color: #f56c6c;
-}
-
-/* 顶栏下方子栏样式，确保面包屑与风险提示同一行 */
-.subbar {
-  background-color: #fff;
-  border-bottom: 1px solid #e4e7ed;
-}
-.subbar-content {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: nowrap;
-  gap: 16px;
-  padding: 8px 16px;
-}
-
-@media (max-width: 959px) {
-  .topbar {
-    height: 56px;
-    padding: 0 12px;
-  }
-
-  .topbar-left {
-    margin-right: 12px;
-    min-width: 0;
-  }
-
-  .app-title {
-    font-size: 15px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .main-content {
-    height: calc(100dvh - 56px);
-  }
 }
 </style>

@@ -16,6 +16,18 @@
         />
       </el-select>
 
+      <el-date-picker
+        v-model="endDate"
+        type="date"
+        placeholder="截止日期"
+        :disabled="loading"
+        :clearable="false"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        @change="updateChart"
+        style="width: 160px; margin-right: 10px;"
+      />
+
       <el-select 
         v-model="weekFlag" 
         :disabled="loading"
@@ -106,6 +118,7 @@ import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
 
 const selectedFundFlowMetric = ref(FundFlowMetricType.TOTAL_NET_INFLOW_AMOUNT)
 const selectedDateRange = ref('20')
+const endDate = ref(new Date().toISOString().split('T')[0])
 const weekFlag = ref(false)
 const valueFilter = ref<'all' | 'positive' | 'negative'>('all')
 const sortAscending = ref(true)
@@ -141,6 +154,28 @@ function getMetricValue(item: IndustryFundFlowDataItem | undefined): number {
   if (!item) return NaN
   const value = item[selectedFundFlowMetric.value as keyof IndustryFundFlowDataItem]
   return typeof value === 'number' ? value : Number(value)
+}
+
+function getRecentRangeCount(rangeValue: string, useWeekFlag: boolean): number {
+  if (rangeValue === 'all') {
+    return useWeekFlag ? 5 : 30
+  }
+
+  const parsedValue = Number.parseInt(rangeValue, 10)
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return useWeekFlag ? 5 : 20
+  }
+
+  return parsedValue
+}
+
+function getStartDateByEndDate(endDateValue: string, rangeValue: string, useWeekFlag: boolean): string {
+  const end = new Date(endDateValue)
+  const rangeCount = getRecentRangeCount(rangeValue, useWeekFlag)
+  const offsetDays = useWeekFlag ? (rangeCount * 7 - 1) : (rangeCount - 1)
+  const start = new Date(end)
+  start.setDate(end.getDate() - offsetDays)
+  return start.toISOString().split('T')[0]
 }
 
 const filteredFundFlowData = computed<IndustryFundFlowData | null>(() => {
@@ -185,24 +220,12 @@ const filteredFundFlowData = computed<IndustryFundFlowData | null>(() => {
 const fetchFundFlowData = async () => {
   loading.value = true
   try {
-    const today = new Date()
-    const endDate = today.toISOString().split('T')[0]
-
-    let days: number
-    if (weekFlag.value) {
-      const weeks = selectedDateRange.value === 'all' ? 5 : parseInt(selectedDateRange.value)
-      days = weeks * 7
-    } else {
-      days = selectedDateRange.value === 'all' ? 30 : parseInt(selectedDateRange.value)
-    }
-
-    const startDate = new Date(today)
-    startDate.setDate(today.getDate() - days)
-    const formattedStartDate = startDate.toISOString().split('T')[0]
+    const endDateValue = endDate.value
+    const formattedStartDate = getStartDateByEndDate(endDateValue, selectedDateRange.value, weekFlag.value)
 
     const response = await fetchIndustryFundFlowData({
       startDate: formattedStartDate,
-      endDate,
+      endDate: endDateValue,
       weekFlag: weekFlag.value,
       idxType: '行业板块',
       level: selectedLevel.value
