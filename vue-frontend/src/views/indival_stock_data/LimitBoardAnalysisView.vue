@@ -347,7 +347,7 @@ const trendRangeOptions: Array<{ label: string; value: TrendRange }> = [
 
 const activeTab = ref<TabName>('sentiment')
 const tradeDate = ref(getRecentTradeDate())
-const trendRange = ref<TrendRange>('1m')
+const trendRange = ref<TrendRange>('2w')
 const trendEndDate = ref(getRecentTradeDate())
 const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
 const topN = ref(20)

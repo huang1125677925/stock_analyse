@@ -8,6 +8,11 @@
       <div class="matrix-legend">
         <span class="legend-label">纵轴按最近交易日（{{ formatDisplayDate(lastDate) }}）行业涨停数量倒序排列</span>
         <span class="legend-tip">点击单元格顶部涨停数量查看当日行业涨停详情，点击个股标签查看该股趋势图</span>
+        <el-switch
+          v-model="showStockList"
+          class="legend-switch"
+          active-text="展示个股列表"
+        />
       </div>
 
       <div class="matrix-scroll">
@@ -55,7 +60,7 @@
                       >{{ stat.symbol }}{{ stat.count }}</span>
                     </span>
                   </button>
-                  <div class="cell-stocks">
+                  <div v-if="showStockList" class="cell-stocks">
                     <button
                       v-for="stock in cellStocks(date, industry)"
                       :key="stock.ts_code || stock.name"
@@ -224,6 +229,9 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+/** 是否在交叉块中展示个股涨停列表，默认开启 */
+const showStockList = ref(true)
 
 /** 升序排列的交易日列表（左旧右新） */
 const dates = computed<string[]>(() =>
@@ -587,6 +595,10 @@ function formatDisplayDate(value: string): string {
 .legend-label {
   font-weight: 600;
   color: #303133;
+}
+
+.legend-switch {
+  margin-left: auto;
 }
 
 .matrix-scroll {
