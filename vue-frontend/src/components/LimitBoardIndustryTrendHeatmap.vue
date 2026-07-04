@@ -10,7 +10,7 @@
         />
       </el-select>
       <el-button @click="toggleSortOrder">
-        {{ sortAscending ? '按末列降序' : '按末列升序' }}
+        当前：按末列{{ sortAscending ? '升序' : '降序' }}
       </el-button>
       <span class="toolbar-tip">{{ activeMetricConfig.description }}</span>
     </div>
