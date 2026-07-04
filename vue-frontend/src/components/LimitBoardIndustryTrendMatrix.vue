@@ -71,6 +71,12 @@
                       @click="openTrendDialog(stock)"
                     >
                       <span class="chip-name">{{ stock.name || stock.ts_code || '-' }}</span>
+                      <span
+                        v-if="stock.market_type && stock.market_type !== 'HS'"
+                        class="chip-market"
+                        :class="`chip-market-${stock.market_type.toLowerCase()}`"
+                        :title="marketTypeLabel(stock.market_type)"
+                      >{{ marketTypeShort(stock.market_type) }}</span>
                       <span v-if="stock.tag" class="chip-tag">{{ stock.tag }}</span>
                     </button>
                   </div>
@@ -104,7 +110,17 @@
           </template>
         </el-table-column>
         <el-table-column prop="status" label="涨停状态" min-width="100" align="center" />
+        <el-table-column label="市场类型" min-width="110" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.market_type" :type="marketTypeElType(row.market_type)" effect="plain" size="small">
+              {{ marketTypeLabel(row.market_type) }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="lu_desc" label="涨停原因" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="limit_times" label="连板数" min-width="90" align="center" sortable
+          :sort-method="(a: IndustryTrendStock, b: IndustryTrendStock) => numberOr(a.limit_times) - numberOr(b.limit_times)" />
         <el-table-column label="最新价" min-width="100" align="right" sortable
           :sort-method="(a: IndustryTrendStock, b: IndustryTrendStock) => numberOr(a.price) - numberOr(b.price)">
           <template #default="{ row }">{{ formatNumber(row.price) }}</template>
@@ -131,7 +147,18 @@
           :sort-method="(a: IndustryTrendStock, b: IndustryTrendStock) => numberOr(a.limit_up_suc_rate) - numberOr(b.limit_up_suc_rate)">
           <template #default="{ row }">{{ formatRate(row.limit_up_suc_rate) }}</template>
         </el-table-column>
+        <el-table-column label="换手率" min-width="100" align="right" sortable
+          :sort-method="(a: IndustryTrendStock, b: IndustryTrendStock) => turnoverOf(a) - turnoverOf(b)">
+          <template #default="{ row }">{{ formatNumber(turnoverOf(row), '%') }}</template>
+        </el-table-column>
+        <el-table-column label="涨速" min-width="100" align="right" sortable
+          :sort-method="(a: IndustryTrendStock, b: IndustryTrendStock) => numberOr(a.rise_rate) - numberOr(b.rise_rate)">
+          <template #default="{ row }">{{ formatNumber(row.rise_rate, '%') }}</template>
+        </el-table-column>
         <el-table-column prop="open_num" label="开板次数" min-width="100" align="center" sortable />
+        <el-table-column label="首次封板时间" min-width="120" align="center">
+          <template #default="{ row }">{{ row.first_lu_time || row.lu_time || '-' }}</template>
+        </el-table-column>
       </el-table>
     </el-dialog>
 
@@ -565,6 +592,44 @@ function formatRate(value: unknown): string {
   return `${(n * 100).toFixed(1)}%`
 }
 
+/** 市场类型代码转中文标签 */
+function marketTypeLabel(value: unknown): string {
+  const map: Record<string, string> = {
+    HS: '沪深主板',
+    GEM: '创业板',
+    STAR: '科创板'
+  }
+  const key = String(value ?? '').trim()
+  if (!key) return '-'
+  return map[key] || key
+}
+
+/** 市场类型代码转矩阵芯片用的极简标记 */
+function marketTypeShort(value: unknown): string {
+  const map: Record<string, string> = {
+    HS: '主',
+    GEM: '创',
+    STAR: '科'
+  }
+  const key = String(value ?? '').trim()
+  if (!key) return ''
+  return map[key] || key
+}
+
+/** 市场类型代码转标签颜色 */
+function marketTypeElType(value: unknown): 'success' | 'warning' | 'danger' | 'info' {
+  const key = String(value ?? '').trim()
+  if (key === 'GEM') return 'warning'
+  if (key === 'STAR') return 'danger'
+  return 'info'
+}
+
+/** 读取换手率：兼容 turnover_rate 与 turnover_ratio 两种字段 */
+function turnoverOf(stock: IndustryTrendStock): number {
+  const rate = stock.turnover_rate ?? stock.turnover_ratio
+  return numberOr(rate)
+}
+
 function formatAxisDate(value: string): string {
   return value.length === 8 ? `${value.slice(4, 6)}-${value.slice(6, 8)}` : value
 }
@@ -786,6 +851,29 @@ function formatDisplayDate(value: string): string {
   flex-shrink: 0;
   font-size: 10px;
   opacity: 0.85;
+}
+
+.chip-market {
+  flex-shrink: 0;
+  padding: 0 3px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* 创业板 */
+.chip-market-gem {
+  background: #fff7e6;
+  color: #d48806;
+  border: 1px solid #ffe1b0;
+}
+
+/* 科创板 */
+.chip-market-star {
+  background: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ffccc7;
 }
 
 .chip-hot-1 {

@@ -88,12 +88,18 @@ export interface IndustryTrendStock {
   theme?: string
   /** 连板数 */
   limit_times?: number
-  /** 换手率（%） */
+  /** 换手率（%），部分数据源字段为 turnover_ratio */
   turnover_rate?: number
+  /** 换手率（%），limit_list_ths 原始字段 */
+  turnover_ratio?: number
   /** 开板次数 */
   open_num?: number
   /** 首次封板时间 */
   lu_time?: string
+  /** 首次涨停时间 */
+  first_lu_time?: string
+  /** 涨速 */
+  rise_rate?: number
   /** 涨跌幅（%） */
   pct_chg?: number
   /** 最新价 */
@@ -104,11 +110,11 @@ export interface IndustryTrendStock {
   limit_amount?: number
   /** 流通市值（元） */
   free_float?: number
-  /** 涨停封成功率，0-1 */
+  /** 近一年涨停封板率，0-1 */
   limit_up_suc_rate?: number
   /** 换手率占比 */
   turnover?: number
-  /** 市场类型 */
+  /** 股票类型：HS 沪深主板、GEM 创业板、STAR 科创板 */
   market_type?: string
   [key: string]: any
 }
