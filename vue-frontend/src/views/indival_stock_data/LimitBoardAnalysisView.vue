@@ -22,6 +22,16 @@
             </el-radio-button>
           </el-radio-group>
         </el-form-item>
+        <el-form-item v-if="activeTab === 'industryTrend'" label="行业映射">
+          <el-select v-model="industryMapping" style="width: 160px" @change="onIndustryMappingChange">
+            <el-option
+              v-for="option in industryMappingOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item v-if="activeTab !== 'industryTrend'" label="返回数量">
           <el-input-number v-model="topN" :min="5" :max="100" :step="5" controls-position="right" />
         </el-form-item>
@@ -289,6 +299,7 @@ import {
   type BreakResealData,
   type DailySentimentData,
   type HotMoneyReviewData,
+  type IndustryMapping,
   type IndustryTrendStrengthData,
   type ThemeLadderData
 } from '@/services/limitBoardStrategyApi'
@@ -345,9 +356,20 @@ const trendRangeOptions: Array<{ label: string; value: TrendRange }> = [
   { label: '最近三个月', value: '3m' }
 ]
 
+/** 行业趋势的行业映射方式选项，取值对应接口 industry_mapping 参数 */
+const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> = [
+  { label: '默认（按日动态）', value: 'default' },
+  { label: '东财概念', value: 'dc_concept' },
+  { label: '东财地域', value: 'dc_region' },
+  { label: '东财一级行业', value: 'dc_l1' },
+  { label: '东财二级行业', value: 'dc_l2' },
+  { label: '东财三级行业', value: 'dc_l3' }
+]
+
 const activeTab = ref<TabName>('sentiment')
 const tradeDate = ref(getRecentTradeDate())
 const trendRange = ref<TrendRange>('2w')
+const industryMapping = ref<IndustryMapping>('default')
 const trendEndDate = ref(getRecentTradeDate())
 const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
 const topN = ref(20)
@@ -414,6 +436,7 @@ const breakSummaryCards = computed<SummaryCardItem[]>(() => {
 const industryTrendSummaryCards = computed<SummaryCardItem[]>(() => {
   const s = industryTrendData.value?.summary || {}
   return [
+    { key: 'industry_mapping_label', label: '行业映射', value: s.industry_mapping_label },
     { key: 'trade_day_count', label: '交易日数量', value: s.trade_day_count },
     { key: 'industry_count', label: '行业数量', value: s.industry_count },
     { key: 'total_limit_up_count', label: '累计涨停家数', value: s.total_limit_up_count },
@@ -508,7 +531,8 @@ async function loadTab(tab: TabName, force = false) {
     } else if (tab === 'industryTrend') {
       industryTrendData.value = await fetchIndustryTrendStrength({
         start_date: trendStartDate.value,
-        end_date: trendEndDate.value
+        end_date: trendEndDate.value,
+        industry_mapping: industryMapping.value
       })
       lastQueryTime.value = industryTrendData.value.query_time || lastQueryTime.value
     }
@@ -591,6 +615,16 @@ function onTrendRangeChange(range: string | number | boolean | undefined) {
   const value = range as TrendRange
   trendEndDate.value = getRecentTradeDate()
   trendStartDate.value = getRangeStartDate(trendEndDate.value, value)
+  loadTab('industryTrend', true)
+}
+
+/**
+ * 事件：切换涨停趋势行业映射方式。
+ * 参数：mapping 为选中的行业映射方式。
+ * 返回值：void，按新映射方式刷新涨停趋势数据。
+ */
+function onIndustryMappingChange(mapping: string | number | boolean | undefined) {
+  industryMapping.value = mapping as IndustryMapping
   loadTab('industryTrend', true)
 }
 

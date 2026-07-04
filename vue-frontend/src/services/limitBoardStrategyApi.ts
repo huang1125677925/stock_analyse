@@ -27,6 +27,14 @@ export interface AuctionCandidatesParams extends LimitBoardTopParams {
   auction_base_wait?: number
 }
 
+/** 行业趋势强度的行业映射方式：default 为 limit_list_d 按日动态映射，dc_* 为东财板块成分快照映射 */
+export type IndustryMapping = 'default' | 'dc_concept' | 'dc_region' | 'dc_l1' | 'dc_l2' | 'dc_l3'
+
+export interface IndustryTrendStrengthParams extends LimitBoardRangeParams {
+  /** 行业映射方式，默认 default */
+  industry_mapping?: IndustryMapping
+}
+
 export interface DailySentimentData {
   trade_date: string
   summary?: Record<string, any>
@@ -161,6 +169,10 @@ export interface IndustryTrendStrengthSummary {
   excluded_st_count?: number
   /** 因无法归类到具体行业被剔除的个股数 */
   excluded_unknown_industry_count?: number
+  /** 本次使用的行业映射方式 */
+  industry_mapping?: IndustryMapping
+  /** 行业映射方式的中文标签 */
+  industry_mapping_label?: string
   top_industries?: Array<{
     industry: string
     trade_day_count?: number
@@ -215,6 +227,6 @@ export function fetchHotMoneyReview(params: LimitBoardTopParams): Promise<HotMon
   return getLimitBoard<HotMoneyReviewData>('/django/api/strategy/limit-board/hot-money-review/', params)
 }
 
-export function fetchIndustryTrendStrength(params: LimitBoardRangeParams): Promise<IndustryTrendStrengthData> {
+export function fetchIndustryTrendStrength(params: IndustryTrendStrengthParams): Promise<IndustryTrendStrengthData> {
   return getLimitBoard<IndustryTrendStrengthData>('/django/api/strategy/limit-board/industry-trend-strength/', params)
 }
