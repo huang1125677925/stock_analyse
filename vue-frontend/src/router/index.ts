@@ -1,152 +1,39 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { isAuthenticated } from '../services/auth'
+import DefaultLayout from '../layouts/DefaultLayout.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/login',
-      name: 'login',
-      component: () => import('../views/auth/LoginView.vue'),
-      meta: { title: '登录', requiresAuth: false }
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('../views/auth/RegisterView.vue'),
-      meta: { title: '注册', requiresAuth: false }
-    },
-    {
-      path: '/reset-password',
-      name: 'reset-password',
-      component: () => import('../views/auth/ResetPasswordView.vue'),
-      meta: { title: '重置密码', requiresAuth: false }
-    },
-    {
       path: '/',
       name: 'home',
-      component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
+      component: () => import('@/views/HomeView.vue'),
       meta: { title: '大盘指数估值' }
     },
     {
-      path: '/major-index-rps',
-      name: 'major-index-rps',
-      component: () => import('@/views/markt_data/MajorIndexRpsView.vue'),
-      meta: { title: '大盘指数RPS' }
-    },
-    {
-      path: '/market-fund-flow',
-      name: 'market-fund-flow',
-      component: () => import('@/views/markt_data/MarketFundFlowView.vue'),
-      meta: { title: '大盘资金分析' }
-    },
-    {
-      path: '/industries/:industry',
-      name: 'industry-detail',
-      component: () => import('../views/analysis/IndustryDetail.vue'),
-      meta: { title: '行业详情' }
-    },
-    {
-      path: '/stock-picker',
-      name: 'stock-picker',
-      meta: { title: '股票实战' },
+      path: '/market-overview',
+      component: DefaultLayout,
+      meta: { title: '大盘概览' },
       children: [
         {
-          path: '/stock-viewer',
-          name: 'stock-viewer',
-          component: () => import('../views/analysis/StockPickerView.vue'),
-          meta: { title: '股票分析' }
+          path: '/major-index-rps',
+          name: 'major-index-rps',
+          component: () => import('@/views/markt_data/MajorIndexRpsView.vue'),
+          meta: { title: '大盘指数RPS' }
         },
         {
-          path: '/stock-kline',
-          name: 'stock-kline',
-          component: () => import('../views/indival_stock_data/StockKLineView.vue'),
-          meta: { title: '股票K线图分析' }
+          path: '/market-fund-flow',
+          name: 'market-fund-flow',
+          component: () => import('@/views/markt_data/MarketFundFlowView.vue'),
+          meta: { title: '大盘资金分析' }
         }
       ]
     },
     {
-      path: '/quant',
-      name: 'quant',
-      meta: { title: '量化分析' },
-      children: [
-        {
-          path: '/backtest',
-          name: 'QuantitativeBacktest',
-          component: () => import('@/views/quant/QuantitativeBacktestView.vue'),
-          meta: { title: '回测分析' }
-        },
-        {
-          path: '/backtest-strategy',
-          name: 'BacktestStrategy',
-          component: () => import('@/views/quant/BacktestStrategyCreate.vue'),
-          meta: { title: '创建回测任务' }
-        },
-        {
-          path: '/backtest-history',
-          name: 'BacktestHistory',
-          component: () => import('@/views/quant/BacktestHistoryView.vue'),
-          meta: { title: '回测历史' }
-        },
-        {
-          path: '/strategy-list',
-          name: 'StrategyList',
-          component: () => import('@/views/quant/StrategyListView.vue'),
-          meta: { title: '回测策略列表' }
-        },
-        {
-          path: '/backtest-result/:taskId',
-          name: 'BacktestResult',
-          component: () => import('@/views/quant/BacktestResultView.vue'),
-          meta: { title: '回测结果详情' }
-        },
-      ]
-    },
-    {
-      path: '/etf-system',
-      name: 'etf-system',
-      component: () => import('../views/etf-investment-system/EtfSystemView.vue'),
-      meta: { title: '全天候ETF投资系统' }
-    },
-    {
-      path: '/technical-learning',
-      name: 'technical-learning',
-      component: () => import('@/views/TechnicalLearningView.vue'),
-      meta: { title: '技术学习' }
-    },
-    {
       path: '/analysis',
-      name: 'analysis',
-      meta: { title: '行业跟踪' },
+      component: DefaultLayout,
+      meta: { title: 'ETF/指数' },
       children: [
-        {
-          path: '/analysis/technical',
-          name: 'technical',
-          component: () => import('../views/analysis/TechnicalAnalysis.vue'),
-          meta: { title: '技术分析' }
-        },
-        {
-          path: '/analysis/fundamental',
-          name: 'fundamental',
-          component: () => import('../views/analysis/FundamentalAnalysis.vue'),
-          meta: { title: '基本面分析' }
-        },
-        {
-          path: '/analysis/trend',
-          name: 'trend',
-          component: () => import('../views/analysis/TrendAnalysis.vue'),
-          meta: { title: '趋势分析' }
-        },
-        {
-          path: '/analysis/stock/:code',
-          name: 'stock-detail',
-          component: () => import('../views/analysis/StockDetail.vue'),
-          meta: { title: '股票详情' }
-        },
-        {
-          path: '/analysis/index-dailybasic',
-          redirect: '/',
-        },
         {
           path: '/analysis/major-index-rps',
           redirect: '/major-index-rps',
@@ -183,7 +70,7 @@ const router = createRouter({
           path: '/analysis/congestion/index-rps',
           name: 'congestion-index-rps',
           component: () => import('@/views/industry-stock-data/CongestionIndexRpsView.vue'),
-          meta: {}
+          meta: { title: '指数RPS强度排名' }
         },
         {
           path: '/analysis/sw-industry-tree',
@@ -227,134 +114,9 @@ const router = createRouter({
       path: '/personal/holdings',
       name: 'personal-center-holdings',
       component: () => import('@/views/personal-center/HoldingsView.vue'),
-      meta: { title: '个人中心-持有/关注', requiresAuth: true }
-    },
-    {
-      path: '/strategy',
-      name: 'strategy',
-      meta: { title: '策略分析' },
-      children: [
-        {
-          path: '/strategy/index-rps',
-          name: 'index-rps',
-          component: () => import('@/views/strategy/IndexRpsView.vue'),
-          meta: {}
-        },
-        {
-          path: '/strategy/historical-rps',
-          name: 'historical-rps',
-          component: () => import('@/views/strategy/HistoricalRpsView.vue'),
-          meta: { title: '历史RPS数据分析' }
-        }
-      ]
-    },
-    {
-      path: '/ml',
-      name: 'ml',
-      meta: { title: '机器学习研究' },
-      children: [
-        {
-          path: '/ml/index-prediction-validation',
-          name: 'ml-index-prediction-validation',
-          component: () => import('@/views/ml/MlIndexPredictionValidation.vue'),
-          meta: { title: '机器学习-指数预测验证', requiresAuth: false }
-        }
-      ]
-    },
-    {
-      path: '/forum',
-      name: 'forum',
-      meta: { title: '论坛讨论区' },
-      children: [
-        {
-          path: '/forum/posts',
-          name: 'forum-posts',
-          component: () => import('@/views/forum/ForumListView.vue'),
-          meta: { title: '帖子列表' }
-        },
-        {
-          path: '/forum/posts/:id',
-          name: 'post-detail',
-          component: () => import('@/views/forum/PostDetailView.vue'),
-          meta: { title: '帖子详情' }
-        }
-      ]
-    },
-    {
-      path: '/portfolio',
-      name: 'portfolio',
-      component: () => import('../views/PortfolioView.vue'),
-      meta: { title: '投资组合' }
-    },
-    {      path: '/settings',
-      name: 'settings',
-      component: () => import('../views/SettingsView.vue'),
-      meta: { title: '系统设置', requiresAdmin: true }
-    },
-    {
-      path: '/stock-data',
-      name: 'stock-data',
-      meta: { title: '股票实战' },
-      children: [
-        {
-          path: '/stock-limit-step',
-          name: 'stock-limit-step',
-          component: () => import('@/views/indival_stock_data/LimitStepView.vue'),
-          meta: { title: '连板天梯' }
-        },
-        {
-          path: '/stock-limit-board-analysis',
-          name: 'stock-limit-board-analysis',
-          component: () => import('@/views/indival_stock_data/LimitBoardAnalysisView.vue'),
-          meta: { title: '打板分析选股' }
-        },
-        {
-          path: '/stock-swing-practice',
-          name: 'stock-swing-practice',
-          component: () => import('@/views/indival_stock_data/StockSwingPracticeView.vue'),
-          meta: { title: '波段趋势选股' }
-        },
-      ]
-    },
-
-  ],
-})
-
-// 全局前置守卫
-router.beforeEach((to, from, next) => {
-  // 设置页面标题
-  document.title = to.meta.title ? `${to.meta.title} - 股票分析系统` : '股票分析系统'
-  
-  // 检查路由是否需要认证，默认所有路由都需要认证，除非明确设置requiresAuth为false
-  const requiresAuth = to.matched.some(record => record.meta.requiresAuth !== false)
-  
-  // 如果路由需要认证且用户未登录，则重定向到登录页面
-  if (requiresAuth && !isAuthenticated()) {
-    next({ name: 'login', query: { redirect: to.fullPath } })
-    return
-  }
-  
-  // 检查是否需要管理员权限
-  const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin === true)
-  
-  // 如果需要管理员权限，检查当前用户是否是管理员
-  if (requiresAdmin) {
-    const userJson = localStorage.getItem('user')
-    if (userJson) {
-      const user = JSON.parse(userJson)
-      if (!user.is_admin) {
-        // 如果不是管理员，重定向到首页
-        next({ name: 'home' })
-        return
-      }
-    } else {
-      // 如果没有用户信息，重定向到登录页面
-      next({ name: 'login', query: { redirect: to.fullPath } })
-      return
+      meta: { title: '个人持仓' }
     }
-  }
-  
-  next()
+  ]
 })
 
 export default router

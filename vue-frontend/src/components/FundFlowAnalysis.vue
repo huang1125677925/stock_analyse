@@ -16,7 +16,6 @@
         />
       </el-select>
 
-      <!-- 数据周期选择 -->
       <el-select 
         v-model="weekFlag" 
         :disabled="loading"
@@ -27,7 +26,6 @@
         <el-option label="按周" :value="true" />
       </el-select>
       
-      <!-- 资金流指标选择 -->
       <FundFlowMetricSelector 
         v-model="selectedFundFlowMetric" 
         @change="updateChart" 
@@ -35,7 +33,6 @@
         style="margin-right: 10px;"
       />
       
-      <!-- 日期范围选择 -->
       <DateRangeSelector 
         v-model="selectedDateRange" 
         :week-flag="weekFlag"
@@ -43,7 +40,6 @@
         @change="updateChart" 
       />
       
-      <!-- 数值过滤选择 -->
       <el-select 
         v-model="valueFilter" 
         @change="updateChart" 
@@ -55,12 +51,25 @@
         <el-option label="仅正值" value="positive" />
         <el-option label="仅负值" value="negative" />
       </el-select>
+
+      <el-select
+        v-model="consecutiveIncreaseDays"
+        :disabled="loading"
+        placeholder="最近N天递增"
+        style="width: 160px; margin-right: 10px;"
+      >
+        <el-option
+          v-for="option in consecutiveIncreaseDaysOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
       
       <el-button @click="sortByLastColumn" type="primary" :disabled="loading">按最后一列排序</el-button>
     </div>
     
     <div class="chart-container">
-      <!-- 资金流热力图 -->
       <FundFlowHeatmap 
         :data="filteredFundFlowData"
         :selected-metric="selectedFundFlowMetric"
@@ -81,34 +90,23 @@
 </template>
 
 <script setup lang="ts">
-/**
- * 行业资金流分析组件
- * 功能：
- * - 按东财行业层级查询并展示行业资金流热力图
- * - 支持日/周周期切换、多种资金流指标、日期范围和正负值过滤
- * - 支持点击行业单元格后弹出东财行业趋势看板
- * 参数：无
- * 返回值：无
- * 事件：
- * - chart-ready: 热力图实例初始化完成
- * - chart-click: 点击热力图行业单元格后弹出趋势看板
- */
-import { ref, onMounted, computed } from 'vue'
-import { watch } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import FundFlowMetricSelector from './FundFlowMetricSelector.vue'
 import DateRangeSelector from './DateRangeSelector.vue'
 import FundFlowHeatmap from './FundFlowHeatmap.vue'
 import IndustryTrendDialog from '@/components/IndustryTrendDialog.vue'
-import { FundFlowMetricType } from '@/services/industry-fund-flow'
-import { fetchIndustryFundFlowData } from '@/services/industry-fund-flow'
-import type { IndustryFundFlowData } from '@/services/industry-fund-flow'
+import {
+  FundFlowMetricType,
+  fetchIndustryFundFlowData,
+  type IndustryFundFlowData,
+  type IndustryFundFlowDataItem
+} from '@/services/industry-fund-flow'
 import type { EastMoneyIndustryLevel } from '@/services/strategyBreadthApi'
 
-// 响应式变量
 const selectedFundFlowMetric = ref(FundFlowMetricType.TOTAL_NET_INFLOW_AMOUNT)
-const selectedDateRange = ref('20') // 默认按天查看最近20天，按周模式切换时重置为5周
-const weekFlag = ref(false) // 数据周期标志，false为按天，true为按周
+const selectedDateRange = ref('20')
+const weekFlag = ref(false)
 const valueFilter = ref<'all' | 'positive' | 'negative'>('all')
 const sortAscending = ref(true)
 const loading = ref(false)
@@ -117,14 +115,20 @@ const trendBoard = ref({
   sectorCode: '',
   name: ''
 })
+const consecutiveIncreaseDaysOptions = [
+  { label: '不筛选', value: 0 },
+  { label: '连续2天递增', value: 2 },
+  { label: '连续3天递增', value: 3 },
+  { label: '连续5天递增', value: 5 },
+  { label: '连续10天递增', value: 10 }
+]
+const consecutiveIncreaseDays = ref(0)
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
   { label: '东财二级行业', value: '东财二级行业' },
   { label: '东财三级行业', value: '东财三级行业' }
 ]
 const selectedLevel = ref<EastMoneyIndustryLevel>('东财二级行业')
-
-// 数据存储
 const industryFundFlowData = ref<IndustryFundFlowData | null>(null)
 
 interface Props {
@@ -133,46 +137,69 @@ interface Props {
 
 const props = defineProps<Props>()
 
-/**
- * 过滤后的行业资金流数据：当selectedIndustries为空时显示全部，否则只显示选中的行业
- */
+function getMetricValue(item: IndustryFundFlowDataItem | undefined): number {
+  if (!item) return NaN
+  const value = item[selectedFundFlowMetric.value as keyof IndustryFundFlowDataItem]
+  return typeof value === 'number' ? value : Number(value)
+}
+
 const filteredFundFlowData = computed<IndustryFundFlowData | null>(() => {
   if (!industryFundFlowData.value) return null
-  if (!props.selectedIndustries || props.selectedIndustries.length === 0) {
-    return industryFundFlowData.value
+
+  let swCodeNames = industryFundFlowData.value.swCodeNames
+
+  if (props.selectedIndustries && props.selectedIndustries.length > 0) {
+    const selectedSet = new Set(props.selectedIndustries)
+    swCodeNames = swCodeNames.filter(item => selectedSet.has(item.indexName))
   }
-  const selectedSet = new Set(props.selectedIndustries)
+
+  const n = consecutiveIncreaseDays.value
+  if (n > 0) {
+    swCodeNames = swCodeNames.filter((industry) => {
+      const series = industryFundFlowData.value?.congestions[industry.indexCode]
+        || industryFundFlowData.value?.congestions[industry.indexName]
+
+      if (!series || series.length < n + 1) {
+        return false
+      }
+
+      const tail = series.slice(-(n + 1))
+      for (let i = 1; i < tail.length; i++) {
+        const previousValue = getMetricValue(tail[i - 1])
+        const currentValue = getMetricValue(tail[i])
+        if (!Number.isFinite(previousValue) || !Number.isFinite(currentValue) || currentValue <= previousValue) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }
+
   return {
     ...industryFundFlowData.value,
-    swCodeNames: industryFundFlowData.value.swCodeNames.filter(
-      item => selectedSet.has(item.indexName)
-    )
+    swCodeNames
   }
 })
 
-// 获取行业资金流数据
 const fetchFundFlowData = async () => {
   loading.value = true
   try {
-    // 计算日期范围
     const today = new Date()
     const endDate = today.toISOString().split('T')[0]
-    
-    // 根据选择的日期范围和周期标志计算开始日期
+
     let days: number
     if (weekFlag.value) {
-      // 按周模式：将周数转换为天数
       const weeks = selectedDateRange.value === 'all' ? 5 : parseInt(selectedDateRange.value)
       days = weeks * 7
     } else {
-      // 按天模式：直接使用天数
       days = selectedDateRange.value === 'all' ? 30 : parseInt(selectedDateRange.value)
     }
-    
+
     const startDate = new Date(today)
     startDate.setDate(today.getDate() - days)
     const formattedStartDate = startDate.toISOString().split('T')[0]
-    
+
     const response = await fetchIndustryFundFlowData({
       startDate: formattedStartDate,
       endDate,
@@ -180,7 +207,7 @@ const fetchFundFlowData = async () => {
       idxType: '行业板块',
       level: selectedLevel.value
     })
-    
+
     if (response) {
       industryFundFlowData.value = response
     } else {
@@ -194,25 +221,20 @@ const fetchFundFlowData = async () => {
   }
 }
 
-// 更新图表
 const updateChart = () => {
   fetchFundFlowData()
 }
 
-// 监听周期标志变化，按当前周期重置为对应默认范围
 watch(weekFlag, (newWeekFlag: boolean) => {
   selectedDateRange.value = newWeekFlag ? '5' : '20'
-  updateChart() // 更新图表
+  updateChart()
 })
 
-// 更新图表
 const sortByLastColumn = () => {
   sortAscending.value = !sortAscending.value
 }
 
-// 图表事件处理
-const handleChartReady = (chartInstance: any) => {
-  // 图表准备就绪
+const handleChartReady = (_chartInstance: unknown) => {
 }
 
 const handleChartClick = (payload: any) => {
@@ -230,7 +252,6 @@ const handleChartClick = (payload: any) => {
   trendDialogVisible.value = true
 }
 
-// 组件挂载时获取数据
 onMounted(() => {
   fetchFundFlowData()
 })
@@ -243,6 +264,7 @@ onMounted(() => {
     align-items: center;
     margin-bottom: 20px;
     gap: 10px;
+    flex-wrap: wrap;
   }
   
   .chart-container {
