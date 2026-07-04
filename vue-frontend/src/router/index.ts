@@ -7,8 +7,14 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: () => import('@/views/HomeView.vue'),
+      component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
       meta: { title: '大盘指数估值' }
+    },
+    {
+      path: '/feature-updates',
+      name: 'feature-updates',
+      component: () => import('@/views/HomeView.vue'),
+      meta: { title: '平台功能迭代' }
     },
     {
       path: '/market-overview',
