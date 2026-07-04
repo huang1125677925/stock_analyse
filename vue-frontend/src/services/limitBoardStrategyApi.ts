@@ -71,31 +71,95 @@ export interface HotMoneyReviewData {
   query_time?: string
 }
 
-export interface IndustryTrendStrengthItem {
-  trade_date: string
+/** 涨停个股，保留 limit_list_ths 原始字段并补充所属行业 */
+export interface IndustryTrendStock {
+  ts_code?: string
+  name?: string
+  industry?: string
+  /** 涨停原因 */
+  lu_desc?: string
+  /** 涨停标签，如「首板」「2天2板」 */
+  tag?: string
+  /** 涨停状态，如「换手板」「一字板」「T字板」 */
+  status?: string
+  /** 涨停原因/题材类型 */
+  limit_type?: string
+  /** 题材 */
+  theme?: string
+  /** 连板数 */
+  limit_times?: number
+  /** 换手率（%） */
+  turnover_rate?: number
+  /** 开板次数 */
+  open_num?: number
+  /** 首次封板时间 */
+  lu_time?: string
+  /** 涨跌幅（%） */
+  pct_chg?: number
+  /** 最新价 */
+  price?: number
+  /** 封单量（股/手，取决于数据源） */
+  limit_order?: number
+  /** 封单额（元） */
+  limit_amount?: number
+  /** 流通市值（元） */
+  free_float?: number
+  /** 涨停封成功率，0-1 */
+  limit_up_suc_rate?: number
+  /** 换手率占比 */
+  turnover?: number
+  /** 市场类型 */
+  market_type?: string
+  [key: string]: any
+}
+
+/** 单个交易日的整体维度 */
+export interface IndustryTrendDailyOverall {
+  limit_up_count: number
+  industry_count: number
+}
+
+/** 行业涨停状态数量统计（固定三种状态，未出现计为 0） */
+export interface IndustryTrendStatusCounts {
+  /** T 字板数量 */
+  'T字板': number
+  /** 一字板数量 */
+  '一字板': number
+  /** 换手板数量 */
+  '换手板': number
+}
+
+/** 单个交易日的行业维度条目 */
+export interface IndustryTrendDailyIndustry {
   industry: string
-  limit_up_count?: number
-  avg_turnover_ratio?: number
-  avg_first_limit_minutes?: number
-  total_amount?: number
-  avg_open_times?: number
-  avg_limit_times?: number
-  avg_up_stat_n?: number
-  avg_up_stat_t?: number
-  avg_up_stat_ratio_pct?: number
+  limit_up_count: number
+  /** 该日该行业涨停股按涨停状态分类的数量统计 */
+  status_counts?: IndustryTrendStatusCounts
+}
+
+/** 单个交易日的三维明细：整体、行业、个股 */
+export interface IndustryTrendDaily {
+  trade_date: string
+  overall: IndustryTrendDailyOverall
+  industries: IndustryTrendDailyIndustry[]
+  /** 以行业名称为 key 的涨停个股列表 */
+  stocks: Record<string, IndustryTrendStock[]>
 }
 
 export interface IndustryTrendStrengthSummary {
   trade_day_count?: number
   industry_count?: number
-  record_count?: number
   total_limit_up_count?: number
+  industry_matched_count?: number
+  /** 因 ST/退市被剔除的个股数 */
+  excluded_st_count?: number
+  /** 因无法归类到具体行业被剔除的个股数 */
+  excluded_unknown_industry_count?: number
   top_industries?: Array<{
     industry: string
     trade_day_count?: number
     total_limit_up_count?: number
     avg_daily_limit_up_count?: number
-    total_amount?: number
   }>
 }
 
@@ -103,7 +167,8 @@ export interface IndustryTrendStrengthData {
   start_date: string
   end_date: string
   summary?: IndustryTrendStrengthSummary
-  data?: IndustryTrendStrengthItem[]
+  /** 以交易日 YYYYMMDD 为 key 的日度明细 */
+  data?: Record<string, IndustryTrendDaily>
   source_counts?: Record<string, number>
   query_time?: string
 }

@@ -11,23 +11,16 @@
             :clearable="false"
           />
         </el-form-item>
-        <el-form-item v-if="activeTab === 'industryTrend'" label="开始日期">
-          <el-date-picker
-            v-model="trendStartDate"
-            type="date"
-            value-format="YYYYMMDD"
-            placeholder="选择开始日期"
-            :clearable="false"
-          />
-        </el-form-item>
-        <el-form-item v-if="activeTab === 'industryTrend'" label="结束日期">
-          <el-date-picker
-            v-model="trendEndDate"
-            type="date"
-            value-format="YYYYMMDD"
-            placeholder="选择结束日期"
-            :clearable="false"
-          />
+        <el-form-item v-if="activeTab === 'industryTrend'" label="时间范围">
+          <el-radio-group v-model="trendRange" @change="onTrendRangeChange">
+            <el-radio-button
+              v-for="option in trendRangeOptions"
+              :key="option.value"
+              :label="option.value"
+            >
+              {{ option.label }}
+            </el-radio-button>
+          </el-radio-group>
         </el-form-item>
         <el-form-item v-if="activeTab !== 'industryTrend'" label="返回数量">
           <el-input-number v-model="topN" :min="5" :max="100" :step="5" controls-position="right" />
@@ -255,28 +248,16 @@
             </div>
           </div>
 
-          <el-card shadow="never" class="trend-card" v-if="industryTrendRecords.length">
-            <template #header>行业日度趋势强度热力图</template>
-            <LimitBoardIndustryTrendHeatmap :records="industryTrendRecords" />
-          </el-card>
-
-          <el-card shadow="never" class="trend-card" v-if="topIndustryRows.length">
-            <template #header>区间强势行业排行</template>
-            <el-table :data="topIndustryRows" border stripe empty-text="暂无行业排行">
-              <el-table-column prop="industry" label="行业" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="trade_day_count" label="上榜交易日" min-width="110" align="center" sortable />
-              <el-table-column prop="total_limit_up_count" label="累计涨停家数" min-width="120" align="center" sortable />
-              <el-table-column prop="avg_daily_limit_up_count" label="日均涨停家数" min-width="120" align="right" sortable>
-                <template #default="{ row }">{{ formatValue(row.avg_daily_limit_up_count) }}</template>
-              </el-table-column>
-              <el-table-column prop="total_amount" label="累计成交额" min-width="140" align="right" sortable>
-                <template #default="{ row }">{{ formatMoney(row.total_amount) }}</template>
-              </el-table-column>
-            </el-table>
+          <el-card shadow="never" class="trend-card" v-if="hasIndustryTrendDaily">
+            <template #header>行业涨停趋势矩阵</template>
+            <LimitBoardIndustryTrendMatrix :daily="industryTrendDaily" />
           </el-card>
 
           <SourceCounts :counts="industryTrendData?.source_counts" />
-          <el-empty v-if="!loading.industryTrend && !industryTrendData" description="请选择日期区间查询涨停趋势" />
+          <el-empty
+            v-if="!loading.industryTrend && (!industryTrendData || !hasIndustryTrendDaily)"
+            description="请选择日期区间查询涨停趋势"
+          />
         </section>
       </el-tab-pane>
     </el-tabs>
@@ -298,7 +279,7 @@
  */
 import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import LimitBoardIndustryTrendHeatmap from '@/components/LimitBoardIndustryTrendHeatmap.vue'
+import LimitBoardIndustryTrendMatrix from '@/components/LimitBoardIndustryTrendMatrix.vue'
 import {
   fetchBreakReseal,
   fetchDailySentiment,
@@ -356,10 +337,19 @@ const SourceCounts = defineComponent({
   }
 })
 
+type TrendRange = '2w' | '1m' | '3m'
+
+const trendRangeOptions: Array<{ label: string; value: TrendRange }> = [
+  { label: '最近2周', value: '2w' },
+  { label: '最近一个月', value: '1m' },
+  { label: '最近三个月', value: '3m' }
+]
+
 const activeTab = ref<TabName>('sentiment')
 const tradeDate = ref(getRecentTradeDate())
+const trendRange = ref<TrendRange>('1m')
 const trendEndDate = ref(getRecentTradeDate())
-const trendStartDate = ref(getShiftedDate(trendEndDate.value, -20))
+const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
 const topN = ref(20)
 const loadingAll = ref(false)
 const lastQueryTime = ref('')
@@ -426,8 +416,8 @@ const industryTrendSummaryCards = computed<SummaryCardItem[]>(() => {
   return [
     { key: 'trade_day_count', label: '交易日数量', value: s.trade_day_count },
     { key: 'industry_count', label: '行业数量', value: s.industry_count },
-    { key: 'record_count', label: '明细记录数', value: s.record_count },
-    { key: 'total_limit_up_count', label: '累计涨停家数', value: s.total_limit_up_count }
+    { key: 'total_limit_up_count', label: '累计涨停家数', value: s.total_limit_up_count },
+    { key: 'industry_matched_count', label: '匹配行业记录', value: s.industry_matched_count }
   ]
 })
 
@@ -435,8 +425,8 @@ const themeList = computed(() => themeData.value?.themes || [])
 const themeRows = computed(() => paginateRows(themeList.value, pagination.theme.page, pagination.theme.pageSize))
 const hotMoneyRecords = computed(() => hotMoneyData.value?.records || [])
 const hotMoneyRows = computed(() => paginateRows(hotMoneyRecords.value, pagination.hotMoney.page, pagination.hotMoney.pageSize))
-const industryTrendRecords = computed(() => industryTrendData.value?.data || [])
-const topIndustryRows = computed(() => industryTrendData.value?.summary?.top_industries || [])
+const industryTrendDaily = computed(() => industryTrendData.value?.data || {})
+const hasIndustryTrendDaily = computed(() => Object.keys(industryTrendDaily.value).length > 0)
 const ladderLevels = computed(() => {
   const groups = new Map<number, Record<string, any>[]>()
   ladderData.value.forEach(stock => {
@@ -571,6 +561,37 @@ function getShiftedDate(value: string, offsetDays: number): string {
   const date = parseDateString(value)
   date.setDate(date.getDate() + offsetDays)
   return formatDate(date)
+}
+
+/**
+ * 工具：按时间范围快捷键计算起始日期。
+ * 参数：
+ *  - endValue 为区间结束日期 YYYYMMDD；
+ *  - range 为快捷范围，2周/1个月/3个月。
+ * 返回值：区间起始日期 YYYYMMDD。
+ */
+function getRangeStartDate(endValue: string, range: TrendRange): string {
+  const date = parseDateString(endValue)
+  if (range === '2w') {
+    date.setDate(date.getDate() - 14)
+  } else if (range === '1m') {
+    date.setMonth(date.getMonth() - 1)
+  } else {
+    date.setMonth(date.getMonth() - 3)
+  }
+  return formatDate(date)
+}
+
+/**
+ * 事件：切换涨停趋势时间范围。
+ * 参数：range 为选中的快捷范围。
+ * 返回值：void，重算起始日期并刷新涨停趋势数据。
+ */
+function onTrendRangeChange(range: string | number | boolean | undefined) {
+  const value = range as TrendRange
+  trendEndDate.value = getRecentTradeDate()
+  trendStartDate.value = getRangeStartDate(trendEndDate.value, value)
+  loadTab('industryTrend', true)
 }
 
 function formatValue(value: unknown, suffix = ''): string {
