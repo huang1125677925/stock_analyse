@@ -35,13 +35,6 @@
                     :value="level"
                   />
                 </el-select>
-                <el-switch
-                  v-model="showTodayChange"
-                  class="control-item today-change-switch"
-                  inline-prompt
-                  active-text="显示当日涨跌幅"
-                  inactive-text="隐藏当日涨跌幅"
-                />
               </div>
               <div class="table-summary">
                 <el-tag type="info" effect="plain">共 {{ filteredRpsData.length }} 条</el-tag>
@@ -153,7 +146,6 @@
           </el-table-column>
 
           <el-table-column
-            v-if="showTodayChange"
             prop="pct_change"
             label="当日涨跌幅"
             min-width="110"
@@ -592,7 +584,6 @@ type ChangeRelationMode = 'all' | 'ascending' | 'descending'
 const props = defineProps<Props>()
 
 const rpsPeriods: readonly RpsPeriod[] = [5, 20, 60, 120, 250]
-const relationPeriods: readonly RpsPeriod[] = [5, 20, 60]
 
 function normalizeIndustryLevel(value: unknown): DcIndustryLevel {
   return industryLevelOptions.includes(value as DcIndustryLevel)
@@ -605,7 +596,6 @@ const route = useRoute()
 const rpsData = ref<IndexRpsItem[]>([])
 const queryTime = ref('')
 const searchKeyword = ref('')
-const showTodayChange = ref(false)
 const indexTrendDialogVisible = ref(false)
 const indexTrendLoading = ref(false)
 const indexTrendShortcut = ref<MemberTrendShortcut>('1y')
@@ -665,14 +655,21 @@ const minimumStrengthOptions: Array<{ label: string; value: StrengthRankThreshol
 
 const changeRelationOptions: Array<{ label: string; value: ChangeRelationMode }> = [
   { label: '不筛选', value: 'all' },
-  { label: '当日→5日→20日→60日递增', value: 'ascending' },
-  { label: '当日→5日→20日→60日递减', value: 'descending' }
+  { label: '递增', value: 'ascending' },
+  { label: '递减', value: 'descending' }
 ]
 
 const hasActiveSimpleFilter = computed(() => {
   return selectedStrengthFields.value.length > 0
     || minimumStrengthRank.value !== 'all'
     || changeRelationMode.value !== 'all'
+})
+
+const relationStrengthFields = computed(() => {
+  if (selectedStrengthFields.value.length >= 2) {
+    return selectedStrengthFields.value
+  }
+  return []
 })
 
 const formatPercent = (value: unknown): string => {
@@ -736,6 +733,14 @@ function getStrengthThresholdValue(rank: StrengthRankThreshold): number {
   }
 }
 
+function getReturnValueByStrengthField(item: IndexRpsItem, field: RpsField): number {
+  if (field === 'RPS_today') {
+    return getNumericValue(item.pct_change)
+  }
+  const period = Number(field.replace('RPS_', '')) as RpsPeriod
+  return getNumericValue(item[getReturnProp(period)])
+}
+
 function matchesStrengthFilters(item: IndexRpsItem): boolean {
   if (selectedStrengthFields.value.length === 0 || minimumStrengthRank.value === 'all') {
     return true
@@ -745,14 +750,11 @@ function matchesStrengthFilters(item: IndexRpsItem): boolean {
 }
 
 function matchesChangeRelation(item: IndexRpsItem): boolean {
-  if (changeRelationMode.value === 'all') {
+  if (changeRelationMode.value === 'all' || relationStrengthFields.value.length < 2) {
     return true
   }
 
-  const values = [
-    getNumericValue(item.pct_change),
-    ...relationPeriods.map((period) => getNumericValue(item[getReturnProp(period)]))
-  ]
+  const values = relationStrengthFields.value.map((field) => getReturnValueByStrengthField(item, field))
 
   for (let i = 1; i < values.length; i++) {
     if (changeRelationMode.value === 'ascending' && values[i] <= values[i - 1]) {
@@ -1205,10 +1207,6 @@ watch(() => route.query.level, (level) => {
   width: 220px;
 }
 
-.today-change-switch {
-  width: auto;
-}
-
 .table-summary {
   display: flex;
   align-items: center;
@@ -1245,7 +1243,7 @@ watch(() => route.query.level, (level) => {
 }
 
 .relation-filter-select {
-  width: 240px;
+  width: 180px;
 }
 
 .simple-filter-reset {
