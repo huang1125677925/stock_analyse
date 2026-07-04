@@ -90,7 +90,6 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
                 <el-dropdown-item v-if="currentUser?.is_admin" command="inviteCode">邀请码生成</el-dropdown-item>
                 <el-dropdown-item command="changePassword">修改密码</el-dropdown-item>
                 <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
@@ -187,10 +186,6 @@
               <span class="username">{{ currentUser?.username || '用户' }}</span>
             </div>
             <div class="mobile-user-actions">
-              <div class="mobile-user-item" @click="handleCommand('profile')">
-                <el-icon><User /></el-icon>
-                <span>个人中心</span>
-              </div>
               <div v-if="currentUser?.is_admin" class="mobile-user-item" @click="handleCommand('inviteCode')">
                 <el-icon><Setting /></el-icon>
                 <span>邀请码生成</span>
@@ -269,9 +264,6 @@ async function handleCommand(command: string) {
         router.push('/')
       } catch {
       }
-      break
-    case 'profile':
-      router.push('/personal/holdings')
       break
     case 'inviteCode':
       router.push('/admin/invite-codes')

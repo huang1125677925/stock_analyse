@@ -144,10 +144,16 @@ const router = createRouter({
       redirect: '/stock-picker/swing-practice'
     },
     {
-      path: '/personal/holdings',
-      name: 'personal-center-holdings',
-      component: () => import('@/views/personal-center/HoldingsView.vue'),
-      meta: { title: '个人持仓' }
+      path: '/admin/invite-codes',
+      component: DefaultLayout,
+      children: [
+        {
+          path: '',
+          name: 'admin-invite-codes',
+          component: () => import('@/views/SettingsView.vue'),
+          meta: { title: '邀请码生成' }
+        }
+      ]
     }
   ]
 })
