@@ -7,7 +7,7 @@
     <template v-else>
       <div class="matrix-legend">
         <span class="legend-label">纵轴按最近交易日（{{ formatDisplayDate(lastDate) }}）行业涨停数量倒序排列</span>
-        <span class="legend-tip">点击单元格顶部涨停数量查看当日行业涨停详情，点击个股标签查看该股趋势图</span>
+        <span class="legend-tip">点击日期在表头查看当日情绪摘要；点击单元格顶部涨停数量查看当日行业涨停详情，点击个股标签查看该股趋势图</span>
         <el-switch
           v-model="showStockList"
           class="legend-switch"
@@ -23,10 +23,30 @@
                 <div class="corner-industry">行业</div>
                 <div class="corner-date">日期 →</div>
               </th>
-              <th v-for="date in dates" :key="date" class="date-head">
-                <div class="date-text">{{ formatAxisDate(date) }}</div>
-                <div class="overall-count" :title="`当日全市场涨停 ${overallCount(date)} 家`">
-                  {{ overallCount(date) }}
+              <th v-for="date in dates" :key="date" class="date-head" :class="{ 'is-active': date === activeDate }">
+                <button type="button" class="date-head-btn" @click="setActiveDate(date)">
+                  <div class="date-text">{{ formatAxisDate(date) }}</div>
+                  <div class="overall-count" :title="`当日全市场涨停 ${overallCount(date)} 家`">
+                    {{ overallCount(date) }}
+                  </div>
+                </button>
+                <div class="date-head-summary">
+                  <div class="date-head-summary-title">
+                    当日情绪摘要
+                    <span v-if="dailyOverall(date)?.phase_label" class="date-head-summary-phase">
+                      {{ dailyOverall(date).phase_label }}
+                    </span>
+                  </div>
+                  <div class="date-head-summary-metrics">
+                    <div
+                      v-for="item in dailySentimentCards(date)"
+                      :key="item.key"
+                      class="date-head-summary-metric"
+                    >
+                      <span class="dhs-label">{{ item.label }}</span>
+                      <span class="dhs-value">{{ item.value }}</span>
+                    </div>
+                  </div>
                 </div>
               </th>
             </tr>
@@ -119,8 +139,6 @@
           </template>
         </el-table-column>
         <el-table-column prop="lu_desc" label="涨停原因" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="limit_times" label="连板数" min-width="90" align="center" sortable
-          :sort-method="(a: IndustryTrendStock, b: IndustryTrendStock) => numberOr(a.limit_times) - numberOr(b.limit_times)" />
         <el-table-column label="最新价" min-width="100" align="right" sortable
           :sort-method="(a: IndustryTrendStock, b: IndustryTrendStock) => numberOr(a.price) - numberOr(b.price)">
           <template #default="{ row }">{{ formatNumber(row.price) }}</template>
@@ -231,7 +249,7 @@
  * 返回值：无
  * 事件：无
  */
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
@@ -259,6 +277,7 @@ const props = defineProps<Props>()
 
 /** 是否在交叉块中展示个股涨停列表，默认开启 */
 const showStockList = ref(true)
+const activeDate = ref('')
 
 /** 升序排列的交易日列表（左旧右新） */
 const dates = computed<string[]>(() =>
@@ -332,8 +351,97 @@ const maxCellCount = computed(() => {
   return max
 })
 
+watch(
+  dates,
+  nextDates => {
+    if (!nextDates.length) {
+      activeDate.value = ''
+      return
+    }
+    if (!activeDate.value || !nextDates.includes(activeDate.value)) {
+      activeDate.value = nextDates[nextDates.length - 1] || ''
+    }
+  },
+  { immediate: true }
+)
+
+const activeOverall = computed(() => {
+  if (!activeDate.value) return null
+  return props.daily[activeDate.value]?.overall || null
+})
+
+const sentimentSummaryCards = computed(() => {
+  const overall = activeOverall.value
+  return [
+    {
+      key: 'limit_up_count',
+      label: '涨停家数',
+      value: formatSummaryNumber(overall?.limit_up_count)
+    },
+    {
+      key: 'sealed_rate',
+      label: '封板率',
+      value: formatPercentValue(overall?.sealed_rate)
+    },
+    {
+      key: 'broken_rate',
+      label: '炸板率',
+      value: formatPercentValue(overall?.broken_rate)
+    },
+    {
+      key: 'max_board',
+      label: '最高连板',
+      value: formatBoardValue(overall?.max_board)
+    },
+    {
+      key: 'sentiment_score',
+      label: '情绪分',
+      value: formatSummaryNumber(overall?.sentiment_score, 1)
+    }
+  ]
+})
+
+function setActiveDate(date: string) {
+  activeDate.value = date
+}
+
 function overallCount(date: string): number {
   return Number(props.daily[date]?.overall?.limit_up_count) || 0
+}
+
+function dailyOverall(date: string) {
+  return props.daily[date]?.overall || null
+}
+
+function dailySentimentCards(date: string) {
+  const overall = dailyOverall(date)
+  return [
+    {
+      key: 'limit_up_count',
+      label: '涨停家数',
+      value: formatSummaryNumber(overall?.limit_up_count)
+    },
+    {
+      key: 'sealed_rate',
+      label: '封板率',
+      value: formatPercentValue(overall?.sealed_rate)
+    },
+    {
+      key: 'broken_rate',
+      label: '炸板率',
+      value: formatPercentValue(overall?.broken_rate)
+    },
+    {
+      key: 'max_board',
+      label: '最高连板',
+      value: formatBoardValue(overall?.max_board)
+    },
+    {
+      key: 'sentiment_score',
+      label: '情绪分',
+      value: formatSummaryNumber(overall?.sentiment_score, 1)
+    }
+  ]
 }
 
 function industryRangeTotal(industry: string): number {
@@ -448,6 +556,7 @@ const detailTitle = computed(() => {
 })
 
 function openDetail(date: string, industry: string) {
+  activeDate.value = date
   detailDate.value = date
   detailIndustry.value = industry
   detailVisible.value = true
@@ -558,6 +667,26 @@ function formatNumber(value: unknown, suffix = ''): string {
   const n = Number(value)
   if (!Number.isFinite(n)) return '-'
   return `${Number.isInteger(n) ? n : n.toFixed(2)}${suffix}`
+}
+
+function formatSummaryNumber(value: unknown, digits = 0): string {
+  if (value === null || value === undefined || value === '') return '-'
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '-'
+  return digits > 0 ? n.toFixed(digits) : `${Math.round(n)}`
+}
+
+function formatPercentValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '-'
+  const percent = Math.abs(n) <= 1 ? n * 100 : n
+  return `${percent.toFixed(1)}%`
+}
+
+function formatBoardValue(value: unknown): string {
+  const text = formatSummaryNumber(value)
+  return text === '-' ? text : `${text}板`
 }
 
 function pctClass(value: unknown): string {
@@ -696,8 +825,26 @@ function formatDisplayDate(value: string): string {
 .date-head {
   width: 168px;
   min-width: 168px;
-  padding: 6px 4px;
+  padding: 0;
   text-align: center;
+}
+
+.date-head.is-active {
+  background: #eef4ff;
+}
+
+.date-head-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 6px 4px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.date-head-btn:hover {
+  background: rgba(64, 158, 255, 0.08);
 }
 
 .date-text {
@@ -710,6 +857,53 @@ function formatDisplayDate(value: string): string {
   font-size: 18px;
   font-weight: 700;
   color: #d9001b;
+}
+
+/* 表头内嵌的当日情绪摘要（仅激活日期列显示） */
+.date-head-summary {
+  margin-top: 6px;
+  padding: 6px 6px 4px;
+  border-top: 1px solid #dce4f0;
+  text-align: left;
+}
+
+.date-head-summary-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #303133;
+  text-align: center;
+}
+
+.date-head-summary-phase {
+  font-size: 11px;
+  font-weight: 500;
+  color: #909399;
+}
+
+.date-head-summary-metrics {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.date-head-summary-metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.dhs-label {
+  font-size: 11px;
+  color: #909399;
+  font-weight: 400;
+}
+
+.dhs-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #303133;
 }
 
 /* 左上角 */

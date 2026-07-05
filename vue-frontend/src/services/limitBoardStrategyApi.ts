@@ -131,6 +131,19 @@ export interface IndustryTrendStock {
 export interface IndustryTrendDailyOverall {
   limit_up_count: number
   industry_count: number
+  limit_down_count?: number
+  broken_limit_count?: number
+  limit_attempt_count?: number
+  sealed_rate?: number
+  broken_rate?: number
+  max_board?: number
+  one_board_count?: number
+  second_board_or_above_count?: number
+  high_board_count?: number
+  sentiment_score?: number
+  phase?: string
+  phase_label?: string
+  conclusion?: string
 }
 
 /** 行业涨停状态数量统计（固定三种状态，未出现计为 0） */
