@@ -320,6 +320,28 @@
           destroy-on-close
         >
           <div class="member-rps-dialog" v-loading="memberRpsLoading" element-loading-text="正在加载成分股RPS数据...">
+            <!-- 使用场景说明 -->
+            <el-alert
+              title="使用场景说明"
+              type="info"
+              :closable="false"
+              class="usage-tips"
+            >
+              <template #default>
+                <div class="tips-content">
+                  <div class="tip-item">
+                    <strong>找强势股：</strong>选择"20日" + "强于行业"，立即看到20日涨幅超过行业的成分股，查看这些股票的平均涨幅、最高涨幅等统计
+                  </div>
+                  <div class="tip-item">
+                    <strong>找补涨股：</strong>选择"5日" + "弱于行业"，找出短期表现弱于行业的股票，可能存在补涨机会
+                  </div>
+                  <div class="tip-item">
+                    <strong>多周期对比：</strong>切换不同周期（5日、20日、60日等），观察在不同时间维度上的强弱分布，结合RPS值综合判断个股强度
+                  </div>
+                </div>
+              </template>
+            </el-alert>
+
             <div class="toolbar-row member-rps-toolbar">
               <div class="table-controls">
                 <el-input
@@ -348,6 +370,118 @@
               </div>
             </div>
 
+            <div class="toolbar-row member-rps-filter-toolbar">
+              <div class="table-controls">
+                <div class="simple-filter-group">
+                  <div class="simple-filter-label">涨跌幅筛选</div>
+                  <el-select
+                    v-model="memberRpsFilterPeriod"
+                    placeholder="选择周期"
+                    clearable
+                    class="control-item"
+                  >
+                    <el-option
+                      v-for="option in memberRpsFilterPeriodOptions"
+                      :key="option.value"
+                      :label="option.label"
+                      :value="option.value"
+                    />
+                  </el-select>
+                </div>
+                <div class="simple-filter-group" v-if="memberRpsFilterPeriod !== null">
+                  <div class="simple-filter-label">对比行业</div>
+                  <el-select
+                    v-model="memberRpsFilterMode"
+                    class="control-item"
+                  >
+                    <el-option
+                      v-for="option in memberRpsFilterModeOptions"
+                      :key="option.value"
+                      :label="option.label"
+                      :value="option.value"
+                    />
+                  </el-select>
+                </div>
+              </div>
+              <div class="table-summary" v-if="memberRpsFilterPeriod !== null && memberRpsFilterMode !== 'all'">
+                <el-tag type="primary" effect="plain">
+                  筛选后 {{ memberRpsStatistics.count }}/{{ memberRpsStatistics.totalCount }} 只
+                  ({{ memberRpsStatistics.percentage.toFixed(1) }}%)
+                </el-tag>
+                <el-tag type="success" effect="light">平均 {{ formatPercent(memberRpsStatistics.avgReturn) }}</el-tag>
+                <el-tag type="danger" effect="light">最高 {{ formatPercent(memberRpsStatistics.maxReturn) }}</el-tag>
+                <el-tag type="info" effect="light">最低 {{ formatPercent(memberRpsStatistics.minReturn) }}</el-tag>
+              </div>
+            </div>
+
+            <!-- 周期统计表格 -->
+            <div class="period-statistics-container" v-if="memberRpsPeriodStatistics.length > 0">
+              <div class="statistics-header">
+                <span class="statistics-title">周期统计概览</span>
+                <span class="statistics-subtitle">展示各周期下成分股相对行业的强弱分布</span>
+              </div>
+              <el-table
+                :data="memberRpsPeriodStatistics"
+                size="small"
+                border
+                stripe
+                class="period-statistics-table"
+              >
+                <el-table-column prop="periodLabel" label="周期" width="80" align="center" />
+                <el-table-column label="强于行业" width="120" align="center">
+                  <template #default="scope">
+                    <span class="stat-value">{{ scope.row.aboveCount }}/{{ scope.row.totalCount }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="占比" width="100" align="center">
+                  <template #default="scope">
+                    <el-tag
+                      :type="scope.row.abovePercentage >= 50 ? 'success' : 'info'"
+                      size="small"
+                      effect="light"
+                    >
+                      {{ scope.row.abovePercentage.toFixed(1) }}%
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="行业涨跌幅" width="120" align="center">
+                  <template #default="scope">
+                    <span
+                      class="return-value"
+                      :class="{ up: scope.row.boardReturn > 0, down: scope.row.boardReturn < 0 }"
+                    >
+                      {{ formatPercent(scope.row.boardReturn) }}
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="成分股平均涨跌幅" width="150" align="center">
+                  <template #default="scope">
+                    <span
+                      class="return-value"
+                      :class="{ up: scope.row.avgReturn > 0, down: scope.row.avgReturn < 0 }"
+                    >
+                      {{ formatPercent(scope.row.avgReturn) }}
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="行业排名" min-width="150" align="center">
+                  <template #default="scope">
+                    <div class="rank-indicator">
+                      <span v-if="scope.row.avgReturn > scope.row.boardReturn" class="rank-tag rank-above">
+                        成分股强于行业
+                      </span>
+                      <span v-else-if="scope.row.avgReturn < scope.row.boardReturn" class="rank-tag rank-below">
+                        成分股弱于行业
+                      </span>
+                      <span v-else class="rank-tag rank-equal">
+                        持平
+                      </span>
+                    </div>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
             <el-table
               :data="filteredMemberRpsData"
               stripe
@@ -356,6 +490,7 @@
               height="620"
               :default-sort="{ prop: memberRpsDefaultSortProp, order: 'descending' }"
               highlight-current-row
+              :row-class-name="memberRpsTableRowClassName"
               @sort-change="handleMemberRpsSortChange"
             >
               <el-table-column type="index" label="#" width="50" align="center" fixed="left" />
@@ -546,6 +681,9 @@ const memberRpsSearchKeyword = ref('')
 const memberRpsSelectedDate = ref('')
 const memberRpsData = ref<DcBoardMemberRpsItem[]>([])
 const memberRpsPeriods = ref<number[]>([])
+const memberRpsBoardRpsData = ref<IndexRpsItem | null>(null)
+const memberRpsFilterPeriod = ref<number | null>(null)
+const memberRpsFilterMode = ref<'all' | 'above' | 'below'>('all')
 let memberRpsRequestId = 0
 const memberStockTrendDialogVisible = ref(false)
 const memberStockTrendLoading = ref(false)
@@ -586,6 +724,12 @@ const changeRelationOptions: Array<{ label: string; value: ChangeRelationMode }>
   { label: '不筛选', value: 'all' },
   { label: '递增', value: 'ascending' },
   { label: '递减', value: 'descending' }
+]
+
+const memberRpsFilterModeOptions = [
+  { label: '全部成分股', value: 'all' },
+  { label: '强于行业', value: 'above' },
+  { label: '弱于行业', value: 'below' }
 ]
 
 const hasActiveSimpleFilter = computed(() => {
@@ -735,11 +879,145 @@ const filteredRpsData = computed(() => {
 
 const filteredMemberRpsData = computed(() => {
   let result = memberRpsData.value
+
+  // 搜索筛选
   if (memberRpsSearchKeyword.value) {
     const keyword = memberRpsSearchKeyword.value.trim()
     result = result.filter((item) => item.name.includes(keyword) || item.ts_code.includes(keyword))
   }
+
+  // 涨跌幅相对行业筛选
+  if (memberRpsFilterMode.value !== 'all' && memberRpsFilterPeriod.value !== null && memberRpsBoardRpsData.value) {
+    const period = memberRpsFilterPeriod.value
+    const boardReturnField = period === 0 ? 'pct_change' : getDynamicReturnProp(period)
+    const boardReturn = getNumericValue(
+      memberRpsBoardRpsData.value[boardReturnField as keyof IndexRpsItem]
+    )
+
+    result = result.filter((item) => {
+      const itemReturnField = period === 0 ? 'pct_change' : getDynamicReturnProp(period)
+      const itemReturn = getNumericValue((item as Record<string, unknown>)[itemReturnField])
+
+      if (memberRpsFilterMode.value === 'above') {
+        return itemReturn > boardReturn
+      } else if (memberRpsFilterMode.value === 'below') {
+        return itemReturn < boardReturn
+      }
+      return true
+    })
+  }
+
+  // 将行业RPS数据作为第一行插入
+  if (memberRpsBoardRpsData.value) {
+    const boardRow: DcBoardMemberRpsItem = {
+      ts_code: memberRpsBoardRpsData.value.ts_code,
+      name: `【行业】${memberRpsBoardRpsData.value.name}`,
+      pct_change: memberRpsBoardRpsData.value.pct_change,
+      RPS_today: memberRpsBoardRpsData.value.RPS_today
+    }
+
+    // 动态添加各周期的return和RPS字段
+    memberRpsPeriods.value.forEach(period => {
+      const returnField = getDynamicReturnProp(period)
+      const rpsField = getDynamicRpsProp(period)
+      boardRow[returnField] = memberRpsBoardRpsData.value![returnField as keyof IndexRpsItem] as number | null
+      boardRow[rpsField] = memberRpsBoardRpsData.value![rpsField as keyof IndexRpsItem] as number | null
+    })
+
+    result = [boardRow, ...result]
+  }
+
   return result
+})
+
+const memberRpsStatistics = computed(() => {
+  // 排除行业行，只计算成分股的统计
+  const stocks = filteredMemberRpsData.value.filter(item => !item.name.startsWith('【行业】'))
+  const totalStocks = memberRpsData.value.length // 总成分股数
+
+  if (stocks.length === 0 || memberRpsFilterPeriod.value === null) {
+    return {
+      count: stocks.length,
+      totalCount: totalStocks,
+      percentage: 0,
+      avgReturn: 0,
+      maxReturn: 0,
+      minReturn: 0
+    }
+  }
+
+  const period = memberRpsFilterPeriod.value
+  const returnField = period === 0 ? 'pct_change' : getDynamicReturnProp(period)
+
+  const returns = stocks.map(stock =>
+    getNumericValue((stock as Record<string, unknown>)[returnField])
+  )
+
+  const sum = returns.reduce((acc, val) => acc + val, 0)
+  const avg = returns.length > 0 ? sum / returns.length : 0
+  const max = returns.length > 0 ? Math.max(...returns) : 0
+  const min = returns.length > 0 ? Math.min(...returns) : 0
+  const percentage = totalStocks > 0 ? (stocks.length / totalStocks) * 100 : 0
+
+  return {
+    count: stocks.length,
+    totalCount: totalStocks,
+    percentage,
+    avgReturn: avg,
+    maxReturn: max,
+    minReturn: min
+  }
+})
+
+const memberRpsFilterPeriodOptions = computed(() => {
+  const options = [{ label: '当日', value: 0 }]
+  memberRpsPeriods.value.forEach(period => {
+    options.push({ label: `${period}日`, value: period })
+  })
+  return options
+})
+
+const memberRpsPeriodStatistics = computed(() => {
+  if (!memberRpsBoardRpsData.value || memberRpsData.value.length === 0) {
+    return []
+  }
+
+  const periods = [0, ...memberRpsPeriods.value] // 包含当日
+  const stats = periods.map(period => {
+    const returnField = period === 0 ? 'pct_change' : getDynamicReturnProp(period)
+
+    // 获取行业涨跌幅
+    const boardReturn = getNumericValue(
+      memberRpsBoardRpsData.value![returnField as keyof IndexRpsItem]
+    )
+
+    // 统计所有成分股的涨跌幅
+    const stockReturns = memberRpsData.value.map(stock =>
+      getNumericValue((stock as Record<string, unknown>)[returnField])
+    )
+
+    // 计算强于行业的成分股数量
+    const aboveCount = stockReturns.filter(ret => ret > boardReturn).length
+    const totalCount = stockReturns.length
+    const abovePercentage = totalCount > 0 ? (aboveCount / totalCount) * 100 : 0
+
+    // 计算所有成分股的平均涨跌幅
+    const avgReturn = stockReturns.length > 0
+      ? stockReturns.reduce((acc, val) => acc + val, 0) / stockReturns.length
+      : 0
+
+    return {
+      period,
+      periodLabel: period === 0 ? '当日' : `${period}日`,
+      aboveCount,
+      totalCount,
+      abovePercentage,
+      boardReturn,
+      avgReturn
+    }
+  })
+
+  return stats
 })
 
 const getDefaultSortProp = () => {
@@ -1026,6 +1304,8 @@ const openBoardMemberRpsDialog = async (row: IndexRpsItem) => {
   memberRpsSelectedDate.value = ''
   memberRpsData.value = []
   memberRpsPeriods.value = []
+  // 保存当前行业板块的RPS数据，用于在成分股表格中对比显示
+  memberRpsBoardRpsData.value = row
 
   await loadMemberRpsData()
 }
@@ -1042,6 +1322,14 @@ const handleMemberRpsSortChange = (sort: { prop: string, order: string }) => {
       return propB - propA
     })
   }
+}
+
+const memberRpsTableRowClassName = ({ row }: { row: DcBoardMemberRpsItem }) => {
+  // 行业行特殊样式
+  if (row.name.startsWith('【行业】')) {
+    return 'row-board-highlight'
+  }
+  return ''
 }
 
 const applyMemberStockTrendShortcut = (range: MemberTrendShortcut) => {
@@ -1235,6 +1523,106 @@ watch(() => route.query.level, (level) => {
   gap: 16px;
 }
 
+.usage-tips {
+  margin-bottom: 8px;
+}
+
+.tips-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tip-item {
+  color: #606266;
+}
+
+.tip-item strong {
+  color: #409eff;
+  margin-right: 4px;
+}
+
+.period-statistics-container {
+  background: #f9fafb;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 8px;
+}
+
+.statistics-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.statistics-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.statistics-subtitle {
+  font-size: 12px;
+  color: #909399;
+}
+
+.period-statistics-table {
+  background: white;
+}
+
+.period-statistics-table .stat-value {
+  font-weight: 600;
+  color: #606266;
+}
+
+.period-statistics-table .return-value {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.period-statistics-table .return-value.up {
+  color: #f56c6c;
+}
+
+.period-statistics-table .return-value.down {
+  color: #67c23a;
+}
+
+.rank-indicator {
+  display: flex;
+  justify-content: center;
+}
+
+.rank-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rank-above {
+  background-color: #fef0f0;
+  color: #f56c6c;
+  border: 1px solid #fbc4c4;
+}
+
+.rank-below {
+  background-color: #f0f9ff;
+  color: #409eff;
+  border: 1px solid #b3d8ff;
+}
+
+.rank-equal {
+  background-color: #f4f4f5;
+  color: #909399;
+  border: 1px solid #d3d4d6;
+}
+
 .trend-dialog-header {
   display: flex;
   flex-direction: column;
@@ -1269,6 +1657,12 @@ watch(() => route.query.level, (level) => {
 
 .member-rps-toolbar {
   margin-bottom: 0;
+}
+
+.member-rps-filter-toolbar {
+  margin-bottom: 0;
+  padding-top: 8px;
+  border-top: 1px solid #ebeef5;
 }
 
 .member-rps-date {
@@ -1432,6 +1826,15 @@ watch(() => route.query.level, (level) => {
 
 :deep(.row-good) {
   background-color: rgba(64, 158, 255, 0.05);
+}
+
+:deep(.row-board-highlight) {
+  background-color: #fff7e6 !important;
+  font-weight: 600;
+}
+
+:deep(.row-board-highlight:hover) {
+  background-color: #ffe7ba !important;
 }
 
 @media (max-width: 768px) {
