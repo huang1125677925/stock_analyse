@@ -324,11 +324,10 @@ const etfIndexMegaMenuSections = [
   {
     title: '行业热点',
     items: [
+      { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
+      { title: '行业宽度分析', path: '/analysis/congestion/breadth' },
       { title: '行业成交额分析', path: '/analysis/congestion/turnover' },
       { title: '行业流入资金分析', path: '/analysis/congestion/fundflow' },
-      { title: '行业宽度分析', path: '/analysis/congestion/breadth' },
-      { title: '行业涨跌比分析', path: '/analysis/congestion/up-down-ratio' },
-      { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
     ],
   },
   {

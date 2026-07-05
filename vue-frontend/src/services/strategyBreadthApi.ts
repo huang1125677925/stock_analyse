@@ -121,69 +121,6 @@ export async function fetchIndustryMaBreadth(
 }
 
 /**
- * 行业涨跌比数据项
- */
-export interface IndustryUpDownRatioItem {
-  date: string
-  sector_code: string
-  sector_name: string
-  idx_type: IndustryMaBreadthIdxType
-  level?: EastMoneyIndustryLevel | ''
-  up_count: number
-  down_count: number
-  total_count: number
-  up_ratio: number
-  down_ratio: number
-}
-
-/**
- * 行业涨跌比响应数据
- */
-export interface IndustryUpDownRatioData {
-  total: number
-  data: IndustryUpDownRatioItem[]
-  start_date: string
-  end_date: string
-  idx_type: IndustryMaBreadthIdxType
-  level?: EastMoneyIndustryLevel | ''
-  query_time: string
-}
-
-/**
- * 行业涨跌比查询参数
- */
-export interface IndustryUpDownRatioQuery {
-  startDate?: string
-  endDate?: string
-  idxType?: IndustryMaBreadthIdxType
-  level?: EastMoneyIndustryLevel
-}
-
-/**
- * 获取行业涨跌比数据
- * @param query 查询参数，支持日期范围、板块类型与行业层级
- * @returns IndustryUpDownRatioData
- */
-export async function fetchIndustryUpDownRatio(
-  query: IndustryUpDownRatioQuery = {}
-): Promise<IndustryUpDownRatioData> {
-  const params: Record<string, any> = {}
-  if (query.startDate) params.start_date = query.startDate
-  if (query.endDate) params.end_date = query.endDate
-  params.idx_type = query.idxType ?? '行业板块'
-  if (query.level) params.level = query.level
-
-  const res = await axios.get<
-    ApiResponse<IndustryUpDownRatioData> | IndustryUpDownRatioData,
-    ApiResponse<IndustryUpDownRatioData> | AxiosLikeResponse<ApiResponse<IndustryUpDownRatioData> | IndustryUpDownRatioData> | IndustryUpDownRatioData
-  >(
-    '/django/api/strategy/industry-up-down-ratio/',
-    { params }
-  )
-  return unwrapBusinessData(res)
-}
-
-/**
  * 行业规模宽度数据项
  */
 export interface IndustryScaleBreadthItem {

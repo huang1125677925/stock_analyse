@@ -447,12 +447,31 @@ const exchangeOptions = [
   { label: '深交所', value: 'SZSE' },
   { label: '北交所', value: 'BSE' }
 ]
-const marketOptions = [
+const exchangeMarketMap: Record<string, string[]> = {
+  SSE: ['主板', '科创板'],
+  SZSE: ['主板', '创业板'],
+  BSE: ['北交所']
+}
+const allMarketOptions = [
   { label: '主板', value: '主板' },
   { label: '创业板', value: '创业板' },
   { label: '科创板', value: '科创板' },
   { label: '北交所', value: '北交所' }
 ]
+
+/**
+ * 计算属性：根据当前选择的交易所动态返回可用的市场板块选项。
+ * 参数：无。
+ * 返回值：市场板块选项数组。
+ * 事件：无。
+ */
+const marketOptions = computed(() => {
+  if (!filters.exchange) {
+    return allMarketOptions
+  }
+  const availableMarkets = exchangeMarketMap[filters.exchange] || []
+  return allMarketOptions.filter((option) => availableMarkets.includes(option.value))
+})
 const rpsRankOptions: RpsRankLabel[] = ['极强', '强势', '良好', '一般', '弱势']
 const changeDirectionOptions: ChangeDirectionLabel[] = ['上涨', '平盘', '下跌']
 
@@ -1205,6 +1224,20 @@ watch(
     scheduleStockRpsReload()
   },
   { immediate: true }
+)
+
+watch(
+  () => filters.exchange,
+  (newExchange) => {
+    // 当交易所改变时，检查当前市场板块是否属于新交易所
+    if (newExchange) {
+      const availableMarkets = exchangeMarketMap[newExchange] || []
+      if (!availableMarkets.includes(filters.market)) {
+        // 如果当前市场板块不属于新交易所，重置为该交易所的第一个市场板块
+        filters.market = availableMarkets[0] || ''
+      }
+    }
+  }
 )
 
 watch(
