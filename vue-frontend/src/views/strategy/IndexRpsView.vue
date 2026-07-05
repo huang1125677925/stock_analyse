@@ -331,6 +331,17 @@
                   clearable
                   class="control-item control-search"
                 />
+                <el-date-picker
+                  v-model="memberRpsSelectedDate"
+                  type="date"
+                  placeholder="选择交易日（默认最近交易日）"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  :disabled="memberRpsLoading"
+                  :disabled-date="disableFutureDate"
+                  @change="handleMemberRpsDateChange"
+                  class="control-item member-rps-date"
+                />
               </div>
               <div class="table-summary">
                 <el-tag type="info" effect="plain">共 {{ filteredMemberRpsData.length }} 条</el-tag>
@@ -534,8 +545,10 @@ const memberRpsBoardName = ref('')
 const memberRpsTradeDate = ref('')
 const memberRpsQueryTime = ref('')
 const memberRpsSearchKeyword = ref('')
+const memberRpsSelectedDate = ref('')
 const memberRpsData = ref<DcBoardMemberRpsItem[]>([])
 const memberRpsPeriods = ref<number[]>([])
+let memberRpsRequestId = 0
 const memberStockTrendDialogVisible = ref(false)
 const memberStockTrendLoading = ref(false)
 const memberStockTrendShortcut = ref<MemberTrendShortcut>('1y')
@@ -616,6 +629,8 @@ const formatDateToYYYYMMDDWithDash = (date: Date): string => {
 }
 
 const formatDateForStockApi = (dateText: string): string => dateText.replace(/-/g, '')
+
+const disableFutureDate = (date: Date): boolean => date.getTime() > Date.now()
 
 const formatAmount = (value: unknown): string => {
   const numericValue = getNumericValue(value)
@@ -948,33 +963,73 @@ const openLeadRiseDetail = (row: IndexRpsItem) => {
   detailDialogVisible.value = true
 }
 
+/**
+ * 加载成分股RPS数据
+ * 功能：按当前板块与选中的交易日拉取成分股RPS。selectedDate 为空时后端返回最近一个交易日。
+ * 参数：无（读取 memberRpsBoardTsCode 与 memberRpsSelectedDate）
+ * 返回值：Promise<void>
+ * 事件：更新 memberRpsData、memberRpsTradeDate 等状态
+ */
+const loadMemberRpsData = async () => {
+  const tsCode = memberRpsBoardTsCode.value
+  if (!tsCode) return
+
+  const requestId = ++memberRpsRequestId
+  memberRpsLoading.value = true
+  try {
+    const tradeDate = memberRpsSelectedDate.value
+      ? formatDateForStockApi(memberRpsSelectedDate.value)
+      : undefined
+    const response = await getDcBoardMemberRps(tsCode, '5,20,60,120,250', tradeDate)
+
+    if (requestId !== memberRpsRequestId) return
+
+    memberRpsData.value = response.data || []
+    memberRpsPeriods.value = response.periods || []
+    memberRpsBoardTsCode.value = response.board_ts_code || tsCode
+    memberRpsBoardName.value = response.board_name || memberRpsBoardName.value
+    memberRpsTradeDate.value = response.trade_date || ''
+    memberRpsQueryTime.value = response.query_time || ''
+    // 将实际返回的交易日回填到日期选择器，默认展示最近一个交易日
+    if (response.trade_date) {
+      memberRpsSelectedDate.value = response.trade_date
+    }
+    ElMessage.success('成分股RPS数据加载成功')
+  } catch (error) {
+    if (requestId !== memberRpsRequestId) return
+    console.error('加载成分股RPS数据失败:', error)
+    memberRpsData.value = []
+    ElMessage.error('加载成分股RPS数据失败，请稍后重试')
+  } finally {
+    if (requestId === memberRpsRequestId) {
+      memberRpsLoading.value = false
+    }
+  }
+}
+
+/**
+ * 事件：切换成分股RPS交易日
+ * 功能：用户在弹窗中选择交易日后，按新交易日重新拉取成分股RPS数据
+ * 参数：无
+ * 返回值：无
+ */
+const handleMemberRpsDateChange = () => {
+  loadMemberRpsData()
+}
+
 const openBoardMemberRpsDialog = async (row: IndexRpsItem) => {
   memberRpsDialogVisible.value = true
-  memberRpsLoading.value = true
   memberRpsBoardTsCode.value = row.ts_code
   memberRpsBoardName.value = row.name
   memberRpsTradeDate.value = ''
   memberRpsQueryTime.value = ''
   memberRpsSearchKeyword.value = ''
+  // 重置为空，让后端返回最近一个交易日，随后回填到日期选择器
+  memberRpsSelectedDate.value = ''
   memberRpsData.value = []
   memberRpsPeriods.value = []
 
-  try {
-    const response = await getDcBoardMemberRps(row.ts_code, '5,20,60,120,250')
-    memberRpsData.value = response.data || []
-    memberRpsPeriods.value = response.periods || []
-    memberRpsBoardTsCode.value = response.board_ts_code || row.ts_code
-    memberRpsBoardName.value = response.board_name || row.name
-    memberRpsTradeDate.value = response.trade_date || ''
-    memberRpsQueryTime.value = response.query_time || ''
-    ElMessage.success('成分股RPS数据加载成功')
-  } catch (error) {
-    console.error('加载成分股RPS数据失败:', error)
-    memberRpsData.value = []
-    ElMessage.error('加载成分股RPS数据失败，请稍后重试')
-  } finally {
-    memberRpsLoading.value = false
-  }
+  await loadMemberRpsData()
 }
 
 const handleMemberRpsSortChange = (sort: { prop: string, order: string }) => {
@@ -1216,6 +1271,10 @@ watch(() => route.query.level, (level) => {
 
 .member-rps-toolbar {
   margin-bottom: 0;
+}
+
+.member-rps-date {
+  width: 220px;
 }
 
 .rps-data-section {
