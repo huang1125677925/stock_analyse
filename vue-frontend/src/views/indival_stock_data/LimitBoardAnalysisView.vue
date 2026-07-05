@@ -124,7 +124,6 @@ const trendRangeOptions: Array<{ label: string; value: TrendRange }> = [
 
 /** 行业趋势的行业映射方式选项，取值对应接口 industry_mapping 参数 */
 const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> = [
-  { label: '默认（按日动态）', value: 'default' },
   { label: '东财概念', value: 'dc_concept' },
   { label: '东财地域', value: 'dc_region' },
   { label: '东财一级行业', value: 'dc_l1' },
@@ -133,7 +132,7 @@ const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> =
 ]
 
 const trendRange = ref<TrendRange>('2w')
-const industryMapping = ref<IndustryMapping>('default')
+const industryMapping = ref<IndustryMapping>('dc_l1')
 const trendEndDate = ref(getRecentTradeDate())
 const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
 const loading = ref(false)

@@ -54,17 +54,31 @@
           <tbody>
             <tr v-for="industry in industries" :key="industry">
               <th class="industry-head" :title="industry">
-                <span class="industry-name">{{ industry }}</span>
-                <span class="industry-total">{{ industryRangeTotal(industry) }}</span>
+                <button
+                  type="button"
+                  class="industry-name-btn"
+                  @click="openIndustryTrendDialog(industry)"
+                >
+                  <span class="industry-name">{{ industry }}</span>
+                  <span class="industry-total">{{ industryRangeTotal(industry) }}</span>
+                </button>
               </th>
               <td
                 v-for="date in dates"
                 :key="date"
                 class="matrix-cell"
-                :class="{ 'is-empty': cellCount(date, industry) === 0 }"
+                :class="{ 'is-empty': cellCount(date, industry) === 0 && !yesterdayPremium(date, industry) && industryPctChange(date, industry) === null }"
               >
-                <template v-if="cellCount(date, industry) > 0">
+                <template v-if="cellCount(date, industry) > 0 || yesterdayPremium(date, industry) || industryPctChange(date, industry) !== null">
+                  <div v-if="yesterdayPremium(date, industry)" class="yesterday-premium">
+                    <span class="premium-label">昨日{{ yesterdayCount(date, industry) }}家</span>
+                    <span
+                      class="premium-value"
+                      :class="premiumClass(yesterdayAvgPremium(date, industry))"
+                    >{{ formatPremium(yesterdayAvgPremium(date, industry)) }}</span>
+                  </div>
                   <button
+                    v-if="cellCount(date, industry) > 0"
                     type="button"
                     class="cell-count"
                     :style="countStyle(date, industry)"
@@ -80,7 +94,13 @@
                       >{{ stat.symbol }}{{ stat.count }}</span>
                     </span>
                   </button>
-                  <div v-if="showStockList" class="cell-stocks">
+                  <div v-if="industryPctChange(date, industry) !== null" class="industry-pct-change">
+                    <span
+                      class="pct-change-value"
+                      :class="pctChangeClass(industryPctChange(date, industry))"
+                    >{{ formatPctChange(industryPctChange(date, industry)) }}</span>
+                  </div>
+                  <div v-if="showStockList && cellCount(date, industry) > 0" class="cell-stocks">
                     <button
                       v-for="stock in cellStocks(date, industry)"
                       :key="stock.ts_code || stock.name"
@@ -232,6 +252,13 @@
         </el-card>
       </div>
     </el-dialog>
+
+    <IndustryTrendDialog
+      v-model="industryTrendDialogVisible"
+      :sector-code="selectedIndustryCode"
+      :sector-name="selectedIndustryName"
+      @data-loaded="handleIndustryDataLoaded"
+    />
   </div>
 </template>
 
@@ -252,6 +279,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import StockKLineChart from '@/components/StockKLineChart.vue'
+import IndustryTrendDialog from '@/components/IndustryTrendDialog.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import type {
   IndustryTrendDaily,
@@ -467,6 +495,80 @@ const dailyIndustryStatus = computed(() => {
   return map
 })
 
+/** 每个交易日 -> (行业 -> 昨日涨停平均溢价数据) 的快速查表 */
+const dailyIndustryPremium = computed(() => {
+  const map = new Map<string, Map<string, { count: number; avgPct: number; stocks?: any[] }>>()
+
+  dates.value.forEach((date, index) => {
+    const premiumMap = new Map<string, { count: number; avgPct: number; stocks?: any[] }>()
+
+    // 方式1：从当天的 industries 中获取昨日溢价数据（仅限今天也有涨停的行业）
+    props.daily[date]?.industries?.forEach(item => {
+      if (item?.industry && item.yesterday_limit_up_count !== undefined && item.avg_premium_pct !== undefined) {
+        premiumMap.set(item.industry, {
+          count: item.yesterday_limit_up_count,
+          avgPct: item.avg_premium_pct,
+          stocks: item.yesterday_limit_up_stocks
+        })
+      }
+    })
+
+    // 方式2：从前一个交易日推算昨日涨停数据（补充今天没有涨停的行业）
+    if (index > 0) {
+      const prevDate = dates.value[index - 1]
+      const prevDay = props.daily[prevDate]
+
+      prevDay?.industries?.forEach(prevItem => {
+        if (prevItem?.industry && prevItem.limit_up_count > 0) {
+          // 如果这个行业在当天的 industries 中没有记录（说明今天没有涨停），则添加昨日数据
+          if (!premiumMap.has(prevItem.industry)) {
+            // 尝试从 yesterday_limit_up_stocks 获取今日溢价（如果当天数据有提供）
+            const todayIndustry = props.daily[date]?.industries?.find(i => i.industry === prevItem.industry)
+            if (todayIndustry?.yesterday_limit_up_count !== undefined) {
+              premiumMap.set(prevItem.industry, {
+                count: todayIndustry.yesterday_limit_up_count,
+                avgPct: todayIndustry.avg_premium_pct || 0,
+                stocks: todayIndustry.yesterday_limit_up_stocks
+              })
+            } else {
+              // 没有溢价数据，只显示昨日涨停数量
+              premiumMap.set(prevItem.industry, {
+                count: prevItem.limit_up_count,
+                avgPct: NaN, // 表示没有溢价数据
+                stocks: undefined
+              })
+            }
+          }
+        }
+      })
+    }
+
+    map.set(date, premiumMap)
+  })
+
+  return map
+})
+
+/** 每个交易日 -> (行业 -> 行业涨跌幅) 的快速查表，包含所有可获得的行业涨跌幅数据 */
+const dailyIndustryPctChange = computed(() => {
+  const map = new Map<string, Map<string, number>>()
+
+  dates.value.forEach(date => {
+    const pctMap = new Map<string, number>()
+
+    // 从 industries 数组中提取行业涨跌幅数据
+    props.daily[date]?.industries?.forEach(item => {
+      if (item?.industry && item.industry_pct_change !== undefined) {
+        pctMap.set(item.industry, item.industry_pct_change)
+      }
+    })
+
+    map.set(date, pctMap)
+  })
+
+  return map
+})
+
 /**
  * 单元格顶部涨停状态列表：以符号表示 T字板/一字板/换手板，
  * 仅展示数量大于 0 的状态以节省空间。
@@ -482,6 +584,75 @@ function cellStatusList(date: string, industry: string) {
       count: numberOr(counts[meta.key])
     }))
     .filter(item => item.count > 0)
+}
+
+/** 获取昨日涨停平均溢价数据是否存在 */
+function yesterdayPremium(date: string, industry: string): boolean {
+  return dailyIndustryPremium.value.get(date)?.has(industry) || false
+}
+
+/** 获取昨日该行业涨停股数量 */
+function yesterdayCount(date: string, industry: string): number {
+  return dailyIndustryPremium.value.get(date)?.get(industry)?.count || 0
+}
+
+/** 获取昨日涨停股今日平均溢价百分比 */
+function yesterdayAvgPremium(date: string, industry: string): number {
+  return dailyIndustryPremium.value.get(date)?.get(industry)?.avgPct || 0
+}
+
+/** 格式化溢价百分比 */
+function formatPremium(value: number): string {
+  if (!Number.isFinite(value)) return '(待算)'
+  const sign = value >= 0 ? '+' : ''
+  return `${sign}${value.toFixed(2)}%`
+}
+
+/** 溢价值样式类 */
+function premiumClass(value: number): string {
+  if (value > 0) return 'premium-positive'
+  if (value < 0) return 'premium-negative'
+  return 'premium-neutral'
+}
+
+/** 获取行业涨跌幅 */
+function industryPctChange(date: string, industry: string): number | null {
+  // 优先使用缓存的行情数据
+  const industryCode = industryNameToCode.value.get(industry)
+  if (industryCode) {
+    const cachedData = industryPctChangeCache.value.get(industryCode)
+    if (cachedData?.has(date)) {
+      return cachedData.get(date) ?? null
+    }
+  }
+
+  // 其次从快速查表中获取
+  const cached = dailyIndustryPctChange.value.get(date)?.get(industry)
+  if (cached !== undefined) return cached
+
+  // 降级方案：直接查找（兜底）
+  const dayData = props.daily[date]
+  if (!dayData?.industries) return null
+
+  const industryData = dayData.industries.find(item => item.industry === industry)
+  if (!industryData || industryData.industry_pct_change === undefined) return null
+
+  return industryData.industry_pct_change
+}
+
+/** 格式化行业涨跌幅 */
+function formatPctChange(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '-'
+  const sign = value >= 0 ? '+' : ''
+  return `${sign}${value.toFixed(2)}%`
+}
+
+/** 行业涨跌幅样式类 */
+function pctChangeClass(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return ''
+  if (value > 0) return 'pct-positive'
+  if (value < 0) return 'pct-negative'
+  return 'pct-neutral'
 }
 
 function cellStocks(date: string, industry: string): IndustryTrendStock[] {
@@ -580,6 +751,68 @@ const detailVisible = ref(false)
 const detailDate = ref('')
 const detailIndustry = ref('')
 
+// -------- 行业趋势图弹窗 --------
+const industryTrendDialogVisible = ref(false)
+const selectedIndustryCode = ref('')
+const selectedIndustryName = ref('')
+
+/** 行业行情数据缓存：行业代码 -> (日期 -> 涨跌幅) */
+const industryPctChangeCache = ref(new Map<string, Map<string, number>>())
+
+/** 行业代码到行业名称的映射 */
+const industryCodeToName = computed(() => {
+  const map = new Map<string, string>()
+  dates.value.forEach(date => {
+    props.daily[date]?.industries?.forEach(item => {
+      if (item?.industry && item.industry_code) {
+        map.set(item.industry_code, item.industry)
+      }
+    })
+  })
+  return map
+})
+
+/** 行业名称到行业代码的映射 */
+const industryNameToCode = computed(() => {
+  const map = new Map<string, string>()
+  dates.value.forEach(date => {
+    props.daily[date]?.industries?.forEach(item => {
+      if (item?.industry && item.industry_code) {
+        map.set(item.industry, item.industry_code)
+      }
+    })
+  })
+  return map
+})
+
+/** 每个交易日 -> (行业 -> 行业代码) 的快速查表 */
+const dailyIndustryCode = computed(() => {
+  const map = new Map<string, Map<string, string>>()
+
+  dates.value.forEach(date => {
+    const codeMap = new Map<string, string>()
+
+    props.daily[date]?.industries?.forEach(item => {
+      if (item?.industry && item.industry_code) {
+        codeMap.set(item.industry, item.industry_code)
+      }
+    })
+
+    map.set(date, codeMap)
+  })
+
+  return map
+})
+
+/** 获取行业代码（从任意有数据的交易日获取） */
+function getIndustryCode(industry: string): string | null {
+  for (const date of dates.value) {
+    const code = dailyIndustryCode.value.get(date)?.get(industry)
+    if (code) return code
+  }
+  return null
+}
+
 const detailStocks = computed<IndustryTrendStock[]>(() =>
   detailDate.value && detailIndustry.value ? cellStocks(detailDate.value, detailIndustry.value) : []
 )
@@ -594,6 +827,27 @@ function openDetail(date: string, industry: string) {
   detailDate.value = date
   detailIndustry.value = industry
   detailVisible.value = true
+}
+
+/** 打开行业趋势图弹窗 */
+function openIndustryTrendDialog(industry: string) {
+  const industryCode = getIndustryCode(industry)
+  if (!industryCode) {
+    ElMessage.warning('该行业暂无行业代码，无法查看趋势图')
+    return
+  }
+  selectedIndustryCode.value = industryCode
+  selectedIndustryName.value = industry
+  industryTrendDialogVisible.value = true
+}
+
+/** 处理行业行情数据加载完成 */
+function handleIndustryDataLoaded(data: { sectorCode: string; records: Array<{ trade_date: string; pct_change: number }> }) {
+  const dateMap = new Map<string, number>()
+  data.records.forEach(record => {
+    dateMap.set(record.trade_date, record.pct_change)
+  })
+  industryPctChangeCache.value.set(data.sectorCode, dateMap)
 }
 
 // -------- 个股趋势图弹窗 --------
@@ -972,9 +1226,29 @@ function formatDisplayDate(value: string): string {
   width: 120px;
   min-width: 120px;
   background: #fafbfc;
-  padding: 8px;
+  padding: 0;
   text-align: left;
   vertical-align: top;
+}
+
+.industry-name-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+
+.industry-name-btn:hover {
+  background: rgba(64, 158, 255, 0.08);
+}
+
+.industry-name-btn:hover .industry-name {
+  color: #409eff;
 }
 
 .industry-name {
@@ -983,6 +1257,7 @@ function formatDisplayDate(value: string): string {
   color: #303133;
   font-size: 13px;
   word-break: break-all;
+  transition: color 0.15s ease;
 }
 
 .industry-total {
@@ -1005,6 +1280,66 @@ function formatDisplayDate(value: string): string {
 
 .matrix-cell.is-empty {
   background: #fbfbfb;
+}
+
+.yesterday-premium {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 4px;
+  margin-bottom: 3px;
+  border-radius: 2px;
+  background: #f5f7fa;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.premium-label {
+  color: #909399;
+  font-weight: 500;
+}
+
+.premium-value {
+  font-weight: 700;
+}
+
+.premium-positive {
+  color: #d9001b;
+}
+
+.premium-negative {
+  color: #138a36;
+}
+
+.premium-neutral {
+  color: #606266;
+}
+
+.industry-pct-change {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.pct-change-value {
+  font-weight: 700;
+}
+
+.pct-positive {
+  color: #d9001b;
+}
+
+.pct-negative {
+  color: #138a36;
+}
+
+.pct-neutral {
+  color: #606266;
 }
 
 .cell-count {

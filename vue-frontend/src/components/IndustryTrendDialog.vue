@@ -109,6 +109,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  'data-loaded': [data: { sectorCode: string; records: Array<{ trade_date: string; pct_change: number }> }]
 }>()
 
 const trendLoading = ref(false)
@@ -226,6 +227,15 @@ const loadTrendData = async () => {
         turnover_rate: getNumericValue(item.turnover_rate),
         created_at: ''
       }))
+
+    // 触发事件，将数据传递给父组件
+    emit('data-loaded', {
+      sectorCode: props.sectorCode,
+      records: response.records?.map(item => ({
+        trade_date: item.trade_date,
+        pct_change: getNumericValue(item.pct_change)
+      })) || []
+    })
   } catch (error) {
     if (requestId !== trendRequestId) return
     console.error('获取东财板块趋势K线失败:', error)

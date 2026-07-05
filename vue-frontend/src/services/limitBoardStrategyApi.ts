@@ -156,12 +156,31 @@ export interface IndustryTrendStatusCounts {
   '换手板': number
 }
 
+/** 昨日涨停股今日溢价详情 */
+export interface YesterdayLimitUpStock {
+  ts_code: string
+  name: string
+  prev_close: number
+  today_open: number
+  premium_pct: number
+}
+
 /** 单个交易日的行业维度条目 */
 export interface IndustryTrendDailyIndustry {
   industry: string
   limit_up_count: number
   /** 该日该行业涨停股按涨停状态分类的数量统计 */
   status_counts?: IndustryTrendStatusCounts
+  /** 行业代码（仅在使用东财板块映射方式时返回） */
+  industry_code?: string
+  /** 该行业当日涨跌幅百分比（仅在使用东财板块映射方式时返回） */
+  industry_pct_change?: number
+  /** 昨日该行业涨停股数量（仅当存在前一交易日数据时返回） */
+  yesterday_limit_up_count?: number
+  /** 昨日该行业涨停股的今日溢价详情列表（仅当存在前一交易日数据时返回） */
+  yesterday_limit_up_stocks?: YesterdayLimitUpStock[]
+  /** 昨日该行业涨停股今日平均溢价百分比（仅当存在前一交易日数据时返回） */
+  avg_premium_pct?: number
 }
 
 /** 单个交易日的三维明细：整体、行业、个股 */
