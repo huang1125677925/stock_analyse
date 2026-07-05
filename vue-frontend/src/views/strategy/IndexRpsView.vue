@@ -124,24 +124,22 @@
           @sort-change="handleSortChange"
         >
           <el-table-column type="index" label="#" width="50" fixed="left" align="center" />
-          <el-table-column prop="ts_code" label="ts_code" min-width="100" sortable="custom" fixed="left" align="center">
-            <template #default="scope">
-              <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="name" label="name" min-width="120" sortable="custom" fixed="left">
+          <el-table-column label="指数名称" min-width="180" sortable="custom" fixed="left" align="center">
             <template #header>
               <div class="custom-header">
-                <span>指数简称</span>
+                <span>指数名称</span>
                 <el-tooltip content="点击指数名称可查看趋势看板K线图" placement="top">
                   <el-icon><InfoFilled /></el-icon>
                 </el-tooltip>
               </div>
             </template>
             <template #default="scope">
-              <el-button type="text" @click="showIndexDetail(scope.row)">
-                {{ scope.row.name }}
-              </el-button>
+              <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+                <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
+                <el-button type="text" @click="showIndexDetail(scope.row)" style="padding: 0;">
+                  {{ scope.row.name }}
+                </el-button>
+              </div>
             </template>
           </el-table-column>
 

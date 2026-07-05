@@ -88,6 +88,40 @@
             />
           </el-select>
         </div>
+        <div v-if="consecutiveIncreaseDays > 0" class="control-group">
+          <span class="control-label">首日宽度：</span>
+          <el-select
+            v-model="firstDayBreadthRange"
+            placeholder="第一天宽度范围"
+            clearable
+            :disabled="loading"
+            style="width: 140px"
+          >
+            <el-option
+              v-for="option in breadthRangeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </div>
+        <div v-if="consecutiveIncreaseDays > 0" class="control-group">
+          <span class="control-label">尾日宽度：</span>
+          <el-select
+            v-model="lastDayBreadthRange"
+            placeholder="最后一天宽度范围"
+            clearable
+            :disabled="loading"
+            style="width: 140px"
+          >
+            <el-option
+              v-for="option in breadthRangeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </div>
         <div class="control-group">
           <el-button type="primary" :loading="loading" @click="fetchData">刷新</el-button>
         </div>
@@ -252,7 +286,26 @@ const consecutiveIncreaseDaysOptions = [
   { label: '连续5天递增', value: 5 },
   { label: '连续10天递增', value: 10 }
 ]
+const breadthRangeOptions = [
+  { label: '< 20%', value: 'lt20' },
+  { label: '< 30%', value: 'lt30' },
+  { label: '< 40%', value: 'lt40' },
+  { label: '< 50%', value: 'lt50' },
+  { label: '< 60%', value: 'lt60' },
+  { label: '< 70%', value: 'lt70' },
+  { label: '< 80%', value: 'lt80' },
+  { label: '≥ 20%', value: 'gte20' },
+  { label: '≥ 30%', value: 'gte30' },
+  { label: '≥ 40%', value: 'gte40' },
+  { label: '≥ 50%', value: 'gte50' },
+  { label: '≥ 60%', value: 'gte60' },
+  { label: '≥ 70%', value: 'gte70' },
+  { label: '≥ 80%', value: 'gte80' },
+  { label: '≥ 90%', value: 'gte90' }
+]
 const consecutiveIncreaseDays = ref<number>(0)
+const firstDayBreadthRange = ref<string>('')
+const lastDayBreadthRange = ref<string>('')
 const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
@@ -491,9 +544,37 @@ const filteredRawData = computed(() => {
 })
 
 /**
+ * 工具：根据宽度范围选项判断值是否符合条件
+ * 参数：value(number) 宽度值（0-1之间），rangeCode(string) 范围选项代码
+ * 返回值：boolean 是否符合条件
+ * 事件：无
+ */
+const matchesBreadthRange = (value: number, rangeCode: string): boolean => {
+  if (!rangeCode) return true
+  const percentage = value * 100
+  if (rangeCode === 'lt20') return percentage < 20
+  if (rangeCode === 'lt30') return percentage < 30
+  if (rangeCode === 'lt40') return percentage < 40
+  if (rangeCode === 'lt50') return percentage < 50
+  if (rangeCode === 'lt60') return percentage < 60
+  if (rangeCode === 'lt70') return percentage < 70
+  if (rangeCode === 'lt80') return percentage < 80
+  if (rangeCode === 'gte20') return percentage >= 20
+  if (rangeCode === 'gte30') return percentage >= 30
+  if (rangeCode === 'gte40') return percentage >= 40
+  if (rangeCode === 'gte50') return percentage >= 50
+  if (rangeCode === 'gte60') return percentage >= 60
+  if (rangeCode === 'gte70') return percentage >= 70
+  if (rangeCode === 'gte80') return percentage >= 80
+  if (rangeCode === 'gte90') return percentage >= 90
+  return true
+}
+
+/**
  * 连续递增筛选：在行业筛选基础上，进一步筛选出最近 N 天宽度值连续递增的行业。
  * 逻辑：取该行业按日期排序后最后 N+1 个数据点，检查每对相邻值是否严格递增。
  * 当 consecutiveIncreaseDays 为 0 时不做递增筛选，直接透传。
+ * 支持首日和尾日宽度范围筛选：满足连续递增的同时，第一天和最后一天的宽度值需要符合设置的范围条件。
  */
 const increasingFilterRawData = computed(() => {
   const n = consecutiveIncreaseDays.value
@@ -518,15 +599,26 @@ const increasingFilterRawData = computed(() => {
     sectorMap.get(item.sector_name)!.push({ date: item.date, value: Number.isNaN(val) ? 0 : val })
   })
 
-  // 判断哪些行业满足连续 N 天递增
+  // 判断哪些行业满足连续 N 天递增及首尾宽度范围条件
   const qualifiedSectors = new Set<string>()
   sectorMap.forEach((points, sector) => {
     if (points.length < n + 1) return
     points.sort((a, b) => a.date.localeCompare(b.date))
     const tail = points.slice(-(n + 1))
+
+    // 检查连续递增
     for (let i = 1; i < tail.length; i++) {
       if (tail[i].value <= tail[i - 1].value) return
     }
+
+    // 检查首日宽度范围
+    const firstDayValue = tail[0].value
+    if (!matchesBreadthRange(firstDayValue, firstDayBreadthRange.value)) return
+
+    // 检查尾日宽度范围
+    const lastDayValue = tail[tail.length - 1].value
+    if (!matchesBreadthRange(lastDayValue, lastDayBreadthRange.value)) return
+
     qualifiedSectors.add(sector)
   })
 

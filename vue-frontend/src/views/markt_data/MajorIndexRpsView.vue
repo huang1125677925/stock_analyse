@@ -90,8 +90,7 @@
         @sort-change="handleSortChange"
       >
         <el-table-column type="index" label="#" width="60" align="center" fixed="left" />
-        <el-table-column prop="ts_code" label="指数代码" min-width="120" sortable="custom" fixed="left" />
-        <el-table-column prop="name" label="指数名称" min-width="140" sortable="custom" fixed="left">
+        <el-table-column prop="name" label="指数名称" min-width="180" sortable="custom" fixed="left">
           <template #header>
             <div class="custom-header">
               <span>指数名称</span>
@@ -101,14 +100,17 @@
             </div>
           </template>
           <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              class="index-name-button"
-              @click="openTrendDialog(row)"
-            >
-              {{ row.name }}
-            </el-button>
+            <div class="index-name-cell">
+              <el-button
+                type="primary"
+                link
+                class="index-name-button"
+                @click="openTrendDialog(row)"
+              >
+                {{ row.name }}
+              </el-button>
+              <span class="index-code">{{ row.ts_code }}</span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="market" label="市场" min-width="90" align="center" sortable="custom">
@@ -471,6 +473,18 @@ onMounted(() => {
 
 .index-name-button {
   padding: 0;
+}
+
+.index-name-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.index-code {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .methodology {
