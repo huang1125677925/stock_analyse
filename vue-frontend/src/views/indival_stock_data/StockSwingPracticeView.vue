@@ -247,13 +247,7 @@
       >
         <el-table-column type="index" label="#" width="56" fixed="left" align="center" />
 
-        <el-table-column prop="ts_code" label="Tushare代码" min-width="128" sortable="custom" fixed="left" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row.ts_code }}</el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="股票名称" min-width="170" sortable="custom" prop="name" fixed="left" show-overflow-tooltip>
+        <el-table-column label="股票名称/代码" min-width="150" align="center" sortable="custom" prop="name" fixed="left" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="stock-name-cell">
               <el-button type="primary" link @click="openTrendDialog(row)">{{ row.name }}</el-button>
@@ -262,33 +256,20 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="industry" label="行业" min-width="140" show-overflow-tooltip sortable="custom" />
-        <el-table-column prop="market" label="市场板块" min-width="110" align="center" sortable="custom" />
-        <el-table-column prop="list_date" label="上市日期" min-width="110" align="center" sortable="custom">
-          <template #default="{ row }">{{ formatCompactDate(row.list_date) }}</template>
-        </el-table-column>
-
-        <el-table-column prop="pct_change" label="当日涨跌幅" min-width="120" align="center" sortable="custom">
-          <template #default="{ row }">
-            <span :class="getChangeClass(row.pct_change)">{{ formatPercent(row.pct_change) }}</span>
-          </template>
-        </el-table-column>
+        <el-table-column prop="industry" label="行业" min-width="140" align="center" show-overflow-tooltip sortable="custom" />
 
         <el-table-column prop="latest_price" label="最新股价" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPrice(row.latest_price) }}</template>
-        </el-table-column>
-
-        <el-table-column prop="total_mv" label="总市值" min-width="120" align="center" sortable="custom">
-          <template #default="{ row }">{{ formatMarketCap(row.total_mv) }}</template>
         </el-table-column>
 
         <el-table-column prop="circ_mv" label="流通市值" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatMarketCap(row.circ_mv) }}</template>
         </el-table-column>
 
-        <el-table-column prop="RPS_today" label="RPS_today" min-width="140" align="center" sortable="custom">
+        <el-table-column prop="RPS_today" label="当日涨跌幅/RPS" min-width="160" align="center" sortable="custom">
           <template #default="{ row }">
             <div class="rps-cell">
+              <span :class="getChangeClass(row.pct_change)">{{ formatPercent(row.pct_change) }}</span>
               <el-progress
                 :percentage="getNumericValue(row.RPS_today)"
                 :color="getRpsColor(getNumericValue(row.RPS_today))"
@@ -305,28 +286,17 @@
 
         <template v-for="period in currentPeriods" :key="period">
           <el-table-column
-            :prop="getReturnProp(period)"
-            :label="`${period}日涨跌幅`"
-            min-width="120"
-            align="center"
-            sortable="custom"
-          >
-            <template #default="{ row }">
-              <span :class="getChangeClass(row[getReturnProp(period)])">
-                {{ formatPercent(row[getReturnProp(period)]) }}
-              </span>
-            </template>
-          </el-table-column>
-
-          <el-table-column
             :prop="getRpsProp(period)"
-            :label="`RPS_${period}`"
-            min-width="140"
+            :label="`${period}日涨跌幅/RPS`"
+            min-width="160"
             align="center"
             sortable="custom"
           >
             <template #default="{ row }">
               <div class="rps-cell">
+                <span :class="getChangeClass(row[getReturnProp(period)])">
+                  {{ formatPercent(row[getReturnProp(period)]) }}
+                </span>
                 <el-progress
                   :percentage="getNumericValue(row[getRpsProp(period)])"
                   :color="getRpsColor(getNumericValue(row[getRpsProp(period)]))"
@@ -413,7 +383,7 @@ type DynamicReturnField = `return_${number}`
 type DynamicRpsField = `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
 type ChangeDirectionLabel = '上涨' | '平盘' | '下跌'
-type ValueRangeField = 'latest_price' | 'total_mv' | 'circ_mv'
+type ValueRangeField = 'latest_price' | 'circ_mv'
 
 interface RangeOption {
   label: string
@@ -492,7 +462,6 @@ const marketCapRangeOptions: RangeOption[] = [
 ]
 const valueFilterGroups: Array<{ field: ValueRangeField; label: string; options: RangeOption[] }> = [
   { field: 'latest_price', label: '最新股价', options: priceRangeOptions },
-  { field: 'total_mv', label: '总市值', options: marketCapRangeOptions },
   { field: 'circ_mv', label: '流通市值', options: marketCapRangeOptions }
 ]
 
@@ -725,9 +694,8 @@ const changeFilterGroups = computed<Array<{ field: 'pct_change' | DynamicReturnF
 const selectedRpsRanks = reactive<Record<string, RpsRankLabel[]>>({})
 const selectedChangeDirections = reactive<Record<string, ChangeDirectionLabel[]>>({})
 const selectedValueRanges = reactive<Record<ValueRangeField, string[]>>({
-  latest_price: [],
-  total_mv: [],
-  circ_mv: []
+  latest_price: ['10-30', '30-50'],
+  circ_mv: ['50-100亿', '100-500亿']
 })
 
 const defaultSortProp = computed(() => {
@@ -775,7 +743,7 @@ const syncFilterFields = (): void => {
     }
   })
   changeFilterGroups.value.forEach(({ field }) => {
-    selectedChangeDirections[field] = selectedChangeDirections[field] || []
+    selectedChangeDirections[field] = selectedChangeDirections[field] || ['上涨']
   })
 }
 
@@ -846,7 +814,7 @@ const resetChangeFilters = (): void => {
 /**
  * 事件：切换市值/股价区间标签。
  * 参数：
- *  - field 为区间字段名（latest_price、total_mv、circ_mv）；
+ *  - field 为区间字段名（latest_price、circ_mv）；
  *  - rangeLabel 为区间标签。
  * 返回值：void。
  * 事件：更新 `selectedValueRanges`。
@@ -1247,6 +1215,7 @@ watch(
   },
   { immediate: true }
 )
+
 </script>
 
 <style scoped>
@@ -1420,7 +1389,7 @@ watch(
 .stock-name-cell {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 2px;
 }
 

@@ -495,15 +495,49 @@ function cellStocks(date: string, industry: string): IndustryTrendStock[] {
   })
 }
 
+/**
+ * 热度色阶：浅黄 → 黄 → 橙 → 红 → 深红。
+ * 相比单一红色调仅变透明度，多色渐变能显著提升不同涨停数量之间的区分度。
+ */
+const HEAT_STOPS: Array<{ pos: number; rgb: [number, number, number] }> = [
+  { pos: 0, rgb: [255, 244, 204] }, // 浅黄 #fff4cc
+  { pos: 0.25, rgb: [255, 214, 102] }, // 黄  #ffd666
+  { pos: 0.5, rgb: [255, 143, 51] }, // 橙  #ff8f33
+  { pos: 0.75, rgb: [245, 34, 45] }, // 红  #f5222d
+  { pos: 1, rgb: [160, 5, 20] } // 深红 #a00514
+]
+
+/** 按 0-1 热度比例在色阶上线性插值出 RGB */
+function heatColor(ratio: number): [number, number, number] {
+  const r = Math.min(1, Math.max(0, ratio))
+  for (let i = 1; i < HEAT_STOPS.length; i += 1) {
+    const prev = HEAT_STOPS[i - 1]
+    const curr = HEAT_STOPS[i]
+    if (r <= curr.pos) {
+      const span = curr.pos - prev.pos || 1
+      const t = (r - prev.pos) / span
+      return [
+        Math.round(prev.rgb[0] + (curr.rgb[0] - prev.rgb[0]) * t),
+        Math.round(prev.rgb[1] + (curr.rgb[1] - prev.rgb[1]) * t),
+        Math.round(prev.rgb[2] + (curr.rgb[2] - prev.rgb[2]) * t)
+      ]
+    }
+  }
+  return HEAT_STOPS[HEAT_STOPS.length - 1].rgb
+}
+
 /** 单元格顶部涨停数量按热度着色 */
 function countStyle(date: string, industry: string) {
   const count = cellCount(date, industry)
   const max = maxCellCount.value || 1
-  const ratio = Math.min(1, count / max)
-  const alpha = 0.15 + ratio * 0.7
+  // 平方根压缩：多数行业涨停数偏小，放大低数量区间的差异使其更易分辨
+  const ratio = Math.sqrt(Math.min(1, count / max))
+  const [r, g, b] = heatColor(ratio)
+  // 依据背景亮度选择文字颜色，保证浅色块与深色块均清晰可读
+  const luminance = (r * 0.299 + g * 0.587 + b * 0.114) / 255
   return {
-    background: `rgba(217, 0, 27, ${alpha.toFixed(3)})`,
-    color: ratio > 0.5 ? '#fff' : '#a30014'
+    background: `rgb(${r}, ${g}, ${b})`,
+    color: luminance < 0.6 ? '#fff' : '#7a0010'
   }
 }
 
