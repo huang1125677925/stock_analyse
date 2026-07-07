@@ -21,9 +21,9 @@
             <tr>
               <th class="corner-cell">
                 <div class="corner-industry">行业</div>
-                <div class="corner-date">日期 →</div>
+                <div class="corner-date">← 日期</div>
               </th>
-              <th v-for="date in dates" :key="date" class="date-head" :class="{ 'is-active': date === activeDate }">
+              <th v-for="date in displayDates" :key="date" class="date-head" :class="{ 'is-active': date === activeDate }">
                 <button type="button" class="date-head-btn" @click="setActiveDate(date)">
                   <div class="date-text">{{ formatAxisDate(date) }}</div>
                   <div class="overall-count" :title="`当日全市场涨停 ${overallCount(date)} 家`">
@@ -64,7 +64,7 @@
                 </button>
               </th>
               <td
-                v-for="date in dates"
+                v-for="date in displayDates"
                 :key="date"
                 class="matrix-cell"
                 :class="{ 'is-empty': cellCount(date, industry) === 0 && !yesterdayPremium(date, industry) && industryPctChange(date, industry) === null }"
@@ -307,12 +307,15 @@ const props = defineProps<Props>()
 const showStockList = ref(true)
 const activeDate = ref('')
 
-/** 升序排列的交易日列表（左旧右新） */
+/** 升序排列的交易日列表（左旧右新），供所有涨停/溢价计算逻辑使用 */
 const dates = computed<string[]>(() =>
   Object.keys(props.daily || {})
     .filter(key => key && /^\d{8}$/.test(key))
     .sort((a, b) => a.localeCompare(b))
 )
+
+/** 用于表格渲染的日期列顺序：降序（左新右旧） */
+const displayDates = computed<string[]>(() => [...dates.value].reverse())
 
 /** 最近一个交易日 */
 const lastDate = computed(() => dates.value[dates.value.length - 1] || '')

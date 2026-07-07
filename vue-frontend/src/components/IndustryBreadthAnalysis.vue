@@ -172,7 +172,10 @@
       <template #header>
         <div class="card-header">
           <span>市场宽度热力图（{{ selectedBoardLabel }} / MA {{ maWindow }}）</span>
-          <span class="tips">数据来源：板块MA宽度接口</span>
+          <div class="header-right">
+            <span class="count-info">行业总数：{{ totalIndustryCount }} / 当前显示：{{ displayedIndustryCount }}</span>
+            <span class="tips">数据来源：板块MA宽度接口</span>
+          </div>
         </div>
       </template>
 
@@ -310,7 +313,7 @@ const emit = defineEmits<{
 const FIXED_RANGE_DAYS = 10
 const loading = ref(false)
 const endDate = ref<string>(formatDate(new Date()))
-const maWindow = ref<number>(10)
+const maWindow = ref<number>(5)
 const sortByLastColumn = ref(true)
 const maWindowOptions = [5, 10, 20, 30, 60, 90, 250]
 const consecutiveIncreaseDaysOptions = [
@@ -348,7 +351,7 @@ const amountFilterOptions = [
 const consecutiveIncreaseDays = ref<number>(0)
 const firstDayBreadthRange = ref<string>('')
 const lastDayBreadthRange = ref<string>('')
-const minAmount = ref<number>(0)
+const minAmount = ref<number>(10000000000)
 const maxAmount = ref<number>(0)
 const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
@@ -455,36 +458,18 @@ const loadTrendData = async () => {
 
   trendLoading.value = true
   try {
-    // 并行拉取：东财板块日线K线 + 该板块的市场宽度序列（单行业模式）
-    const [response, breadthData] = await Promise.all([
-      fetchDcDaily({
-        ts_code: trendBoard.code,
-        idx_type: trendBoard.idxType,
-        start_date: formatDateForApi(trendDateRange.start),
-        end_date: formatDateForApi(trendDateRange.end),
-        fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate'
-      }),
-      fetchIndustryMaBreadth({
-        sectorCode: trendBoard.code,
-        startDate: trendDateRange.start,
-        endDate: trendDateRange.end,
-        maWindow: maWindow.value
-      }).catch((breadthErr) => {
-        // 宽度序列失败不应阻断K线展示，降级为空数据
-        console.error('获取板块市场宽度序列失败:', breadthErr)
-        return null
-      })
-    ])
+    // 仅拉取东财板块日线K线
+    const response = await fetchDcDaily({
+      ts_code: trendBoard.code,
+      idx_type: trendBoard.idxType,
+      start_date: formatDateForApi(trendDateRange.start),
+      end_date: formatDateForApi(trendDateRange.end),
+      fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate'
+    })
 
     if (requestId !== trendRequestId) return
 
-    trendBreadthPoints.value = (breadthData?.data ?? [])
-      .map((item) => ({
-        date: item.date,
-        value: typeof item.breadth_ratio === 'number' ? item.breadth_ratio : Number(item.breadth_ratio)
-      }))
-      .filter((point) => Number.isFinite(point.value))
-      .sort((a, b) => a.date.localeCompare(b.date))
+    trendBreadthPoints.value = []
 
     trendData.value = [...(response.records || [])]
       .sort((a, b) => a.trade_date.localeCompare(b.trade_date))
@@ -570,6 +555,9 @@ const rawIndustryNames = computed<string[]>(() => {
 watch(rawIndustryNames, (names) => {
   emit('industriesLoaded', names)
 }, { immediate: true })
+
+// 行业总数量（原始数据去重后的行业数）
+const totalIndustryCount = computed<number>(() => rawIndustryNames.value.length)
 
 interface Props {
   selectedIndustries: string[]
@@ -796,6 +784,9 @@ const industries = computed<string[]>(() => {
 
   return names
 })
+
+// 当前显示的行业数量（经过全部筛选后热力图实际展示的行业数）
+const displayedIndustryCount = computed<number>(() => industries.value.length)
 
 const dates = computed<string[]>(() => {
   const ds = Array.from(new Set(amountFilteredData.value.map(d => d.date))).sort()
@@ -1056,6 +1047,13 @@ onMounted(() => {
   }
   .methodology p { margin: 0; }
   .methodology p + p { margin-top: 6px; }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: normal;
+  }
+  .count-info { color: #606266; font-size: 12px; }
   .tips { color: #999; font-size: 12px; }
   .empty-tip { color: #999; padding: 24px; text-align: center; }
 }

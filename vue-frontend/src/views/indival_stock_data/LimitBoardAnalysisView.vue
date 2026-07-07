@@ -132,7 +132,7 @@ const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> =
 ]
 
 const trendRange = ref<TrendRange>('2w')
-const industryMapping = ref<IndustryMapping>('dc_l1')
+const industryMapping = ref<IndustryMapping>('dc_l2')
 const trendEndDate = ref(getRecentTradeDate())
 const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
 const loading = ref(false)
