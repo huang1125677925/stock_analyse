@@ -1,6 +1,6 @@
 <template>
   <div class="industry-breadth-analysis">
-    <el-card class="control-card" shadow="hover">
+    <el-card class="control-card" shadow="never">
       <div class="controls">
         <div class="control-group">
           <span class="control-label">板块类型：</span>
@@ -122,7 +122,7 @@
             />
           </el-select>
         </div>
-        <div class="control-group">
+        <div class="control-group amount-range-group">
           <span class="control-label">成交额范围：</span>
           <el-select
             v-model="minAmount"
@@ -168,7 +168,7 @@
       </div>
     </el-card>
 
-    <el-card class="chart-card" shadow="hover">
+    <el-card class="chart-card" shadow="never">
       <template #header>
         <div class="card-header">
           <span>市场宽度热力图（{{ selectedBoardLabel }} / MA {{ maWindow }}）</span>
@@ -957,6 +957,20 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  // 去掉所有 el-card 的边框、圆角和阴影
+  :deep(.el-card) {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  // 去掉 el-card 的 header 和 body 的左右 padding
+  :deep(.el-card__header),
+  :deep(.el-card__body) {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .control-card {
@@ -1044,5 +1058,72 @@ onMounted(() => {
   .methodology p + p { margin-top: 6px; }
   .tips { color: #999; font-size: 12px; }
   .empty-tip { color: #999; padding: 24px; text-align: center; }
+}
+
+// 移动端适配
+@media (max-width: 768px) {
+  .industry-breadth-analysis {
+    gap: 12px;
+  }
+
+  .control-card {
+    .controls {
+      flex-direction: column;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .control-group {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+
+      // 让所有控件在移动端占满宽度
+      :deep(.el-select),
+      :deep(.el-input),
+      :deep(.el-date-picker) {
+        width: 100% !important;
+      }
+
+      :deep(.el-button) {
+        width: 100%;
+      }
+
+      // 成交额范围的两个选择器特殊处理：保持横向布局
+      &.amount-range-group {
+        flex-direction: row;
+        flex-wrap: wrap;
+
+        .control-label {
+          width: 100%;
+          margin-bottom: 2px;
+        }
+
+        :deep(.el-select) {
+          flex: 1;
+          min-width: 0;
+          width: auto !important;
+        }
+
+        > span:not(.control-label) {
+          flex-shrink: 0;
+        }
+      }
+    }
+    .control-label {
+      font-weight: 500;
+    }
+  }
+
+  .chart-card {
+    .methodology {
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+
+    // 移动端优化热力图显示
+    :deep(.heatmap-chart) {
+      min-height: 300px;
+    }
+  }
 }
 </style>

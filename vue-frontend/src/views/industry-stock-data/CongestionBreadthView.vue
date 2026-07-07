@@ -1,6 +1,6 @@
 <template>
   <div class="congestion-page">
-    <el-card>
+    <el-card shadow="never">
       <div class="header-controls">
         <h3>市场宽度分析</h3>
         <IndustryFilter v-model="selectedIndustries" :industries="availableIndustries" />
@@ -46,8 +46,39 @@ const onIndustriesLoaded = (industries: string[]) => {
 </script>
 
 <style scoped lang="scss">
-.congestion-page { padding: 20px; }
-.header-controls { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-.header-controls h3 { margin:0; color:#303133; }
-@media (max-width: 768px) { .congestion-page { padding:12px; } }
+.congestion-page {
+  padding: 0;
+
+  // 去掉 el-card 的边框、圆角和阴影
+  :deep(.el-card) {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  // 去掉 el-card 的 header 和 body 的左右 padding
+  :deep(.el-card__header),
+  :deep(.el-card__body) {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+.header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.header-controls h3 {
+  margin: 0;
+  color: #303133;
+}
+
+@media (max-width: 768px) {
+  .congestion-page {
+    padding: 0;
+  }
+}
 </style>
