@@ -36,14 +36,22 @@
                   />
                 </el-select>
                 <el-select
-                  v-model="heatmapSortField"
+                  v-model="heatmapMetric"
+                  placeholder="展示指标"
+                  class="control-item"
+                >
+                  <el-option label="涨跌幅" value="return" />
+                  <el-option label="RPS强度" value="rps" />
+                </el-select>
+                <el-select
+                  v-model="heatmapSortKey"
                   placeholder="排序依据"
                   class="control-item"
                 >
                   <el-option
-                    v-for="option in strengthFieldOptions"
+                    v-for="option in sortPeriodOptions"
                     :key="option.value"
-                    :label="`按 ${option.label} 排序`"
+                    :label="option.label"
                     :value="option.value"
                   />
                 </el-select>
@@ -147,10 +155,10 @@
 
         <div class="methodology">
           <p>
-            RPS（Relative Price Strength）用于衡量当前指数相对同组指数的价格强度。热力图纵轴为各指数，横轴为不同周期（当日、5、20、60、120、250 日），单元格颜色深浅代表 RPS 强度高低。
+            热力图纵轴为各指数，横轴为不同周期（当日、5、20、60、120、250 日）。可通过“展示指标”切换单元格数值：默认展示各周期涨跌幅，也可切换为 RPS 相对强度。
           </p>
           <p>
-            计算方式：RPS = (1 - 排名 / 总板块数) × 100。数值越高、颜色越偏红，表示该指数在同组指数中越强。点击任意方块可选择查看该指数的行业趋势图、成分股RPS或领涨数据详情。
+            涨跌幅以 0 为中心，绿跌红涨；RPS = (1 - 排名 / 总板块数) × 100，数值越高、颜色越偏红表示越强。点击任意方块可选择查看该指数的行业趋势图、成分股RPS或领涨数据详情。
           </p>
         </div>
 
@@ -615,6 +623,7 @@ type MemberTrendShortcut = '1y' | '3y' | '5y' | '10y' | '20y'
 type StrengthRankThreshold = 'all' | 'excellent' | 'strong' | 'good' | 'normal'
 type ChangeRelationMode = 'all' | 'ascending' | 'descending'
 type CellAction = 'trend' | 'member' | 'lead'
+type HeatmapMetric = 'return' | 'rps'
 
 const props = defineProps<Props>()
 
@@ -631,7 +640,8 @@ const route = useRoute()
 const rpsData = ref<IndexRpsItem[]>([])
 const queryTime = ref('')
 const searchKeyword = ref('')
-const heatmapSortField = ref<RpsField>('RPS_5')
+const heatmapMetric = ref<HeatmapMetric>('return')
+const heatmapSortKey = ref<number>(5)
 const indexTrendDialogVisible = ref(false)
 const indexTrendLoading = ref(false)
 const indexTrendShortcut = ref<MemberTrendShortcut>('1y')
@@ -702,15 +712,40 @@ const strengthFieldOptions: Array<{ label: string; value: RpsField }> = [
   }))
 ]
 
-// 热力图列定义：横轴各周期，与 strengthFieldOptions 一一对应
-const heatmapColumns: Array<{ label: string; field: RpsField }> = [
-  { label: '当日', field: 'RPS_today' },
-  { label: 'RPS5', field: 'RPS_5' },
-  { label: 'RPS20', field: 'RPS_20' },
-  { label: 'RPS60', field: 'RPS_60' },
-  { label: 'RPS120', field: 'RPS_120' },
-  { label: 'RPS250', field: 'RPS_250' }
+// 热力图列定义：横轴为各周期（period 为 0 表示当日）
+const heatmapColumns: Array<{ label: string; period: number }> = [
+  { label: '当日', period: 0 },
+  { label: '5日', period: 5 },
+  { label: '20日', period: 20 },
+  { label: '60日', period: 60 },
+  { label: '120日', period: 120 },
+  { label: '250日', period: 250 }
 ]
+
+// 排序依据选项：按各周期的当前指标值排序
+const sortPeriodOptions = computed(() =>
+  heatmapColumns.map(col => ({
+    label: `按${col.label}排序`,
+    value: col.period
+  }))
+)
+
+/**
+ * 工具：按指标与周期取出单元格数值
+ * 功能：根据当前展示指标（涨跌幅 / RPS）与周期，从指数数据项中取出对应数值
+ * 参数：item(IndexRpsItem) 指数数据项，period(number) 周期，0 表示当日
+ * 返回值：number 数值（涨跌幅为百分比，RPS 为 0-100 强度）
+ */
+const getCellValue = (item: IndexRpsItem, period: number): number => {
+  if (heatmapMetric.value === 'return') {
+    return period === 0
+      ? getNumericValue(item.pct_change)
+      : getNumericValue(item[getReturnProp(period as RpsPeriod)])
+  }
+  return period === 0
+    ? getNumericValue(item.RPS_today)
+    : getNumericValue(item[getRpsProp(period as RpsPeriod)])
+}
 
 const minimumStrengthOptions: Array<{ label: string; value: StrengthRankThreshold }> = [
   { label: '不筛选', value: 'all' },
@@ -754,6 +789,57 @@ const formatPercent = (value: unknown): string => {
   return `${sign}${num.toFixed(2)}%`
 }
 
+/**
+ * 工具：在一组颜色停靠点之间按比例插值
+ * 功能：给定颜色数组与 0-1 的比例，返回线性插值后的 rgb 颜色
+ * 参数：stops(string[]) 颜色停靠点（#rrggbb），t(number) 比例 0-1
+ * 返回值：string rgb() 颜色字符串
+ */
+const interpolateColorStops = (stops: string[], t: number): string => {
+  if (stops.length === 1) return stops[0]
+  const clamped = Math.min(1, Math.max(0, t))
+  const scaled = clamped * (stops.length - 1)
+  const idx = Math.min(stops.length - 2, Math.floor(scaled))
+  const local = scaled - idx
+  const parse = (hex: string) => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16)
+  ]
+  const [r1, g1, b1] = parse(stops[idx])
+  const [r2, g2, b2] = parse(stops[idx + 1])
+  const r = Math.round(r1 + (r2 - r1) * local)
+  const g = Math.round(g1 + (g2 - g1) * local)
+  const b = Math.round(b1 + (b2 - b1) * local)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+/**
+ * 工具：构建“白色始终对齐 0”的涨跌幅发散配色
+ * 功能：在实际 [min, max] 量程上均匀采样 N 个颜色停靠点，负值段绿→白、正值段白→红，
+ *       且 0 精确落在白色，量程按实际范围收缩（非对称也保持 0 居白）
+ * 参数：min(number) 实际最小值，max(number) 实际最大值，steps(number) 采样点数
+ * 返回值：string[] 供 visualMap.inRange.color 使用的颜色数组（从 min 到 max）
+ */
+const buildDivergingColors = (min: number, max: number, steps = 21): string[] => {
+  const negStops = ['#00A854', '#67c23a', '#c2e7b0', '#f5f7fa']
+  const posStops = ['#f5f7fa', '#fde2e2', '#f56c6c', '#d73027']
+  const colors: string[] = []
+  for (let i = 0; i < steps; i++) {
+    const value = min + ((max - min) * i) / (steps - 1)
+    if (value <= 0) {
+      // 从 min(绿) 到 0(白)：min<0 时 local 0→1，min>=0 时直接白
+      const local = min < 0 ? (value - min) / (0 - min) : 1
+      colors.push(interpolateColorStops(negStops, local))
+    } else {
+      // 从 0(白) 到 max(红)
+      const local = max > 0 ? value / max : 0
+      colors.push(interpolateColorStops(posStops, local))
+    }
+  }
+  return colors
+}
+
 const getNumericValue = (value: unknown): number => {
   const num = typeof value === 'number' ? value : parseFloat(String(value))
   return Number.isFinite(num) ? num : 0
@@ -793,6 +879,7 @@ const formatAmount = (value: unknown): string => {
 const getDynamicReturnProp = (period: number): `return_${number}` => `return_${period}` as `return_${number}`
 const getDynamicRpsProp = (period: number): DynamicRpsField => `RPS_${period}` as DynamicRpsField
 const getReturnProp = (period: RpsPeriod): ReturnField => `return_${period}`
+const getRpsProp = (period: RpsPeriod): `RPS_${RpsPeriod}` => `RPS_${period}`
 
 function getStrengthThresholdValue(rank: StrengthRankThreshold): number {
   switch (rank) {
@@ -918,30 +1005,58 @@ const filteredRpsData = computed(() => {
 })
 
 /**
- * 热力图行数据：在筛选结果的基础上，按选定的排序字段降序排列
+ * 热力图行数据：在筛选结果的基础上，按选定的排序周期（当前展示指标的值）排列
+ * 注意：ECharts 类目 y 轴索引 0 在最底部，因此升序排列可使最大值显示在最上方（从上往下递减）
  */
 const heatmapRows = computed(() => {
-  const field = heatmapSortField.value
+  const period = heatmapSortKey.value
   return [...filteredRpsData.value].sort(
-    (a, b) => getNumericValue(b[field]) - getNumericValue(a[field])
+    (a, b) => getCellValue(a, period) - getCellValue(b, period)
   )
 })
 
 /**
- * 热力图配置：纵轴为指数、横轴为各周期、值为 RPS 强度（0-100）
+ * 热力图配置：纵轴为指数、横轴为各周期
+ * 值随展示指标切换：RPS 为 0-100 强度（蓝→红渐变）；涨跌幅为带符号百分比（绿→红，以 0 为中心对称）
  */
 const heatmapOption = computed<echarts.EChartsOption | null>(() => {
   const rows = heatmapRows.value
   if (rows.length === 0) return null
 
+  const isRps = heatmapMetric.value === 'rps'
   const yLabels = rows.map(row => row.name)
   const xLabels = heatmapColumns.map(col => col.label)
   const data: [number, number, number][] = []
+  let minValue = Infinity
+  let maxValue = -Infinity
   rows.forEach((row, yi) => {
     heatmapColumns.forEach((col, xi) => {
-      data.push([xi, yi, getNumericValue(row[col.field])])
+      const value = getCellValue(row, col.period)
+      data.push([xi, yi, value])
+      minValue = Math.min(minValue, value)
+      maxValue = Math.max(maxValue, value)
     })
   })
+  if (!Number.isFinite(minValue)) minValue = 0
+  if (!Number.isFinite(maxValue)) maxValue = 0
+
+  // 涨跌幅按数据实际最小/最大值取量程；RPS 固定 0-100
+  const visualMap = isRps
+    ? {
+        min: 0,
+        max: 100,
+        inRange: {
+          color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+        }
+      }
+    : {
+        min: minValue,
+        max: maxValue === minValue ? minValue + 1 : maxValue,
+        inRange: {
+          // 按实际量程采样配色，保证 0 精确落在白色（绿跌红涨）
+          color: buildDivergingColors(minValue, maxValue === minValue ? minValue + 1 : maxValue)
+        }
+      }
 
   return {
     animation: false,
@@ -951,7 +1066,9 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
         const [x, y, v] = params?.data ?? []
         const row = typeof y === 'number' ? rows[y] : undefined
         const col = typeof x === 'number' ? heatmapColumns[x] : undefined
-        return `${row?.name ?? ''}<br/>${col?.label ?? ''}: ${Number(v).toFixed(1)}`
+        const valueText = isRps ? Number(v).toFixed(1) : formatPercent(v)
+        const metricLabel = isRps ? 'RPS' : '涨跌幅'
+        return `${row?.name ?? ''}<br/>${col?.label ?? ''} ${metricLabel}: ${valueText}`
       }
     },
     grid: { left: 140, right: 80, top: 60, bottom: 20, containLabel: true },
@@ -968,16 +1085,12 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
       splitArea: { show: true }
     },
     visualMap: {
-      min: 0,
-      max: 100,
+      ...visualMap,
       calculable: true,
       orient: 'vertical',
       right: 10,
       top: 40,
-      bottom: 40,
-      inRange: {
-        color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
-      }
+      bottom: 40
     },
     series: [{
       type: 'heatmap',
@@ -985,7 +1098,7 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
       label: {
         show: true,
         fontSize: 9,
-        formatter: (params: any) => `${Number(params.data[2]).toFixed(0)}`
+        formatter: (params: any) => `${Number(params.data[2]).toFixed(isRps ? 0 : 1)}`
       },
       itemStyle: { borderColor: '#fff', borderWidth: 1 },
       emphasis: {
