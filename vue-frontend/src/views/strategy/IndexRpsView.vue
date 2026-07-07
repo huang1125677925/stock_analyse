@@ -1,7 +1,7 @@
 <template>
   <div class="index-rps-view" v-loading="loading" element-loading-text="正在加载指数RPS数据...">
     <div class="rps-data-section" v-if="rpsData.length > 0">
-      <el-card shadow="hover" class="rps-card">
+      <el-card shadow="never" class="rps-card">
         <template #header>
           <div class="table-header">
             <div class="toolbar-row">
@@ -115,7 +115,6 @@
         <el-table
           :data="filteredRpsData"
           stripe
-          border
           style="width: 100%"
           :default-sort="{ prop: getDefaultSortProp(), order: 'descending' }"
           :height="isMobile ? undefined : 600"
@@ -485,7 +484,6 @@
             <el-table
               :data="filteredMemberRpsData"
               stripe
-              border
               style="width: 100%"
               :height="isMobile ? undefined : 620"
               :default-sort="{ prop: memberRpsDefaultSortProp, order: 'descending' }"
@@ -1449,7 +1447,7 @@ watch(() => route.query.level, (level) => {
 
 <style scoped>
 .index-rps-view {
-  padding: 20px;
+  padding: 0;
 }
 
 .table-header {
@@ -1703,12 +1701,18 @@ watch(() => route.query.level, (level) => {
   border-radius: 0;
 }
 
+:deep(.rps-card.el-card) {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 :deep(.rps-card .el-card__header) {
-  padding: 18px 20px 16px;
+  padding: 18px 0 16px;
 }
 
 :deep(.rps-card .el-card__body) {
-  padding: 0 20px 20px;
+  padding: 0 0 20px;
 }
 
 .methodology {
@@ -1731,9 +1735,9 @@ watch(() => route.query.level, (level) => {
 }
 
 :deep(.el-table) {
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
 
 :deep(.el-table__header) {
@@ -1865,7 +1869,7 @@ watch(() => route.query.level, (level) => {
 
 @media (max-width: 768px) {
   .index-rps-view {
-    padding: 12px;
+    padding: 0;
   }
 
   .control-item,
@@ -1881,11 +1885,11 @@ watch(() => route.query.level, (level) => {
   }
 
   :deep(.rps-card .el-card__header) {
-    padding: 16px;
+    padding: 16px 12px;
   }
 
   :deep(.rps-card .el-card__body) {
-    padding: 0 16px 16px;
+    padding: 0 0 12px;
   }
 }
 </style>
