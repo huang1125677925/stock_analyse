@@ -1,5 +1,5 @@
 <template>
-  <div class="index-rps-view" v-loading="loading" element-loading-text="正在加载指数RPS数据...">
+  <div class="index-rps-heatmap-view" v-loading="loading" element-loading-text="正在加载指数RPS数据...">
     <div class="rps-data-section" v-if="rpsData.length > 0">
       <el-card shadow="never" class="rps-card">
         <template #header>
@@ -35,9 +35,21 @@
                     :value="level"
                   />
                 </el-select>
+                <el-select
+                  v-model="heatmapSortField"
+                  placeholder="排序依据"
+                  class="control-item"
+                >
+                  <el-option
+                    v-for="option in strengthFieldOptions"
+                    :key="option.value"
+                    :label="`按 ${option.label} 排序`"
+                    :value="option.value"
+                  />
+                </el-select>
               </div>
               <div class="table-summary">
-                <el-tag type="info" effect="plain">共 {{ filteredRpsData.length }} 条</el-tag>
+                <el-tag type="info" effect="plain">共 {{ heatmapRows.length }} 条</el-tag>
                 <el-tag v-if="queryTime" type="success" effect="light">更新时间 {{ queryTime }}</el-tag>
               </div>
             </div>
@@ -135,143 +147,43 @@
 
         <div class="methodology">
           <p>
-            RPS（Relative Price Strength）用于衡量当前指数相对同组指数的价格强度。系统会计算各指数在 5、20、60、120、250 日周期内的涨跌幅，再按涨跌幅从高到低排序。
+            RPS（Relative Price Strength）用于衡量当前指数相对同组指数的价格强度。热力图纵轴为各指数，横轴为不同周期（当日、5、20、60、120、250 日），单元格颜色深浅代表 RPS 强度高低。
           </p>
           <p>
-            计算方式：RPS = (1 - 排名 / 总板块数) × 100。数值越高，表示该指数在同组指数中的相对强度越靠前。
+            计算方式：RPS = (1 - 排名 / 总板块数) × 100。数值越高、颜色越偏红，表示该指数在同组指数中越强。点击任意方块可选择查看该指数的行业趋势图、成分股RPS或领涨数据详情。
           </p>
         </div>
-        
-        <el-table
-          :data="filteredRpsData"
-          stripe
-          style="width: 100%"
-          :default-sort="{ prop: getDefaultSortProp(), order: 'descending' }"
-          :height="isMobile ? undefined : 600"
-          :row-class-name="tableRowClassName"
-          highlight-current-row
-          @sort-change="handleSortChange"
-        >
-          <el-table-column type="index" label="#" :width="isMobile ? 40 : 50" :fixed="isMobile ? false : 'left'" align="center" />
-          <el-table-column label="指数名称" :min-width="isMobile ? 120 : 180" sortable="custom" :fixed="isMobile ? false : 'left'" align="center">
-            <template #header>
-              <div class="custom-header">
-                <span>指数名称</span>
-                <el-tooltip content="点击指数名称可查看趋势看板K线图" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
-                <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
-                <el-button type="text" @click="showIndexDetail(scope.row)" style="padding: 0;">
-                  {{ scope.row.name }}
-                </el-button>
-              </div>
-            </template>
-          </el-table-column>
 
-          <el-table-column
-            prop="RPS_today"
-            label="当日涨跌幅 / RPS_today"
-            min-width="150"
-            sortable="custom"
-            align="center"
-          >
-            <template #header>
-              <div class="custom-header">
-                <span>当日涨跌幅 / RPS_today</span>
-                <el-tooltip content="上方为当日涨跌幅，下方为基于当天涨跌幅计算的 RPS 强度" placement="top">
-                  <el-icon><InfoFilled /></el-icon>
-                </el-tooltip>
-              </div>
-            </template>
-            <template #default="scope">
-              <div class="rps-cell rps-cell-with-change">
-                <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
-                  {{ formatPercent(scope.row.pct_change) }}
-                </span>
-                <el-progress
-                  :percentage="getNumericValue(scope.row.RPS_today)"
-                  :color="getRpsColor(getNumericValue(scope.row.RPS_today))"
-                  :format="() => formatRpsValue(scope.row.RPS_today)"
-                  :stroke-width="18"
-                  :text-inside="true"
-                  :show-text="true"
-                />
-                <div class="rps-rank" :class="getRpsRankClass(getNumericValue(scope.row.RPS_today))">
-                  {{ getRpsRankText(getNumericValue(scope.row.RPS_today)) }}
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <template v-for="period in rpsPeriods" :key="period">
-            <el-table-column
-              :label="`${period}日涨跌幅 / RPS_${period}`"
-              min-width="150"
-              sortable="custom"
-              :prop="getRpsProp(period)"
-              align="center"
-            >
-              <template #header>
-                <div class="custom-header">
-                  <span>{{ period }}日涨跌幅 / RPS_{{ period }}</span>
-                  <el-tooltip :content="`上方为${period}日内价格变化百分比，下方为${period}日相对强度指标`" placement="top">
-                    <el-icon><InfoFilled /></el-icon>
-                  </el-tooltip>
-                </div>
-              </template>
-              <template #default="scope">
-                <div class="rps-cell rps-cell-with-change">
-                  <span class="rps-change-text" :class="{ up: Number(scope.row[getReturnProp(period)]) > 0, down: Number(scope.row[getReturnProp(period)]) < 0 }">
-                    {{ formatPercent(scope.row[getReturnProp(period)]) }}
-                  </span>
-                  <el-progress
-                    :percentage="Number(scope.row[getRpsProp(period)])"
-                    :color="getRpsColor(Number(scope.row[getRpsProp(period)]))"
-                    :format="(val: number) => val.toFixed(1)"
-                    :stroke-width="18"
-                    :text-inside="true"
-                    :show-text="true"
-                  />
-                  <div class="rps-rank" :class="getRpsRankClass(Number(scope.row[getRpsProp(period)]))">
-                    {{ getRpsRankText(Number(scope.row[getRpsProp(period)])) }}
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-          </template>
+        <HeatmapChart
+          v-if="heatmapOption"
+          :option="heatmapOption"
+          @chart-click="onHeatmapClick"
+        />
+        <el-empty v-else description="暂无可展示的RPS数据" />
 
-          <el-table-column label="操作" :min-width="isMobile ? 160 : 210" align="center" :fixed="isMobile ? false : 'right'">
-            <template #default="scope">
-              <div class="action-buttons" :class="{ 'mobile-actions': isMobile }">
-                <el-button
-                  type="primary"
-                  :size="isMobile ? 'small' : 'default'"
-                  @click="openLeadRiseDetail(scope.row)"
-                >
-                  {{ isMobile ? '领涨详情' : '领涨数据详情' }}
-                </el-button>
-                <el-button
-                  type="success"
-                  :size="isMobile ? 'small' : 'default'"
-                  @click="openBoardMemberRpsDialog(scope.row)"
-                >
-                  成分股RPS
-                </el-button>
-              </div>
-            </template>
-          </el-table-column>
-          
-        </el-table>
         <LeadRiseDetailDialog
           v-model="detailDialogVisible"
           :ts-code="currentTsCode"
           :idx-type="idxType"
           :name="currentIndexName"
         />
+
+        <!-- 点击热力图方块后，选择查看方式 -->
+        <el-dialog
+          v-model="actionSelectVisible"
+          :title="`选择查看方式 - ${actionSelectRow?.name ?? ''}`"
+          width="420px"
+          append-to-body
+        >
+          <div class="action-select-body">
+            <p class="action-select-tip">请选择要查看的内容：</p>
+            <div class="action-select-buttons">
+              <el-button type="primary" @click="handleSelectAction('trend')">行业趋势图</el-button>
+              <el-button type="success" @click="handleSelectAction('member')">成分股RPS</el-button>
+              <el-button type="warning" @click="handleSelectAction('lead')">领涨数据详情</el-button>
+            </div>
+          </div>
+        </el-dialog>
 
         <el-dialog
           v-model="indexTrendDialogVisible"
@@ -646,14 +558,26 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 指数RPS强度热力图页面
+ * 功能：
+ * - 以热力图形式展示各指数在不同周期（当日、5、20、60、120、250日）的RPS强度
+ * - 复用指数RPS强度排名页的数据获取与筛选（板块类型、行业层级、强度、涨跌幅关系、成交额范围）
+ * - 点击热力图任意方块时，弹出选择框，由用户选择查看该指数的行业趋势图、成分股RPS或领涨数据详情
+ * 参数：level(可选) 行业层级
+ * 返回值：无
+ * 事件：无
+ */
 import { ref, reactive, computed, onMounted, onUnmounted, watch, defineComponent, h } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
-import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
+import { Search } from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
 import { getDcBoardMemberRps, getIndexRps } from '@/services/strategyApi'
 import type { DcBoardMemberRpsItem, DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
 import { fetchDcDaily } from '@/services/dcDailyApi'
+import HeatmapChart from '@/components/HeatmapChart.vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import {
@@ -690,6 +614,7 @@ type DynamicRpsField = 'RPS_today' | `RPS_${number}`
 type MemberTrendShortcut = '1y' | '3y' | '5y' | '10y' | '20y'
 type StrengthRankThreshold = 'all' | 'excellent' | 'strong' | 'good' | 'normal'
 type ChangeRelationMode = 'all' | 'ascending' | 'descending'
+type CellAction = 'trend' | 'member' | 'lead'
 
 const props = defineProps<Props>()
 
@@ -706,6 +631,7 @@ const route = useRoute()
 const rpsData = ref<IndexRpsItem[]>([])
 const queryTime = ref('')
 const searchKeyword = ref('')
+const heatmapSortField = ref<RpsField>('RPS_5')
 const indexTrendDialogVisible = ref(false)
 const indexTrendLoading = ref(false)
 const indexTrendShortcut = ref<MemberTrendShortcut>('1y')
@@ -755,6 +681,10 @@ const turnoverData = ref<IndustryTurnoverPercentileItem[]>([])
 const minAmount = ref<number>(10000000000)
 const maxAmount = ref<number>(0)
 
+// 点击热力图方块后的“选择查看方式”弹窗状态
+const actionSelectVisible = ref(false)
+const actionSelectRow = ref<IndexRpsItem | null>(null)
+
 const amountFilterOptions: Array<{ label: string; value: number }> = [
   { label: '不限', value: 0 },
   { label: '100亿', value: 10000000000 },
@@ -770,6 +700,16 @@ const strengthFieldOptions: Array<{ label: string; value: RpsField }> = [
     label: `RPS_${period}`,
     value: `RPS_${period}` as RpsField
   }))
+]
+
+// 热力图列定义：横轴各周期，与 strengthFieldOptions 一一对应
+const heatmapColumns: Array<{ label: string; field: RpsField }> = [
+  { label: '当日', field: 'RPS_today' },
+  { label: 'RPS5', field: 'RPS_5' },
+  { label: 'RPS20', field: 'RPS_20' },
+  { label: 'RPS60', field: 'RPS_60' },
+  { label: 'RPS120', field: 'RPS_120' },
+  { label: 'RPS250', field: 'RPS_250' }
 ]
 
 const minimumStrengthOptions: Array<{ label: string; value: StrengthRankThreshold }> = [
@@ -853,7 +793,6 @@ const formatAmount = (value: unknown): string => {
 const getDynamicReturnProp = (period: number): `return_${number}` => `return_${period}` as `return_${number}`
 const getDynamicRpsProp = (period: number): DynamicRpsField => `RPS_${period}` as DynamicRpsField
 const getReturnProp = (period: RpsPeriod): ReturnField => `return_${period}`
-const getRpsProp = (period: RpsPeriod): `RPS_${RpsPeriod}` => `RPS_${period}`
 
 function getStrengthThresholdValue(rank: StrengthRankThreshold): number {
   switch (rank) {
@@ -977,6 +916,125 @@ const filteredRpsData = computed(() => {
   result = result.filter(matchesAmountFilter)
   return result
 })
+
+/**
+ * 热力图行数据：在筛选结果的基础上，按选定的排序字段降序排列
+ */
+const heatmapRows = computed(() => {
+  const field = heatmapSortField.value
+  return [...filteredRpsData.value].sort(
+    (a, b) => getNumericValue(b[field]) - getNumericValue(a[field])
+  )
+})
+
+/**
+ * 热力图配置：纵轴为指数、横轴为各周期、值为 RPS 强度（0-100）
+ */
+const heatmapOption = computed<echarts.EChartsOption | null>(() => {
+  const rows = heatmapRows.value
+  if (rows.length === 0) return null
+
+  const yLabels = rows.map(row => row.name)
+  const xLabels = heatmapColumns.map(col => col.label)
+  const data: [number, number, number][] = []
+  rows.forEach((row, yi) => {
+    heatmapColumns.forEach((col, xi) => {
+      data.push([xi, yi, getNumericValue(row[col.field])])
+    })
+  })
+
+  return {
+    animation: false,
+    tooltip: {
+      position: 'top',
+      formatter: (params: any) => {
+        const [x, y, v] = params?.data ?? []
+        const row = typeof y === 'number' ? rows[y] : undefined
+        const col = typeof x === 'number' ? heatmapColumns[x] : undefined
+        return `${row?.name ?? ''}<br/>${col?.label ?? ''}: ${Number(v).toFixed(1)}`
+      }
+    },
+    grid: { left: 140, right: 80, top: 60, bottom: 20, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: xLabels,
+      position: 'top',
+      splitArea: { show: true },
+      axisLabel: { rotate: 0, hideOverlap: true, interval: 'auto' }
+    },
+    yAxis: {
+      type: 'category',
+      data: yLabels,
+      splitArea: { show: true }
+    },
+    visualMap: {
+      min: 0,
+      max: 100,
+      calculable: true,
+      orient: 'vertical',
+      right: 10,
+      top: 40,
+      bottom: 40,
+      inRange: {
+        color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+      }
+    },
+    series: [{
+      type: 'heatmap',
+      data,
+      label: {
+        show: true,
+        fontSize: 9,
+        formatter: (params: any) => `${Number(params.data[2]).toFixed(0)}`
+      },
+      itemStyle: { borderColor: '#fff', borderWidth: 1 },
+      emphasis: {
+        itemStyle: { shadowBlur: 5, shadowColor: 'rgba(0, 0, 0, 0.3)' },
+        label: {
+          show: true,
+          fontSize: 10,
+          formatter: (params: any) => `${Number(params.data[2]).toFixed(1)}`
+        }
+      }
+    }]
+  }
+})
+
+/**
+ * 事件：点击热力图方块
+ * 功能：定位对应的指数行，打开“选择查看方式”弹窗，由用户选择后续展示内容
+ * 参数：params(any) ECharts 点击事件负载，data 为 [x, y, value]
+ * 返回值：无
+ */
+const onHeatmapClick = (params: any) => {
+  const data = params?.data as [number, number, number] | undefined
+  if (!data) return
+  const y = data[1]
+  if (typeof y !== 'number') return
+  const row = heatmapRows.value[y]
+  if (!row) return
+  actionSelectRow.value = row
+  actionSelectVisible.value = true
+}
+
+/**
+ * 事件：在选择弹窗中选定查看方式
+ * 功能：根据用户选择打开对应的行业趋势图 / 成分股RPS / 领涨数据详情
+ * 参数：action(CellAction) 选定的查看方式
+ * 返回值：无
+ */
+const handleSelectAction = (action: CellAction) => {
+  const row = actionSelectRow.value
+  if (!row) return
+  actionSelectVisible.value = false
+  if (action === 'trend') {
+    showIndexDetail(row)
+  } else if (action === 'member') {
+    openBoardMemberRpsDialog(row)
+  } else if (action === 'lead') {
+    openLeadRiseDetail(row)
+  }
+}
 
 const filteredMemberRpsData = computed(() => {
   let result = memberRpsData.value
@@ -1121,10 +1179,6 @@ const memberRpsPeriodStatistics = computed(() => {
   return stats
 })
 
-const getDefaultSortProp = () => {
-  return 'RPS_5'
-}
-
 const memberRpsDefaultSortProp = computed(() => {
   const firstPeriod = memberRpsPeriods.value[0]
   return firstPeriod ? getDynamicRpsProp(firstPeriod) : 'RPS_today'
@@ -1151,28 +1205,6 @@ const getRpsRankClass = (value: number) => {
   if (value >= 70) return 'rank-good'
   if (value >= 50) return 'rank-normal'
   return 'rank-weak'
-}
-
-const tableRowClassName = ({ row }: { row: IndexRpsItem }) => {
-  const rpsValue = row.RPS_5
-  if (rpsValue >= 90) return 'row-excellent'
-  if (rpsValue >= 80) return 'row-strong'
-  if (rpsValue >= 70) return 'row-good'
-  return ''
-}
-
-const handleSortChange = (sort: { prop: string, order: string }) => {
-  if (sort.prop && sort.order) {
-    rpsData.value.sort((a, b) => {
-      const propA = Number(a[sort.prop as keyof IndexRpsItem] ?? 0)
-      const propB = Number(b[sort.prop as keyof IndexRpsItem] ?? 0)
-      if (sort.order === 'ascending') {
-        return propA - propB
-      } else {
-        return propB - propA
-      }
-    })
-  }
 }
 
 const applyIndexTrendShortcut = (range: MemberTrendShortcut) => {
@@ -1548,7 +1580,7 @@ watch(() => route.query.level, (level) => {
 </script>
 
 <style scoped>
-.index-rps-view {
+.index-rps-heatmap-view {
   padding: 0;
 }
 
@@ -1639,21 +1671,27 @@ watch(() => route.query.level, (level) => {
   padding: 0;
 }
 
-.action-buttons {
+.action-select-body {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.action-select-tip {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.action-select-buttons {
+  display: flex;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.action-buttons.mobile-actions {
-  flex-direction: column;
-  gap: 6px;
-}
-
-.action-buttons.mobile-actions .el-button {
-  width: 100%;
+.action-select-buttons .el-button {
+  flex: 1;
+  min-width: 110px;
   margin: 0;
 }
 
@@ -1869,36 +1907,6 @@ watch(() => route.query.level, (level) => {
   background-color: #f0f9ff !important;
 }
 
-.custom-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.custom-header span {
-  margin-right: 5px;
-}
-
-.up {
-  color: #f56c6c;
-  font-weight: bold;
-}
-
-.down {
-  color: #67c23a;
-  font-weight: bold;
-}
-
-.change-percent-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.trend-indicator {
-  margin-left: 5px;
-}
-
 .rps-cell {
   display: flex;
   flex-direction: column;
@@ -1962,18 +1970,6 @@ watch(() => route.query.level, (level) => {
   border: 1px solid #d3d4d6;
 }
 
-:deep(.row-excellent) {
-  background-color: rgba(245, 108, 108, 0.05);
-}
-
-:deep(.row-strong) {
-  background-color: rgba(230, 162, 60, 0.05);
-}
-
-:deep(.row-good) {
-  background-color: rgba(64, 158, 255, 0.05);
-}
-
 :deep(.row-board-highlight) {
   background-color: #fff7e6 !important;
   font-weight: 600;
@@ -1984,7 +1980,7 @@ watch(() => route.query.level, (level) => {
 }
 
 @media (max-width: 768px) {
-  .index-rps-view {
+  .index-rps-heatmap-view {
     padding: 0;
   }
 
