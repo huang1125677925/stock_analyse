@@ -1,6 +1,6 @@
 <template>
   <div class="major-index-rps-view" v-loading="loading" element-loading-text="正在加载大盘指数RPS数据...">
-    <el-card class="page-header" shadow="hover">
+    <el-card class="page-header" shadow="never">
       <template #header>
         <div class="header-content">
           <div>
@@ -10,7 +10,7 @@
         </div>
       </template>
 
-      <el-form :inline="true" class="query-form">
+      <el-form :inline="!isMobile" class="query-form">
         <el-form-item label="截止日期">
           <el-date-picker
             v-model="tradeDate"
@@ -63,7 +63,7 @@
       </div>
     </el-card>
 
-    <el-card class="table-card" shadow="hover">
+    <el-card class="table-card" shadow="never">
       <template #header>
         <div class="table-header">
           <div class="table-title">多周期 RPS 排名</div>
@@ -82,15 +82,14 @@
       <el-table
         :data="filteredRows"
         stripe
-        border
         style="width: 100%"
-        height="640"
+        :height="isMobile ? undefined : 640"
         :default-sort="{ prop: sortState.prop, order: sortState.order || undefined }"
         empty-text="暂无大盘指数RPS数据"
         @sort-change="handleSortChange"
       >
-        <el-table-column type="index" label="#" width="60" align="center" fixed="left" />
-        <el-table-column prop="name" label="指数名称" min-width="180" sortable="custom" fixed="left">
+        <el-table-column type="index" label="#" :width="isMobile ? 40 : 60" align="center" :fixed="isMobile ? false : 'left'" />
+        <el-table-column prop="name" label="指数名称" :min-width="isMobile ? 120 : 180" sortable="custom" :fixed="isMobile ? false : 'left'">
           <template #header>
             <div class="custom-header">
               <span>指数名称</span>
@@ -191,7 +190,7 @@
  * 返回值：无
  * 事件（emits）：无
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { InfoFilled, RefreshRight, Search } from '@element-plus/icons-vue'
 import MajorIndexTrendDialog from '@/components/MajorIndexTrendDialog.vue'
@@ -228,6 +227,7 @@ const trendIndex = ref({
   name: '',
   market: '',
 })
+const isMobile = ref(window.innerWidth < 768)
 
 const domesticCount = computed(() => rows.value.filter(item => item.market === '国内').length)
 const internationalCount = computed(() => rows.value.filter(item => item.market === '国际').length)
@@ -390,17 +390,50 @@ function openTrendDialog(row: MajorIndexRpsItem) {
 
 onMounted(() => {
   fetchData()
+  window.addEventListener('resize', handleResize)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+function handleResize() {
+  isMobile.value = window.innerWidth < 768
+}
 </script>
 
 <style scoped>
 .major-index-rps-view {
-  padding: 20px;
+  padding: 0;
 }
 
 .page-header,
 .table-card {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+}
+
+/* 去掉 el-card 的边框、阴影和圆角 */
+.page-header.el-card,
+.table-card.el-card {
+  border-radius: 0;
+}
+
+:deep(.page-header.el-card),
+:deep(.table-card.el-card) {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 去掉 el-card header 和 body 的左右 padding */
+:deep(.page-header .el-card__header),
+:deep(.table-card .el-card__header) {
+  padding: 18px 0 16px;
+}
+
+:deep(.page-header .el-card__body),
+:deep(.table-card .el-card__body) {
+  padding: 0 0 20px;
 }
 
 .header-content {
@@ -546,11 +579,56 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .major-index-rps-view {
-    padding: 12px;
+    padding: 0;
+  }
+
+  .page-header,
+  .table-card {
+    margin-bottom: 12px;
+  }
+
+  :deep(.page-header .el-card__header),
+  :deep(.table-card .el-card__header) {
+    padding: 16px 12px;
+  }
+
+  :deep(.page-header .el-card__body),
+  :deep(.table-card .el-card__body) {
+    padding: 0 0 12px;
   }
 
   .summary-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .query-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .query-form :deep(.el-form-item) {
+    margin-right: 0;
+    margin-bottom: 12px;
+    width: 100%;
+  }
+
+  .query-form :deep(.el-select),
+  .query-form :deep(.el-input),
+  .query-form :deep(.el-date-picker) {
+    width: 100% !important;
+  }
+
+  .query-form :deep(.el-form-item__content) {
+    width: 100%;
+  }
+
+  .query-form :deep(.el-button) {
+    width: 100%;
+  }
+
+  .methodology {
+    padding: 10px 12px;
+    font-size: 13px;
   }
 }
 </style>
