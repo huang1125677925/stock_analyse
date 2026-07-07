@@ -118,13 +118,13 @@
           border
           style="width: 100%"
           :default-sort="{ prop: getDefaultSortProp(), order: 'descending' }"
-          height="600"
+          :height="isMobile ? undefined : 600"
           :row-class-name="tableRowClassName"
           highlight-current-row
           @sort-change="handleSortChange"
         >
-          <el-table-column type="index" label="#" width="50" fixed="left" align="center" />
-          <el-table-column label="指数名称" min-width="180" sortable="custom" fixed="left" align="center">
+          <el-table-column type="index" label="#" :width="isMobile ? 40 : 50" :fixed="isMobile ? false : 'left'" align="center" />
+          <el-table-column label="指数名称" :min-width="isMobile ? 120 : 180" sortable="custom" :fixed="isMobile ? false : 'left'" align="center">
             <template #header>
               <div class="custom-header">
                 <span>指数名称</span>
@@ -214,20 +214,20 @@
               </template>
             </el-table-column>
           </template>
-          
-          <el-table-column label="操作" min-width="210" align="center" fixed="right">
+
+          <el-table-column label="操作" :min-width="isMobile ? 160 : 210" align="center" :fixed="isMobile ? false : 'right'">
             <template #default="scope">
-              <div class="action-buttons">
+              <div class="action-buttons" :class="{ 'mobile-actions': isMobile }">
                 <el-button
                   type="primary"
-                  size="small"
+                  :size="isMobile ? 'small' : 'default'"
                   @click="openLeadRiseDetail(scope.row)"
                 >
-                  领涨数据详情
+                  {{ isMobile ? '领涨详情' : '领涨数据详情' }}
                 </el-button>
                 <el-button
                   type="success"
-                  size="small"
+                  :size="isMobile ? 'small' : 'default'"
                   @click="openBoardMemberRpsDialog(scope.row)"
                 >
                   成分股RPS
@@ -487,19 +487,19 @@
               stripe
               border
               style="width: 100%"
-              height="620"
+              :height="isMobile ? undefined : 620"
               :default-sort="{ prop: memberRpsDefaultSortProp, order: 'descending' }"
               highlight-current-row
               :row-class-name="memberRpsTableRowClassName"
               @sort-change="handleMemberRpsSortChange"
             >
-              <el-table-column type="index" label="#" width="50" align="center" fixed="left" />
-              <el-table-column prop="ts_code" label="ts_code" min-width="120" sortable="custom" fixed="left" align="center">
+              <el-table-column type="index" label="#" :width="isMobile ? 40 : 50" align="center" :fixed="isMobile ? false : 'left'" />
+              <el-table-column prop="ts_code" label="ts_code" :min-width="isMobile ? 100 : 120" sortable="custom" :fixed="isMobile ? false : 'left'" align="center">
                 <template #default="scope">
                   <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="name" label="名称" min-width="150" sortable="custom" fixed="left">
+              <el-table-column prop="name" label="名称" :min-width="isMobile ? 100 : 150" sortable="custom" :fixed="isMobile ? false : 'left'">
                 <template #default="scope">
                   <el-button
                     type="primary"
@@ -618,7 +618,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, defineComponent, h } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, defineComponent, h } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
 import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
@@ -630,6 +630,22 @@ import StockKLineChart from '@/components/StockKLineChart.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 
 const industryLevelOptions: DcIndustryLevel[] = ['东财一级行业', '东财二级行业', '东财三级行业']
+
+// 响应式屏幕宽度检测
+const isMobile = ref(false)
+
+const checkMobile = () => {
+  isMobile.value = window.innerWidth < 768
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
 
 interface Props {
   level?: DcIndustryLevel
@@ -1515,6 +1531,16 @@ watch(() => route.query.level, (level) => {
   justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.action-buttons.mobile-actions {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.action-buttons.mobile-actions .el-button {
+  width: 100%;
+  margin: 0;
 }
 
 .member-rps-dialog {
