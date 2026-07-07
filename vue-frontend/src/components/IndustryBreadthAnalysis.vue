@@ -35,7 +35,7 @@
         <div class="control-group">
           <span class="control-label">时间范围：</span>
           <el-input
-            value="最近20天"
+            value="最近10天"
             disabled
             style="width: 160px"
           />
@@ -123,12 +123,42 @@
           </el-select>
         </div>
         <div class="control-group">
+          <span class="control-label">成交额范围：</span>
+          <el-select
+            v-model="minAmount"
+            placeholder="最小值"
+            :disabled="loading"
+            style="width: 110px"
+          >
+            <el-option
+              v-for="option in amountFilterOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+          <span style="margin: 0 4px">-</span>
+          <el-select
+            v-model="maxAmount"
+            placeholder="最大值"
+            :disabled="loading"
+            style="width: 110px"
+          >
+            <el-option
+              v-for="option in amountFilterOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </div>
+        <div class="control-group">
           <el-button type="primary" :loading="loading" @click="fetchData">刷新</el-button>
         </div>
         <div class="control-group">
-          <el-button 
-            type="default" 
-            :disabled="loading || !increasingFilterRawData.length" 
+          <el-button
+            type="default"
+            :disabled="loading || !amountFilteredData.length"
             @click="toggleLastColumnSort"
             :icon="sortByLastColumn ? 'SortDown' : 'Sort'"
           >
@@ -264,6 +294,10 @@ import {
 } from '@/services/strategyBreadthApi'
 import { fetchDcDaily } from '@/services/dcDailyApi'
 import type { StockHistoryDataItem } from '@/services/stockHistoryApi'
+import {
+  fetchIndustryTurnoverPercentile,
+  type IndustryTurnoverPercentileItem
+} from '@/services/industry-turnover-percentile'
 
 type TrendShortcut = '1y' | '3y' | '5y' | '10y' | '20y'
 
@@ -273,7 +307,7 @@ const emit = defineEmits<{
   industriesLoaded: [industries: string[]]
 }>()
 
-const FIXED_RANGE_DAYS = 20
+const FIXED_RANGE_DAYS = 10
 const loading = ref(false)
 const endDate = ref<string>(formatDate(new Date()))
 const maWindow = ref<number>(10)
@@ -303,9 +337,19 @@ const breadthRangeOptions = [
   { label: '≥ 80%', value: 'gte80' },
   { label: '≥ 90%', value: 'gte90' }
 ]
+const amountFilterOptions = [
+  { label: '不限', value: 0 },
+  { label: '100亿', value: 10000000000 },
+  { label: '300亿', value: 30000000000 },
+  { label: '500亿', value: 50000000000 },
+  { label: '1000亿', value: 100000000000 },
+  { label: '2000亿', value: 200000000000 }
+]
 const consecutiveIncreaseDays = ref<number>(0)
 const firstDayBreadthRange = ref<string>('')
 const lastDayBreadthRange = ref<string>('')
+const minAmount = ref<number>(0)
+const maxAmount = ref<number>(0)
 const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
   { label: '东财一级行业', value: '东财一级行业' },
@@ -511,6 +555,7 @@ const openTrendDialog = (sectorCode: string, sectorName: string, idxType: Indust
 }
 
 const rawData = ref<IndustryMaBreadthItem[]>([])
+const turnoverData = ref<IndustryTurnoverPercentileItem[]>([])
 
 /**
  * 从获取到的原始数据中提取唯一的行业名称列表（已排序），
@@ -625,6 +670,62 @@ const increasingFilterRawData = computed(() => {
   return source.filter(item => qualifiedSectors.has(item.sector_name))
 })
 
+/**
+ * 成交额范围筛选：在递增筛选基础上，进一步按成交额范围筛选
+ * 使用最近一个交易日的成交额数据进行筛选
+ * 支持设置最小值和最大值，实现区间筛选
+ */
+const amountFilteredData = computed(() => {
+  const hasMinFilter = minAmount.value > 0
+  const hasMaxFilter = maxAmount.value > 0
+
+  // 如果没有设置任何筛选条件，返回原数据
+  if (!hasMinFilter && !hasMaxFilter) return increasingFilterRawData.value
+
+  // 如果没有成交额数据，返回原数据
+  if (turnoverData.value.length === 0) return increasingFilterRawData.value
+
+  // 获取所有日期，找到最近的交易日
+  const allDates = Array.from(new Set(turnoverData.value.map(d => d.date))).sort()
+  if (allDates.length === 0) return increasingFilterRawData.value
+  const latestDate = allDates[allDates.length - 1]
+
+  // 构建 sector_code -> amount 的映射（使用最近一个交易日的数据）
+  const sectorAmountMap = new Map<string, number>()
+  turnoverData.value.forEach(item => {
+    if (item.date === latestDate) {
+      const amount = item.amount ?? 0
+      sectorAmountMap.set(item.sector_code, amount)
+    }
+  })
+
+  // 筛选出成交额符合条件的行业
+  const qualifiedSectors = new Set<string>()
+
+  sectorAmountMap.forEach((amount, sectorCode) => {
+    let qualified = true
+
+    // 检查最小值
+    if (hasMinFilter && amount < minAmount.value) {
+      qualified = false
+    }
+
+    // 检查最大值
+    if (hasMaxFilter && amount > maxAmount.value) {
+      qualified = false
+    }
+
+    if (qualified) {
+      qualifiedSectors.add(sectorCode)
+    }
+  })
+
+  // 过滤数据
+  return increasingFilterRawData.value.filter(item =>
+    qualifiedSectors.has(item.sector_code)
+  )
+})
+
 const selectedBoardLabel = computed(() => {
   return selectedIdxType.value === '行业板块'
     ? selectedLevel.value
@@ -670,21 +771,21 @@ const toggleLastColumnSort = () => {
 
 // 计算行业与日期维度
 const industries = computed<string[]>(() => {
-  const names = Array.from(new Set(increasingFilterRawData.value.map(d => d.sector_name)))
-  
+  const names = Array.from(new Set(amountFilteredData.value.map(d => d.sector_name)))
+
   // 如果启用按最后一列排序
   if (sortByLastColumn.value && dates.value.length > 0) {
     const lastDate = dates.value[dates.value.length - 1]
-    
+
     // 获取每个行业在最后一个日期的数据
     const industryLastValues = new Map<string, number>()
-    increasingFilterRawData.value.forEach(item => {
+    amountFilteredData.value.forEach(item => {
       if (item.date === lastDate && names.includes(item.sector_name)) {
         const val = typeof item.breadth_ratio === 'number' ? item.breadth_ratio : Number(item.breadth_ratio)
         industryLastValues.set(item.sector_name, Number.isNaN(val) ? 0 : val)
       }
     })
-    
+
     // 按最后一列的值降序排序
     names.sort((a, b) => {
       const valueA = industryLastValues.get(a) || 0
@@ -692,12 +793,12 @@ const industries = computed<string[]>(() => {
       return valueA - valueB || 0
     })
   }
-  
+
   return names
 })
 
 const dates = computed<string[]>(() => {
-  const ds = Array.from(new Set(increasingFilterRawData.value.map(d => d.date))).sort()
+  const ds = Array.from(new Set(amountFilteredData.value.map(d => d.date))).sort()
   return ds
 })
 
@@ -706,7 +807,7 @@ const heatmapData = computed<[number, number, number][]>(() => {
   const dateIndex = new Map(dates.value.map((d, i) => [d, i]))
   const industryIndex = new Map(industries.value.map((n, i) => [n, i]))
   const points: [number, number, number][] = []
-  increasingFilterRawData.value.forEach(item => {
+  amountFilteredData.value.forEach(item => {
     const di = dateIndex.get(item.date)
     const ii = industryIndex.get(item.sector_name)
     if (di !== undefined && ii !== undefined) {
@@ -760,8 +861,26 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
     series: [{
       type: 'heatmap',
       data: heatmapData.value,
+      label: {
+        show: true,
+        fontSize: 9,
+        formatter: (params: any) => {
+          const value = params.data[2]
+          return `${(Number(value) * 100).toFixed(0)}`
+        }
+      },
       itemStyle: { borderColor: '#fff', borderWidth: 1 },
-      emphasis: { itemStyle: { shadowBlur: 5, shadowColor: 'rgba(0, 0, 0, 0.3)' } }
+      emphasis: {
+        itemStyle: { shadowBlur: 5, shadowColor: 'rgba(0, 0, 0, 0.3)' },
+        label: {
+          show: true,
+          fontSize: 10,
+          formatter: (params: any) => {
+            const value = params.data[2]
+            return `${(Number(value) * 100).toFixed(2)}%`
+          }
+        }
+      }
     }]
   }
 })
@@ -771,14 +890,29 @@ const fetchData = async () => {
   loading.value = true
   try {
     const [start, end] = computeDateRangeByEndDate(endDate.value, FIXED_RANGE_DAYS)
-    const data = await fetchIndustryMaBreadth({
-      startDate: start,
-      endDate: end,
-      maWindow: maWindow.value,
-      idxType: selectedIdxType.value,
-      level: selectedIdxType.value === '行业板块' ? selectedLevel.value : undefined
-    })
-    rawData.value = data.data ?? []
+
+    // 并行获取市场宽度数据和成交额数据
+    const [breadthData, turnoverResult] = await Promise.all([
+      fetchIndustryMaBreadth({
+        startDate: start,
+        endDate: end,
+        maWindow: maWindow.value,
+        idxType: selectedIdxType.value,
+        level: selectedIdxType.value === '行业板块' ? selectedLevel.value : undefined
+      }),
+      fetchIndustryTurnoverPercentile({
+        startDate: start,
+        endDate: end,
+        idxType: selectedIdxType.value,
+        level: selectedIdxType.value === '行业板块' ? selectedLevel.value : undefined
+      }).catch((err) => {
+        console.error('获取成交额数据失败:', err)
+        return null
+      })
+    ])
+
+    rawData.value = breadthData.data ?? []
+    turnoverData.value = turnoverResult?.data ?? []
   } catch (err) {
     console.error('获取行业MA宽度数据失败:', err)
   } finally {
@@ -799,7 +933,7 @@ const onChartClick = (params: any) => {
   const [x, y, v] = (params?.data ?? []) as [number, number, number]
   const date = typeof x === 'number' ? dates.value[x] : ''
   const industry = typeof y === 'number' ? industries.value[y] : ''
-  const matchedRecord = increasingFilterRawData.value.find((item) => item.date === date && item.sector_name === industry)
+  const matchedRecord = amountFilteredData.value.find((item) => item.date === date && item.sector_name === industry)
   const payload = {
     date,
     industry,
