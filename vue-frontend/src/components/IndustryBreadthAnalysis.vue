@@ -1028,6 +1028,15 @@ onMounted(() => {
   min-height: 220px;
 }
 
+:deep(.trend-preview-card.el-card) {
+  border: none;
+  box-shadow: none;
+}
+
+:deep(.trend-preview-card .el-card__body) {
+  padding: 0;
+}
+
 .chart-card {
   .card-header {
     display: flex;

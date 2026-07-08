@@ -97,12 +97,6 @@ const router = createRouter({
           meta: { title: '指数RPS强度排名' }
         },
         {
-          path: '/analysis/congestion/index-rps-heatmap',
-          name: 'congestion-index-rps-heatmap',
-          component: () => import('@/views/strategy/IndexRpsHeatmapView.vue'),
-          meta: { title: '指数RPS强度热力图' }
-        },
-        {
           path: '/analysis/sw-industry-valuation',
           name: 'sw-industry-valuation',
           component: () => import('@/views/industry-stock-data/SwIndustryValuationView.vue'),

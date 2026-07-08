@@ -266,7 +266,7 @@
           </el-table-column>
           
         </el-table>
-        <LeadRiseDetailDialog
+        <LeadRiseMatrixDialog
           v-model="detailDialogVisible"
           :ts-code="currentTsCode"
           :idx-type="idxType"
@@ -315,6 +315,7 @@
               </div>
               <div class="trend-shortcuts">
                 <el-radio-group v-model="indexTrendShortcut" @change="handleIndexTrendShortcutChange">
+                  <el-radio-button label="2m">最近2个月</el-radio-button>
                   <el-radio-button label="1y">最近1年</el-radio-button>
                   <el-radio-button label="3y">最近3年</el-radio-button>
                   <el-radio-button label="5y">最近5年</el-radio-button>
@@ -493,6 +494,32 @@
                     </span>
                   </template>
                 </el-table-column>
+                <el-table-column label="成分股最高涨跌幅" min-width="160" align="center">
+                  <template #default="scope">
+                    <div class="extreme-cell">
+                      <span
+                        class="return-value"
+                        :class="{ up: scope.row.maxReturn > 0, down: scope.row.maxReturn < 0 }"
+                      >
+                        {{ formatPercent(scope.row.maxReturn) }}
+                      </span>
+                      <span class="extreme-name">{{ scope.row.maxName }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="成分股最低涨跌幅" min-width="160" align="center">
+                  <template #default="scope">
+                    <div class="extreme-cell">
+                      <span
+                        class="return-value"
+                        :class="{ up: scope.row.minReturn > 0, down: scope.row.minReturn < 0 }"
+                      >
+                        {{ formatPercent(scope.row.minReturn) }}
+                      </span>
+                      <span class="extreme-name">{{ scope.row.minName }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
                 <el-table-column label="行业排名" min-width="150" align="center">
                   <template #default="scope">
                     <div class="rank-indicator">
@@ -614,6 +641,7 @@
           <div class="trend-dialog-body">
             <div class="trend-shortcuts">
               <el-radio-group v-model="memberStockTrendShortcut" @change="handleMemberStockTrendShortcutChange">
+                <el-radio-button label="2m">最近2个月</el-radio-button>
                 <el-radio-button label="1y">最近1年</el-radio-button>
                 <el-radio-button label="3y">最近3年</el-radio-button>
                 <el-radio-button label="5y">最近5年</el-radio-button>
@@ -646,15 +674,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch, defineComponent, h } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElDialog, ElTable, ElTableColumn, ElButton } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { InfoFilled, CaretTop, CaretBottom, Minus, Search } from '@element-plus/icons-vue'
 import { getDcBoardMemberRps, getIndexRps } from '@/services/strategyApi'
 import type { DcBoardMemberRpsItem, DcIndustryLevel, IndexRpsIdxType, IndexRpsItem } from '@/services/strategyApi'
-import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
 import { fetchDcDaily } from '@/services/dcDailyApi'
 import StockKLineChart from '@/components/StockKLineChart.vue'
+import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import {
   fetchIndustryTurnoverPercentile,
@@ -687,7 +715,7 @@ type RpsPeriod = 5 | 20 | 60 | 120 | 250
 type RpsField = 'RPS_today' | `RPS_${RpsPeriod}`
 type ReturnField = `return_${RpsPeriod}`
 type DynamicRpsField = 'RPS_today' | `RPS_${number}`
-type MemberTrendShortcut = '1y' | '3y' | '5y' | '10y' | '20y'
+type MemberTrendShortcut = '2m' | '1y' | '3y' | '5y' | '10y' | '20y'
 type StrengthRankThreshold = 'all' | 'excellent' | 'strong' | 'good' | 'normal'
 type ChangeRelationMode = 'all' | 'ascending' | 'descending'
 
@@ -708,7 +736,7 @@ const queryTime = ref('')
 const searchKeyword = ref('')
 const indexTrendDialogVisible = ref(false)
 const indexTrendLoading = ref(false)
-const indexTrendShortcut = ref<MemberTrendShortcut>('1y')
+const indexTrendShortcut = ref<MemberTrendShortcut>('2m')
 const indexTrendData = ref<StockHistoryDataItem[]>([])
 const indexTrendBoard = reactive({
   code: '',
@@ -735,7 +763,7 @@ const memberRpsFilterMode = ref<'all' | 'above' | 'below'>('all')
 let memberRpsRequestId = 0
 const memberStockTrendDialogVisible = ref(false)
 const memberStockTrendLoading = ref(false)
-const memberStockTrendShortcut = ref<MemberTrendShortcut>('1y')
+const memberStockTrendShortcut = ref<MemberTrendShortcut>('2m')
 const memberStockTrendData = ref<StockHistoryDataItem[]>([])
 const memberStockTrendStock = reactive({
   code: '',
@@ -1092,20 +1120,29 @@ const memberRpsPeriodStatistics = computed(() => {
       memberRpsBoardRpsData.value![returnField as keyof IndexRpsItem]
     )
 
-    // 统计所有成分股的涨跌幅
-    const stockReturns = memberRpsData.value.map(stock =>
-      getNumericValue((stock as Record<string, unknown>)[returnField])
-    )
+    // 统计所有成分股的涨跌幅（保留股票名以便定位最高/最低）
+    const stockReturns = memberRpsData.value.map(stock => ({
+      ret: getNumericValue((stock as Record<string, unknown>)[returnField]),
+      name: String((stock as Record<string, unknown>).name ?? (stock as Record<string, unknown>).ts_code ?? '')
+    }))
 
     // 计算强于行业的成分股数量
-    const aboveCount = stockReturns.filter(ret => ret > boardReturn).length
+    const aboveCount = stockReturns.filter(item => item.ret > boardReturn).length
     const totalCount = stockReturns.length
     const abovePercentage = totalCount > 0 ? (aboveCount / totalCount) * 100 : 0
 
     // 计算所有成分股的平均涨跌幅
     const avgReturn = stockReturns.length > 0
-      ? stockReturns.reduce((acc, val) => acc + val, 0) / stockReturns.length
+      ? stockReturns.reduce((acc, item) => acc + item.ret, 0) / stockReturns.length
       : 0
+
+    // 计算成分股最高 / 最低涨跌幅及对应股票名
+    let maxItem = stockReturns.length > 0 ? stockReturns[0] : null
+    let minItem = stockReturns.length > 0 ? stockReturns[0] : null
+    for (const item of stockReturns) {
+      if (maxItem && item.ret > maxItem.ret) maxItem = item
+      if (minItem && item.ret < minItem.ret) minItem = item
+    }
 
     return {
       period,
@@ -1114,7 +1151,11 @@ const memberRpsPeriodStatistics = computed(() => {
       totalCount,
       abovePercentage,
       boardReturn,
-      avgReturn
+      avgReturn,
+      maxReturn: maxItem ? maxItem.ret : 0,
+      maxName: maxItem ? maxItem.name : '-',
+      minReturn: minItem ? minItem.ret : 0,
+      minName: minItem ? minItem.name : '-'
     }
   })
 
@@ -1176,10 +1217,10 @@ const handleSortChange = (sort: { prop: string, order: string }) => {
 }
 
 const applyIndexTrendShortcut = (range: MemberTrendShortcut) => {
-  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5, '10y': 10, '20y': 20 }
+  const monthMap: Record<MemberTrendShortcut, number> = { '2m': 2, '1y': 12, '3y': 36, '5y': 60, '10y': 120, '20y': 240 }
   const endDate = new Date()
   const startDate = new Date()
-  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+  startDate.setMonth(endDate.getMonth() - monthMap[range])
   indexTrendDateRange.start = formatDateToYYYYMMDDWithDash(startDate)
   indexTrendDateRange.end = formatDateToYYYYMMDDWithDash(endDate)
 }
@@ -1242,93 +1283,12 @@ const handleIndexTrendShortcutChange = (range: MemberTrendShortcut) => {
 const showIndexDetail = (row: IndexRpsItem) => {
   indexTrendBoard.code = row.ts_code
   indexTrendBoard.name = row.name
-  indexTrendShortcut.value = '1y'
+  indexTrendShortcut.value = '2m'
   indexTrendData.value = []
-  applyIndexTrendShortcut('1y')
+  applyIndexTrendShortcut('2m')
   indexTrendDialogVisible.value = true
   loadIndexTrendData()
 }
-
-const LeadRiseDetailDialog = defineComponent({
-  name: 'LeadRiseDetailDialog',
-  props: {
-    modelValue: { type: Boolean, default: false },
-    tsCode: { type: String, required: true },
-    idxType: { type: String, required: true },
-    name: { type: String, default: '' }
-  },
-  emits: ['update:modelValue'],
-  setup(props, { emit }) {
-    const visible = ref(props.modelValue)
-    const loading = ref(false)
-    const records = ref<DcIndexRecord[]>([])
-
-    const loadData = async () => {
-      if (!props.tsCode || !props.idxType) return
-      loading.value = true
-      try {
-        const data = await fetchDcIndexLastNDays({ tsCode: props.tsCode, name: props.name }, 30)
-        records.value = (data.records || []).sort((a, b) => a.trade_date.localeCompare(b.trade_date))
-      } catch (e) {
-        console.error('获取dc_daily数据失败:', e)
-        records.value = []
-      } finally {
-        loading.value = false
-      }
-    }
-
-    watch(() => props.modelValue, (val) => {
-      visible.value = val
-      if (val) {
-        loadData()
-      }
-    })
-
-    watch(() => props.tsCode, (newVal) => {
-      if (visible.value && newVal) {
-        loadData()
-      }
-    })
-
-    const close = () => emit('update:modelValue', false)
-
-    return () => h(
-      ElDialog as any,
-      {
-        modelValue: visible.value,
-        'onUpdate:modelValue': (v: boolean) => emit('update:modelValue', v),
-        title: `领涨数据详情 - ${props.name || props.tsCode}`,
-        width: '1200px'
-      },
-      {
-        default: () => [
-          h('div', { style: 'margin-bottom: 12px; color: #909399;' }, `近30天概念板块（领涨）：${props.idxType}`),
-          h(
-            ElTable as any,
-            { data: records.value, stripe: true, border: true, height: 420 },
-            {
-              default: () => [
-                h(ElTableColumn as any, { prop: 'trade_date', label: '日期', width: 110, align: 'center' }),
-                h(ElTableColumn as any, { prop: 'name', label: '概念名称', minWidth: 150 }),
-                h(ElTableColumn as any, { prop: 'leading', label: '领涨股票', minWidth: 150 }),
-                h(ElTableColumn as any, { prop: 'leading_code', label: '领涨代码', width: 120, align: 'center' }),
-                h(ElTableColumn as any, { prop: 'leading_pct', label: '领涨涨幅%', width: 110, align: 'center' }),
-                h(ElTableColumn as any, { prop: 'pct_change', label: '板块涨幅%', width: 110, align: 'center' }),
-                h(ElTableColumn as any, { prop: 'total_mv', label: '总市值', width: 120, align: 'center' }),
-                h(ElTableColumn as any, { prop: 'turnover_rate', label: '换手率', width: 100, align: 'center' }),
-                h(ElTableColumn as any, { prop: 'up_num', label: '上涨家数', width: 100, align: 'center' }),
-                h(ElTableColumn as any, { prop: 'down_num', label: '下跌家数', width: 100, align: 'center' })
-              ]
-            }
-          )
-        ],
-        footer: () => [
-          h(ElButton as any, { onClick: close }, '关闭')
-        ]
-      }
-    )
-  }
-})
 
 const detailDialogVisible = ref(false)
 const currentTsCode = ref('')
@@ -1434,10 +1394,10 @@ const memberRpsTableRowClassName = ({ row }: { row: DcBoardMemberRpsItem }) => {
 }
 
 const applyMemberStockTrendShortcut = (range: MemberTrendShortcut) => {
-  const yearMap: Record<MemberTrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5, '10y': 10, '20y': 20 }
+  const monthMap: Record<MemberTrendShortcut, number> = { '2m': 2, '1y': 12, '3y': 36, '5y': 60, '10y': 120, '20y': 240 }
   const endDate = new Date()
   const startDate = new Date()
-  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+  startDate.setMonth(endDate.getMonth() - monthMap[range])
   memberStockTrendDateRange.start = formatDateToYYYYMMDDWithDash(startDate)
   memberStockTrendDateRange.end = formatDateToYYYYMMDDWithDash(endDate)
 }
@@ -1480,9 +1440,9 @@ const handleMemberStockTrendShortcutChange = (range: MemberTrendShortcut) => {
 const openMemberStockTrendDialog = (row: DcBoardMemberRpsItem) => {
   memberStockTrendStock.code = row.ts_code
   memberStockTrendStock.name = row.name
-  memberStockTrendShortcut.value = '1y'
+  memberStockTrendShortcut.value = '2m'
   memberStockTrendData.value = []
-  applyMemberStockTrendShortcut('1y')
+  applyMemberStockTrendShortcut('2m')
   memberStockTrendDialogVisible.value = true
   loadMemberStockTrendData()
 }
@@ -1732,6 +1692,22 @@ watch(() => route.query.level, (level) => {
   color: #67c23a;
 }
 
+.extreme-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.extreme-name {
+  font-size: 11px;
+  color: #909399;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rank-indicator {
   display: flex;
   justify-content: center;
@@ -1793,6 +1769,17 @@ watch(() => route.query.level, (level) => {
 
 .trend-preview-card {
   min-height: 220px;
+}
+
+:deep(.trend-preview-card.el-card) {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+:deep(.trend-preview-card .el-card__body) {
+  padding: 0;
 }
 
 .member-rps-toolbar {

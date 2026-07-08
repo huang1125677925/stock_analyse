@@ -44,9 +44,9 @@
         </div>
       </template>
       <el-table :data="comparisonRows" border stripe style="width: 100%" empty-text="暂无指数估值对比数据">
-        <el-table-column prop="label" label="指数" min-width="160" fixed="left" />
+        <el-table-column prop="label" label="指数" min-width="160" fixed="left" align="center" />
         <el-table-column prop="latestTradeDate" label="最新日期" min-width="120" align="center" />
-        <el-table-column label="最新估值" min-width="140" align="right">
+        <el-table-column label="最新估值" min-width="140" align="center">
           <template #default="{ row }">
             {{ formatMetricValue(row.latestValue) }}
           </template>
@@ -63,7 +63,7 @@
             <span v-else>--</span>
           </template>
         </el-table-column>
-        <el-table-column prop="totalCount" label="样本数" min-width="100" align="right" />
+        <el-table-column prop="totalCount" label="样本数" min-width="100" align="center" />
       </el-table>
     </el-card>
 
@@ -172,7 +172,7 @@ const metricLabel = computed(() => metricOptions.find(opt => opt.value === selec
 
 // 查询时间范围：以截止日期为基准，向前回溯指定年数
 const endDate = ref<string>('')
-const lookbackYears = ref<number>(1)
+const lookbackYears = ref<number>(3)
 const dateRange = computed<[string, string]>(() => buildYearDateRange(lookbackYears.value, endDate.value))
 const dateRangeText = computed(() => {
   const [startDate, finalDate] = dateRange.value
@@ -232,6 +232,11 @@ const comparisonRows = computed<ComparisonRow[]>(() => datasets.value.map(datase
     type: dataset.valuation?.type ?? 'info',
     totalCount: dataset.totalCount,
   }
+}).sort((a, b) => {
+  // 按历史分位从低到高排列，无分位数据的排在最后
+  if (a.percentile === null) return 1
+  if (b.percentile === null) return -1
+  return a.percentile - b.percentile
 }))
 
 // ECharts 相关
