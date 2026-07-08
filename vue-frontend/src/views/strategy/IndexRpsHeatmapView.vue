@@ -165,6 +165,7 @@
         <HeatmapChart
           v-if="heatmapOption"
           :option="heatmapOption"
+          :min-auto-height="isMobile ? 300 : 500"
           @chart-click="onHeatmapClick"
         />
         <el-empty v-else description="暂无可展示的RPS数据" />
@@ -1071,41 +1072,58 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
         return `${row?.name ?? ''}<br/>${col?.label ?? ''} ${metricLabel}: ${valueText}`
       }
     },
-    grid: { left: 140, right: 80, top: 60, bottom: 20, containLabel: true },
+    grid: isMobile.value
+      ? { left: 68, right: 12, top: 35, bottom: 50, containLabel: true }
+      : { left: 140, right: 80, top: 60, bottom: 20, containLabel: true },
     xAxis: {
       type: 'category',
       data: xLabels,
       position: 'top',
       splitArea: { show: true },
-      axisLabel: { rotate: 0, hideOverlap: true, interval: 'auto' }
+      axisLabel: { rotate: 0, hideOverlap: true, interval: 'auto', fontSize: isMobile.value ? 9 : undefined }
     },
     yAxis: {
       type: 'category',
       data: yLabels,
-      splitArea: { show: true }
+      splitArea: { show: true },
+      axisLabel: isMobile.value
+        ? { width: 68, overflow: 'truncate', ellipsis: '...', fontSize: 10 }
+        : {}
     },
-    visualMap: {
-      ...visualMap,
-      calculable: true,
-      orient: 'vertical',
-      right: 10,
-      top: 40,
-      bottom: 40
-    },
+    visualMap: isMobile.value
+      ? {
+          ...visualMap,
+          orient: 'horizontal',
+          bottom: 5,
+          left: 'center',
+          itemWidth: 14,
+          itemHeight: 10,
+          textStyle: { fontSize: 9 }
+        }
+      : {
+          ...visualMap,
+          calculable: true,
+          orient: 'vertical',
+          right: 10,
+          top: 40,
+          bottom: 40
+        },
     series: [{
       type: 'heatmap',
       data,
-      label: {
-        show: true,
-        fontSize: 9,
-        formatter: (params: any) => `${Number(params.data[2]).toFixed(isRps ? 0 : 1)}`
-      },
-      itemStyle: { borderColor: '#fff', borderWidth: 1 },
+      label: isMobile.value
+        ? { show: false }
+        : {
+            show: true,
+            fontSize: 9,
+            formatter: (params: any) => `${Number(params.data[2]).toFixed(isRps ? 0 : 1)}`
+          },
+      itemStyle: { borderColor: '#fff', borderWidth: isMobile.value ? 0.5 : 1 },
       emphasis: {
         itemStyle: { shadowBlur: 5, shadowColor: 'rgba(0, 0, 0, 0.3)' },
         label: {
           show: true,
-          fontSize: 10,
+          fontSize: isMobile.value ? 8 : 10,
           formatter: (params: any) => `${Number(params.data[2]).toFixed(1)}`
         }
       }

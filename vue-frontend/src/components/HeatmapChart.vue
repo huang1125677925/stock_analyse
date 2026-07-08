@@ -16,6 +16,7 @@
  * - option: ECharts配置选项
  * - height: 图表高度（可选，默认自动计算）
  * - autoResize: 是否自动调整大小（默认true）
+ * - minAutoHeight: 自动计算时的最小高度（默认 500）
  * 
  * Events:
  * - chartReady: 图表初始化完成
@@ -37,10 +38,13 @@ interface Props {
   height?: number
   /** 是否自动调整大小 */
   autoResize?: boolean
+  /** 自动计算时的最小高度，默认 500 */
+  minAutoHeight?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  autoResize: true
+  autoResize: true,
+  minAutoHeight: 500
 })
 
 const emit = defineEmits<{
@@ -61,13 +65,13 @@ const containerHeight = computed(() => {
   const yAxisData = props.option?.yAxis as any
   if (yAxisData && Array.isArray(yAxisData) && yAxisData[0]?.data) {
     const dataLength = yAxisData[0].data.length
-    return Math.max(500, dataLength * 22 + 120)
+    return Math.max(props.minAutoHeight, dataLength * 22 + 120)
   } else if (yAxisData && yAxisData.data) {
     const dataLength = yAxisData.data.length
-    return Math.max(500, dataLength * 22 + 120)
+    return Math.max(props.minAutoHeight, dataLength * 22 + 120)
   }
   
-  return 500
+  return props.minAutoHeight
 })
 
 // 初始化图表
