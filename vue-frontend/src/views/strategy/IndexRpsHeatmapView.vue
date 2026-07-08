@@ -181,7 +181,7 @@
         <el-dialog
           v-model="actionSelectVisible"
           :title="`选择查看方式 - ${actionSelectRow?.name ?? ''}`"
-          width="420px"
+          :width="isMobile ? '90%' : '420px'"
           append-to-body
         >
           <div class="action-select-body">
@@ -265,7 +265,7 @@
         <el-dialog
           v-model="memberRpsDialogVisible"
           :title="`成分股RPS强度 - ${memberRpsBoardName || memberRpsBoardTsCode}`"
-          width="1400px"
+          :width="isMobile ? '96%' : '1400px'"
           top="5vh"
           destroy-on-close
         >
@@ -2219,10 +2219,6 @@ watch(() => route.query.level, (level) => {
       padding: 8px 10px;
       font-size: 12px;
     }
-  }
-
-  :deep(.el-dialog) {
-    width: 96% !important;
   }
 
   .member-rps-toolbar,
