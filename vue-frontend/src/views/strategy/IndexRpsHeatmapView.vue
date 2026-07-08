@@ -2097,16 +2097,56 @@ watch(() => route.query.level, (level) => {
     padding: 0;
   }
 
-  .control-item,
-  .control-search,
-  .simple-filter-select,
-  .strength-filter-select,
-  .relation-filter-select {
+  .toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .table-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
     width: 100%;
+  }
+
+  .control-item,
+  .control-search {
+    width: 100% !important;
+  }
+
+  .table-summary {
+    width: 100%;
+  }
+
+  .table-header {
+    gap: 12px;
+  }
+
+  .simple-filter-panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding-top: 0;
   }
 
   .simple-filter-group {
     width: 100%;
+
+    :deep(.el-select),
+    :deep(.el-input) {
+      width: 100% !important;
+    }
+  }
+
+  .simple-filter-select,
+  .strength-filter-select,
+  .relation-filter-select {
+    width: 100% !important;
+  }
+
+  .simple-filter-label {
+    font-weight: 500;
   }
 
   .amount-range-inputs {
@@ -2116,19 +2156,79 @@ watch(() => route.query.level, (level) => {
   .amount-range-select {
     flex: 1;
     min-width: 0;
-    width: auto;
+    width: auto !important;
   }
 
-  .table-summary {
+  .simple-filter-reset {
     width: 100%;
   }
 
+  .action-select-buttons {
+    flex-direction: column;
+    gap: 10px;
+
+    .el-button {
+      width: 100%;
+    }
+  }
+
+  .methodology {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  :deep(.heatmap-chart) {
+    min-height: 300px;
+  }
+
   :deep(.rps-card .el-card__header) {
-    padding: 16px 12px;
+    padding: 16px 0 12px;
   }
 
   :deep(.rps-card .el-card__body) {
     padding: 0 0 12px;
+  }
+
+  .trend-shortcuts {
+    width: 100%;
+    overflow-x: auto;
+
+    :deep(.el-radio-group) {
+      flex-wrap: nowrap;
+    }
+
+    :deep(.el-radio-button__inner) {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+  }
+
+  :deep(.el-dialog) {
+    width: 96% !important;
+  }
+
+  .member-rps-toolbar,
+  .member-rps-filter-toolbar {
+    .table-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      width: 100%;
+
+      .control-item,
+      .member-rps-date {
+        width: 100% !important;
+      }
+    }
+  }
+
+  .member-rps-date {
+    width: 100% !important;
+  }
+
+  .period-statistics-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 </style>
