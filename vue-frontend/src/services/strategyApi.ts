@@ -54,6 +54,8 @@ export interface MajorIndexRpsData {
 export interface DcBoardMemberRpsItem {
   ts_code: string
   name: string
+  market: string | null
+  close: number | null
   pct_change: number | null
   RPS_today: number | null
   [key: `return_${number}`]: number | null

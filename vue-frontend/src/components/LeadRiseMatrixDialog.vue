@@ -117,14 +117,20 @@ watch(() => props.tsCode, (newVal) => {
   if (props.modelValue && newVal) loadData()
 })
 
-// 日期维度：每个交易日的板块涨幅与涨跌家数
+// 日期维度：仅取实际有交易数据的交易日（去重后按日期升序），
+// 节假日和周末没有交易数据，因此不会出现在日期轴上
 const dates = computed(() => {
-  return records.value.map(r => ({
-    date: r.trade_date,
-    pct_change: Number(r.pct_change) || 0,
-    up_num: Number(r.up_num) || 0,
-    down_num: Number(r.down_num) || 0
-  }))
+  const map = new Map<string, { date: string; pct_change: number; up_num: number; down_num: number }>()
+  for (const r of records.value) {
+    if (map.has(r.trade_date)) continue
+    map.set(r.trade_date, {
+      date: r.trade_date,
+      pct_change: Number(r.pct_change) || 0,
+      up_num: Number(r.up_num) || 0,
+      down_num: Number(r.down_num) || 0
+    })
+  }
+  return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
 })
 
 // 领涨股票维度：按领涨天数降序排列

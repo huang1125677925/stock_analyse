@@ -403,6 +403,42 @@
             <div class="toolbar-row member-rps-filter-toolbar">
               <div class="table-controls">
                 <div class="simple-filter-group">
+                  <div class="simple-filter-label">市场类型</div>
+                  <el-select
+                    v-model="memberRpsMarketFilter"
+                    placeholder="全部市场"
+                    clearable
+                    class="control-item"
+                  >
+                    <el-option
+                      v-for="option in memberRpsMarketOptions"
+                      :key="option.value"
+                      :label="option.label"
+                      :value="option.value"
+                    />
+                  </el-select>
+                </div>
+                <div class="simple-filter-group">
+                  <div class="simple-filter-label">收盘价范围</div>
+                  <div class="amount-range-inputs">
+                    <el-input-number
+                      v-model="memberRpsMinPrice"
+                      :min="0"
+                      :controls="false"
+                      placeholder="最低价"
+                      class="price-range-input"
+                    />
+                    <span class="amount-range-separator">-</span>
+                    <el-input-number
+                      v-model="memberRpsMaxPrice"
+                      :min="0"
+                      :controls="false"
+                      placeholder="最高价"
+                      class="price-range-input"
+                    />
+                  </div>
+                </div>
+                <div class="simple-filter-group">
                   <div class="simple-filter-label">涨跌幅筛选</div>
                   <el-select
                     v-model="memberRpsFilterPeriod"
@@ -563,6 +599,20 @@
                   >
                     {{ scope.row.name }}
                   </el-button>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="market" label="市场" :min-width="isMobile ? 80 : 90" align="center">
+                <template #default="scope">
+                  <el-tag v-if="scope.row.market" size="small" type="info" effect="plain">{{ scope.row.market }}</el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="close" label="收盘价" :min-width="isMobile ? 80 : 100" sortable="custom" align="center">
+                <template #default="scope">
+                  <span v-if="scope.row.close !== null && scope.row.close !== undefined">{{ getNumericValue(scope.row.close).toFixed(2) }}</span>
+                  <span v-else>-</span>
                 </template>
               </el-table-column>
 
@@ -760,6 +810,11 @@ const memberRpsPeriods = ref<number[]>([])
 const memberRpsBoardRpsData = ref<IndexRpsItem | null>(null)
 const memberRpsFilterPeriod = ref<number | null>(null)
 const memberRpsFilterMode = ref<'all' | 'above' | 'below'>('all')
+// 成分股市场类型筛选，默认展示主板成分股
+const memberRpsMarketFilter = ref<string>('主板')
+// 成分股收盘价筛选（区间，空字符串表示不限）
+const memberRpsMinPrice = ref<number | null>(null)
+const memberRpsMaxPrice = ref<number | null>(null)
 let memberRpsRequestId = 0
 const memberStockTrendDialogVisible = ref(false)
 const memberStockTrendLoading = ref(false)
@@ -780,7 +835,7 @@ const selectedStrengthFields = ref<RpsField[]>([])
 const minimumStrengthRank = ref<StrengthRankThreshold>('all')
 const changeRelationMode = ref<ChangeRelationMode>('all')
 const turnoverData = ref<IndustryTurnoverPercentileItem[]>([])
-const minAmount = ref<number>(10000000000)
+const minAmount = ref<number>(30000000000)
 const maxAmount = ref<number>(0)
 
 const amountFilterOptions: Array<{ label: string; value: number }> = [
@@ -818,6 +873,15 @@ const memberRpsFilterModeOptions = [
   { label: '全部成分股', value: 'all' },
   { label: '强于行业', value: 'above' },
   { label: '弱于行业', value: 'below' }
+]
+
+// 成分股市场类型筛选选项，默认展示主板
+const memberRpsMarketOptions = [
+  { label: '全部市场', value: '' },
+  { label: '主板', value: '主板' },
+  { label: '创业板', value: '创业板' },
+  { label: '科创板', value: '科创板' },
+  { label: '北交所', value: '北交所' }
 ]
 
 const hasActiveSimpleFilter = computed(() => {
@@ -1015,6 +1079,23 @@ const filteredMemberRpsData = computed(() => {
     result = result.filter((item) => item.name.includes(keyword) || item.ts_code.includes(keyword))
   }
 
+  // 市场类型筛选（默认主板）
+  if (memberRpsMarketFilter.value) {
+    result = result.filter((item) => item.market === memberRpsMarketFilter.value)
+  }
+
+  // 收盘价区间筛选
+  if (memberRpsMinPrice.value !== null || memberRpsMaxPrice.value !== null) {
+    const min = memberRpsMinPrice.value
+    const max = memberRpsMaxPrice.value
+    result = result.filter((item) => {
+      if (item.close === null || item.close === undefined) return false
+      if (min !== null && item.close < min) return false
+      if (max !== null && item.close > max) return false
+      return true
+    })
+  }
+
   // 涨跌幅相对行业筛选
   if (memberRpsFilterMode.value !== 'all' && memberRpsFilterPeriod.value !== null && memberRpsBoardRpsData.value) {
     const period = memberRpsFilterPeriod.value
@@ -1041,6 +1122,8 @@ const filteredMemberRpsData = computed(() => {
     const boardRow: DcBoardMemberRpsItem = {
       ts_code: memberRpsBoardRpsData.value.ts_code,
       name: `【行业】${memberRpsBoardRpsData.value.name}`,
+      market: null,
+      close: null,
       pct_change: memberRpsBoardRpsData.value.pct_change,
       RPS_today: memberRpsBoardRpsData.value.RPS_today
     }
@@ -1589,6 +1672,10 @@ watch(() => route.query.level, (level) => {
 
 .amount-range-select {
   width: 110px;
+}
+
+.price-range-input {
+  width: 100px;
 }
 
 .amount-range-separator {
