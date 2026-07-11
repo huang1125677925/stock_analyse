@@ -96,6 +96,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 interface TrendDataItem {
   [key: string]: any
@@ -135,6 +138,9 @@ const selectedYFields = ref<string[]>([])
 const dateRangeType = ref('all')
 
 const availableYFields = computed(() => props.yFields)
+
+// 移动端压缩图表高度以提升单屏内容密度
+const effectiveHeight = computed(() => (isMobile.value ? '320px' : props.height))
 
 const filteredData = computed(() => {
   if (!props.data || props.data.length === 0) return []
@@ -324,37 +330,46 @@ const updateChart = async () => {
     })
   })
   
+  const mobile = isMobile.value
+
   const option = {
     title: {
       // text: props.title,
       subtext: `数据范围: ${startDate.value} 至 ${endDate.value} (共${filteredData.value.length}条记录)`,
-      left: 'center'
+      left: 'center',
+      subtextStyle: { fontSize: mobile ? 10 : 12 }
     },
     tooltip: {
       trigger: 'axis',
+      confine: true,
       formatter: function(params: any) {
         const dataIndex = params[0].dataIndex
         const dataItem = filteredData.value[dataIndex]
         let result = `日期: ${dataItem[props.dateField]}<br/>`
-        
+
         params.forEach((param: any) => {
           result += `${param.seriesName}: ${param.value}<br/>`
         })
-        
+
         return result
       }
     },
     legend: {
       data: selectedYFields.value.map(fieldKey => getFieldLabel(fieldKey)),
-      top: 40
+      type: 'scroll',
+      top: mobile ? 26 : 40,
+      textStyle: { fontSize: mobile ? 11 : 12 }
     },
     grid: {
-      left: '3%',
-      right: yAxes.length > 1 ? '8%' : '4%',
-      bottom: '15%',
+      left: mobile ? 6 : '3%',
+      right: mobile ? 10 : (yAxes.length > 1 ? '8%' : '4%'),
+      top: mobile ? 56 : 70,
+      bottom: mobile ? 64 : '15%',
       containLabel: true
     },
+    // 移动端隐藏 toolbox，避免与 legend / 标题重叠
     toolbox: {
+      show: !mobile,
       feature: {
         dataZoom: {
           yAxisIndex: 'none'
@@ -363,28 +378,30 @@ const updateChart = async () => {
         saveAsImage: {}
       }
     },
-    dataZoom: [
-      {
-        type: 'inside',
-        start: 0,
-        end: 100
-      },
-      {
-        start: 0,
-        end: 100
-      }
-    ],
+    dataZoom: mobile
+      // 移动端仅保留内置缩放 + 底部独立滑块，滑块留出独立高度不压 x 轴标签
+      ? [
+          { type: 'inside', start: 0, end: 100 },
+          { type: 'slider', height: 16, bottom: 6, start: 0, end: 100 }
+        ]
+      : [
+          { type: 'inside', start: 0, end: 100 },
+          { start: 0, end: 100 }
+        ],
     xAxis: {
       type: 'category',
       data: dates,
       axisLabel: {
-        rotate: 45
+        rotate: mobile ? 45 : 45,
+        hideOverlap: true,
+        interval: 'auto',
+        fontSize: mobile ? 10 : 12
       }
     },
     yAxis: yAxes,
     series: series
   }
-  
+
   chart.setOption(option, true)
 }
 
@@ -418,6 +435,13 @@ watch(() => props.data, () => {
     }
   }
 }, { deep: true })
+
+// 断点切换时重算 option 并 resize（高度也随之变化）
+watch(isMobile, () => {
+  if (!chart) return
+  updateChart()
+  nextTick(() => chart?.resize())
+})
 
 onMounted(() => {
   nextTick(() => {
@@ -481,7 +505,7 @@ onUnmounted(() => {
 
 .chart-container {
   width: 100%;
-  height: v-bind(height);
+  height: v-bind(effectiveHeight);
   border: 1px solid #e0e0e0;
   border-radius: 4px;
 }

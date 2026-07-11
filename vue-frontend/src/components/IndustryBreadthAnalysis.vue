@@ -224,6 +224,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import HeatmapChart from '@/components/HeatmapChart.vue'
+import { useIsMobile } from '@/composables/useIsMobile'
 import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import {
   fetchIndustryMaBreadth,
@@ -298,6 +299,8 @@ const leadRiseVisible = ref(false)
 const leadRiseTsCode = ref('')
 const leadRiseName = ref('')
 const leadRiseIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
+
+const { isMobile } = useIsMobile()
 
 // 计算日期范围字符串（YYYY-MM-DD）
 function formatDate(d: Date): string {
@@ -586,10 +589,12 @@ const heatmapData = computed<[number, number, number][]>(() => {
 // 计算热力图配置
 const heatmapOption = computed<echarts.EChartsOption | null>(() => {
   if (dates.value.length === 0 || industries.value.length === 0 || heatmapData.value.length === 0) return null
+  const mobile = isMobile.value
   return {
     animation: false,
     tooltip: {
       position: 'top',
+      confine: true,
       formatter: (params: any) => {
         const [x, y, v] = params?.data ?? []
         const date = typeof x === 'number' ? dates.value[x] : ''
@@ -597,28 +602,42 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
         return `${date}<br/>${industry}<br/>宽度比例: ${(Number(v) * 100).toFixed(2)}%`
       }
     },
-    // 加大左右与顶部边距，给上方日期与右侧颜色条留空间
-    grid: { left: 140, right: 80, top: 80, bottom: 20 },
+    // 桌面端左右留大边距给行业名与颜色条；移动端收紧边距，颜色条移到底部横向，最大化矩阵宽度
+    grid: mobile
+      ? { left: 4, right: 6, top: 34, bottom: 56, containLabel: true }
+      : { left: 140, right: 80, top: 80, bottom: 20 },
     xAxis: {
       type: 'category',
       data: dates.value,
-      // 将日期轴放在上方，并优化标签拥挤问题
-      position: 'top',
-      axisLabel: { rotate: 0, hideOverlap: true, interval: 'auto' }
+      // 桌面端日期轴放在上方；移动端放在底部并旋转、去掉年份省宽
+      position: mobile ? 'bottom' : 'top',
+      axisLabel: {
+        rotate: mobile ? 45 : 0,
+        hideOverlap: true,
+        interval: 'auto',
+        fontSize: mobile ? 9 : 12,
+        formatter: mobile ? (v: string) => (v && v.length >= 10 ? v.slice(5) : v) : undefined
+      }
     },
     yAxis: {
       type: 'category',
-      data: industries.value
+      data: industries.value,
+      axisLabel: {
+        fontSize: mobile ? 10 : 12,
+        // 移动端限制行业名宽度并截断，避免占用过多横向空间
+        ...(mobile ? { width: 52, overflow: 'truncate' as const } : {})
+      }
     },
     visualMap: {
       min: 0,
       max: 1,
       calculable: true,
-      // 改为纵向颜色条放在右侧
-      orient: 'vertical',
-      right: 10,
-      top: 40,
-      bottom: 40,
+      // 桌面端纵向放右侧；移动端横向放底部
+      orient: mobile ? 'horizontal' : 'vertical',
+      ...(mobile
+        ? { left: 'center', bottom: 2, itemWidth: 12, itemHeight: 70 }
+        : { right: 10, top: 40, bottom: 40 }),
+      textStyle: { fontSize: mobile ? 10 : 12 },
       inRange: {
         color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
       }
@@ -627,14 +646,15 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
       type: 'heatmap',
       data: heatmapData.value,
       label: {
-        show: true,
+        // 移动端单元格过小，隐藏格内数字避免重叠不可读；数值改由 tooltip 展示
+        show: !mobile,
         fontSize: 9,
         formatter: (params: any) => {
           const value = params.data[2]
           return `${(Number(value) * 100).toFixed(0)}`
         }
       },
-      itemStyle: { borderColor: '#fff', borderWidth: 1 },
+      itemStyle: { borderColor: '#fff', borderWidth: mobile ? 0.5 : 1 },
       emphasis: {
         itemStyle: { shadowBlur: 5, shadowColor: 'rgba(0, 0, 0, 0.3)' },
         label: {

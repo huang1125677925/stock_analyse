@@ -30,6 +30,9 @@
 
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import * as echarts from 'echarts'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 interface Props {
   /** ECharts配置选项 */
@@ -60,18 +63,22 @@ const containerHeight = computed(() => {
   if (props.height) {
     return props.height
   }
-  
+
+  // 移动端压缩每行高度与最小高度，避免过高的纵向滚动、提升单屏密度
+  const perRow = isMobile.value ? 18 : 22
+  const minH = isMobile.value ? Math.min(props.minAutoHeight, 360) : props.minAutoHeight
+
   // 根据option中的数据自动计算高度
   const yAxisData = props.option?.yAxis as any
   if (yAxisData && Array.isArray(yAxisData) && yAxisData[0]?.data) {
     const dataLength = yAxisData[0].data.length
-    return Math.max(props.minAutoHeight, dataLength * 22 + 120)
+    return Math.max(minH, dataLength * perRow + 120)
   } else if (yAxisData && yAxisData.data) {
     const dataLength = yAxisData.data.length
-    return Math.max(props.minAutoHeight, dataLength * 22 + 120)
+    return Math.max(minH, dataLength * perRow + 120)
   }
-  
-  return props.minAutoHeight
+
+  return minH
 })
 
 // 初始化图表
@@ -120,21 +127,33 @@ watch(containerHeight, () => {
   })
 })
 
-// 窗口大小变化时自动调整
+// 容器尺寸变化时自动调整（ResizeObserver 能捕捉窗口 resize 之外的宽度变化，
+// 如侧栏收起、Tab 切换显示等场景，避免画布被挤压或溢出）
+let resizeObserver: ResizeObserver | null = null
+let resizeRaf = 0
 const handleResize = () => {
-  if (chart && props.autoResize) {
-    chart.resize()
-  }
+  if (!(chart && props.autoResize)) return
+  cancelAnimationFrame(resizeRaf)
+  resizeRaf = requestAnimationFrame(() => chart?.resize())
 }
 
 onMounted(() => {
   initChart()
   if (props.autoResize) {
     window.addEventListener('resize', handleResize)
+    if (typeof ResizeObserver !== 'undefined' && chartContainer.value) {
+      resizeObserver = new ResizeObserver(handleResize)
+      resizeObserver.observe(chartContainer.value)
+    }
   }
 })
 
 onUnmounted(() => {
+  cancelAnimationFrame(resizeRaf)
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
   if (chart) {
     chart.dispose()
     chart = null

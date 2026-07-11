@@ -40,6 +40,13 @@ const selectedIndustries = ref<string[]>([])
   }
 }
 @media (max-width: 768px) {
-  .congestion-page { padding: 12px; }
+  .congestion-page {
+    padding: 12px;
+    .header-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+  }
 }
 </style>

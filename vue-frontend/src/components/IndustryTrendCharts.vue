@@ -70,10 +70,31 @@
 import { ref, watch, onMounted, nextTick, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { 
+import {
   getIndustryPerformanceReports,
   type IndustryPerformanceReport
 } from '../services/industryAnalysisApi'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
+
+// 各图表通用的移动端 x 轴 / grid / legend 配置
+const mobileXAxisLabel = () => ({
+  rotate: isMobile.value ? 45 : 0,
+  hideOverlap: true,
+  interval: 'auto' as const,
+  fontSize: isMobile.value ? 10 : 12
+})
+const mobileGrid = () =>
+  isMobile.value
+    ? { left: 8, right: 8, top: 48, bottom: 56, containLabel: true }
+    : { left: 12, right: 12, top: 56, bottom: 32, containLabel: true }
+const scrollLegend = (data: string[]) => ({ data, type: 'scroll' as const, top: 0 })
+// 万元 → 亿元 紧凑显示，避免 y 轴长数字裁切
+const compactWan = (value: number) => {
+  if (Math.abs(value) >= 10000) return (value / 10000).toFixed(1) + '亿'
+  return value + ''
+}
 
 // Props定义
 interface Props {
@@ -168,28 +189,32 @@ const renderRevenueChart = () => {
         type: 'cross'
       }
     },
-    legend: {
-      data: ['营业收入', '净利润']
-    },
+    legend: scrollLegend(['营业收入', '净利润']),
+    grid: mobileGrid(),
     xAxis: {
       type: 'category',
-      data: quarters
+      data: quarters,
+      axisLabel: mobileXAxisLabel()
     },
     yAxis: [
       {
         type: 'value',
-        name: '营业收入 (万元)',
+        name: isMobile.value ? '收入' : '营业收入 (万元)',
         position: 'left',
+        nameTextStyle: { fontSize: isMobile.value ? 10 : 12 },
         axisLabel: {
-          formatter: '{value}'
+          fontSize: isMobile.value ? 10 : 12,
+          formatter: (v: number) => compactWan(v)
         }
       },
       {
         type: 'value',
-        name: '净利润 (万元)',
+        name: isMobile.value ? '利润' : '净利润 (万元)',
         position: 'right',
+        nameTextStyle: { fontSize: isMobile.value ? 10 : 12 },
         axisLabel: {
-          formatter: '{value}'
+          fontSize: isMobile.value ? 10 : 12,
+          formatter: (v: number) => compactWan(v)
         }
       }
     ],
@@ -260,17 +285,18 @@ const renderGrowthChart = () => {
         return result
       }
     },
-    legend: {
-      data: ['营业收入增长率', '净利润增长率', '毛利率']
-    },
+    legend: scrollLegend(['营业收入增长率', '净利润增长率', '毛利率']),
+    grid: mobileGrid(),
     xAxis: {
       type: 'category',
-      data: quarters
+      data: quarters,
+      axisLabel: mobileXAxisLabel()
     },
     yAxis: {
       type: 'value',
-      name: '百分比 (%)',
+      name: isMobile.value ? '' : '百分比 (%)',
       axisLabel: {
+        fontSize: isMobile.value ? 10 : 12,
         formatter: '{value}%'
       }
     },
@@ -351,17 +377,18 @@ const renderRoeChart = () => {
         return result
       }
     },
-    legend: {
-      data: ['ROE', 'ROA']
-    },
+    legend: scrollLegend(['ROE', 'ROA']),
+    grid: mobileGrid(),
     xAxis: {
       type: 'category',
-      data: quarters
+      data: quarters,
+      axisLabel: mobileXAxisLabel()
     },
     yAxis: {
       type: 'value',
-      name: '百分比 (%)',
+      name: isMobile.value ? '' : '百分比 (%)',
       axisLabel: {
+        fontSize: isMobile.value ? 10 : 12,
         formatter: '{value}%'
       }
     },
@@ -409,6 +436,15 @@ const handleResize = () => {
 watch([() => props.industry, () => props.quarter], () => {
   fetchIndustryData()
 }, { immediate: false })
+
+// 断点切换时重算 option（含 grid / 标签旋转 / 轴名称）并适配高度
+watch(isMobile, () => {
+  if (chartData.value.length === 0) return
+  nextTick(() => {
+    renderAllCharts()
+    handleResize()
+  })
+})
 
 // 监听外部日期范围变更，仅重新渲染（无需重新拉取）
 // 已移除外部日期范围监听，趋势图仅根据行业与季度变化重新渲染

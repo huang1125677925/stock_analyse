@@ -323,4 +323,16 @@ onMounted(() => {
 .trend-card {
   margin-bottom: 12px;
 }
+
+@media (max-width: 768px) {
+  /* 内联表单在窄屏堆叠为多行，取消为单行调优的负外边距，避免遮挡下方内容 */
+  .query-form {
+    margin-bottom: 0;
+  }
+
+  /* 行业映射下拉占满整行 */
+  .query-form :deep(.el-select) {
+    width: 100% !important;
+  }
+}
 </style>

@@ -1037,5 +1037,15 @@ onMounted(() => {
   :deep(.industry-drill-dialog) {
     width: 96vw !important;
   }
+
+  /* 分级下拉在窄屏占满整行，不再是孤立的 140px */
+  .level-select {
+    width: 100% !important;
+  }
+
+  /* 详情描述在窄屏改为单列，标签/值不再被挤压 */
+  .dialog-descriptions :deep(.el-descriptions__table) {
+    table-layout: fixed;
+  }
 }
 </style>

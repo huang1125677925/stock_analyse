@@ -91,16 +91,21 @@ a:hover {
 }
 
 @media (max-width: 959px) {
+  /* 去掉 el-main 默认 20px 内边距，改由子元素控制更窄的边距，扩大展示区 */
+  .el-main.main-content {
+    padding: 0 !important;
+  }
+
   .el-main.main-content > * {
-    padding: 12px !important;
+    padding: 8px !important;
   }
 
   .el-card__header {
-    padding: 12px 14px;
+    padding: 10px 10px;
   }
 
   .el-card__body {
-    padding: 12px;
+    padding: 10px;
   }
 
   .el-form--inline {
@@ -206,24 +211,32 @@ a:hover {
   }
 
   .el-table .cell {
-    padding: 0 6px;
-    line-height: 1.45;
+    padding: 0 4px;
+    line-height: 1.4;
   }
 
   .el-table th.el-table__cell,
   .el-table td.el-table__cell {
-    padding: 7px 0;
+    padding: 6px 0;
   }
 
+  /* 横向滚动更顺滑，避免宽表卡顿 */
+  .el-table .el-scrollbar__wrap,
+  .el-table__body-wrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 分页在移动端精简：隐藏 sizes / jumper / total，仅保留翻页 */
   .el-pagination {
-    justify-content: flex-start;
-    gap: 6px;
+    justify-content: center;
+    gap: 4px;
     white-space: normal;
   }
 
   .el-pagination .el-pagination__sizes,
-  .el-pagination .el-pagination__jump {
-    margin-left: 0;
+  .el-pagination .el-pagination__jump,
+  .el-pagination .el-pagination__total {
+    display: none !important;
   }
 
   .el-descriptions__body .el-descriptions__table {
@@ -234,16 +247,41 @@ a:hover {
   .el-descriptions__content {
     word-break: break-word;
   }
+
+  /* 对话框移动端全屏化兜底：贴顶、占满宽高，避免超宽对话框横向溢出遮挡 */
+  .el-dialog:not(.is-fullscreen) {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    border-radius: 0;
+  }
+
+  .el-dialog:not(.is-fullscreen) .el-dialog__body {
+    max-height: calc(100dvh - 108px);
+  }
+
+  .el-overlay-dialog {
+    padding: 0;
+  }
+
+  /* 弹窗内并排的 el-row/el-col 在移动端统一堆叠为整宽 */
+  .el-dialog .el-row > .el-col {
+    max-width: 100%;
+    flex: 0 0 100%;
+  }
 }
 
 @media (max-width: 480px) {
   .el-main.main-content > * {
-    padding: 10px !important;
+    padding: 4px !important;
   }
 
-  .el-card__header,
+  .el-card__header {
+    padding: 8px 8px;
+  }
+
   .el-card__body {
-    padding: 10px;
+    padding: 8px;
   }
 
   .el-dialog {

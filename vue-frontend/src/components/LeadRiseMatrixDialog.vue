@@ -16,20 +16,6 @@
         <span class="matrix-hint">横轴为日期，纵轴为领涨股票；标色格子表示该股当日领涨，格内为领涨涨幅。点击股票名称可在上方趋势图查看其K线</span>
       </div>
 
-      <!-- 对比区：左=板块K线（固定），右=悬停日期当日领涨股K线；随下方矩阵日期列悬停切换 -->
-      <div class="compare-panel">
-        <div class="compare-hint">
-          悬停下方矩阵的<strong>日期列</strong>，右侧即显示当日领涨股K线，与左侧板块K线对照（紫色虚线标记该日）
-        </div>
-        <div class="compare-chart-wrap" :style="{ height: compareChartHeight + 'px' }">
-          <div
-            ref="compareChartRef"
-            class="compare-chart"
-            :style="{ height: compareChartHeight + 'px' }"
-          ></div>
-        </div>
-      </div>
-
       <!-- 趋势图：板块 + 全部领涨股 独立K线小图矩阵 -->
       <div ref="trendPanelRef" class="trend-panel">
         <div class="trend-toolbar">
@@ -63,6 +49,20 @@
             description="当前区间暂无走势数据"
             :image-size="60"
           />
+        </div>
+      </div>
+
+      <!-- 对比区：左=板块K线（固定），右=悬停日期当日领涨股K线；随下方矩阵日期列悬停切换 -->
+      <div class="compare-panel">
+        <div class="compare-hint">
+          悬停下方矩阵的<strong>日期列</strong>，右侧即显示当日领涨股K线，与左侧板块K线对照（紫色虚线标记该日）
+        </div>
+        <div class="compare-chart-wrap" :style="{ height: compareChartHeight + 'px' }">
+          <div
+            ref="compareChartRef"
+            class="compare-chart"
+            :style="{ height: compareChartHeight + 'px' }"
+          ></div>
         </div>
       </div>
 

@@ -88,8 +88,8 @@
         empty-text="暂无大盘指数RPS数据"
         @sort-change="handleSortChange"
       >
-        <el-table-column type="index" label="#" :width="isMobile ? 40 : 60" align="center" :fixed="isMobile ? false : 'left'" />
-        <el-table-column prop="name" label="指数名称" :min-width="isMobile ? 120 : 180" sortable="custom" :fixed="isMobile ? false : 'left'">
+        <el-table-column type="index" label="#" :width="isMobile ? 34 : 60" align="center" :fixed="isMobile ? false : 'left'" />
+        <el-table-column prop="name" label="指数名称" :min-width="isMobile ? 92 : 180" sortable="custom" :fixed="isMobile ? false : 'left'">
           <template #header>
             <div class="custom-header">
               <span>指数名称</span>
@@ -124,7 +124,7 @@
             {{ formatTradeDate(row.trade_date) }}
           </template>
         </el-table-column>
-        <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" min-width="180" align="center" sortable="custom">
+        <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" :min-width="isMobile ? 118 : 180" align="center" sortable="custom">
           <template #default="{ row }">
             <div class="rps-cell rps-cell-with-change">
               <span :class="getChangeClass(row.pct_change)" class="rps-change-text">
@@ -146,7 +146,7 @@
           <el-table-column
             :prop="getRpsProp(period)"
             :label="`${period}日涨跌幅 / RPS_${period}`"
-            min-width="180"
+            :min-width="isMobile ? 118 : 180"
             align="center"
             sortable="custom"
           >
@@ -589,16 +589,35 @@ function handleResize() {
 
   :deep(.page-header .el-card__header),
   :deep(.table-card .el-card__header) {
-    padding: 16px 12px;
+    padding: 10px 8px;
   }
 
   :deep(.page-header .el-card__body),
   :deep(.table-card .el-card__body) {
-    padding: 0 0 12px;
+    padding: 0 0 10px;
   }
 
+  /* 摘要卡片在手机上 2 列排布，提升单屏信息密度 */
   .summary-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .summary-card :deep(.el-card__body) {
+    padding: 10px;
+  }
+
+  .summary-label {
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+
+  .summary-value {
+    font-size: 18px;
+  }
+
+  .summary-name {
+    font-size: 15px;
   }
 
   .query-form {

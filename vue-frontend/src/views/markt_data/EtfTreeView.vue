@@ -1269,7 +1269,14 @@ const loadIndexTrend = async () => {
   }
 }
 
+// 窗口尺寸变化（含移动端旋转、对话框宽度变化）时让两个饼/柱图重排，避免变形
+const handleChartsResize = () => {
+  categoryChart?.resize()
+  industryChart?.resize()
+}
+
 onMounted(async () => {
+  window.addEventListener('resize', handleChartsResize)
   try {
     await Promise.all([ensureEtfBasicLoaded(), ensureIndexBasicLoaded(), loadLatestRealtime()])
     const firstType = etfTypes.value[0]
@@ -1280,6 +1287,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', handleChartsResize)
   if (categoryChart) categoryChart.dispose()
   if (industryChart) industryChart.dispose()
 })

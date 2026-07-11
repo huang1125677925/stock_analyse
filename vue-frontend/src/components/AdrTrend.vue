@@ -14,10 +14,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchAdr, type AdrResponseData } from '@/services/marketBreadthAnalysisApi'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 // Props
 interface Props {
@@ -59,9 +62,11 @@ const loadData = async () => {
     if (!chartRef.value) return
     if (!chart) chart = echarts.init(chartRef.value)
 
+    const mobile = isMobile.value
     const option: echarts.EChartsOption = {
       tooltip: {
         trigger: 'axis',
+        confine: true,
         formatter: (params: any) => {
           const date = params?.[0]?.axisValueLabel || ''
           const adrItem = params.find((p: any) => p.seriesName === 'ADR')
@@ -75,21 +80,29 @@ const loadData = async () => {
           return [date, adrStr, advStr, declStr, flatStr].filter(Boolean).join('<br/>')
         }
       },
-      legend: { data: ['ADR', '上涨家数', '下跌家数', '平家数', '典型区间'], top: 8 },
-      grid: { left: 48, right: 24, top: 80, bottom: 48 },
-      xAxis: { type: 'category', data: dates },
+      legend: { data: ['ADR', '上涨家数', '下跌家数', '平家数', '典型区间'], type: 'scroll', top: 4 },
+      grid: mobile
+        ? { left: 40, right: 36, top: 56, bottom: 56, containLabel: true }
+        : { left: 48, right: 24, top: 80, bottom: 48, containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: dates,
+        axisLabel: { rotate: mobile ? 45 : 0, hideOverlap: true, interval: 'auto', fontSize: mobile ? 10 : 12 }
+      },
       yAxis: [
         {
           type: 'value',
           name: 'ADR',
           position: 'left',
+          nameTextStyle: { fontSize: mobile ? 10 : 12 },
           min: (val) => Math.min(typicalMin, Math.floor(val.min * 10) / 10),
           max: (val) => Math.max(typicalMax, Math.ceil(val.max * 10) / 10)
         },
         {
           type: 'value',
           name: '家数',
-          position: 'right'
+          position: 'right',
+          nameTextStyle: { fontSize: mobile ? 10 : 12 }
         }
       ],
       series: [
@@ -153,8 +166,7 @@ const loadData = async () => {
       ]
     }
 
-    chart.setOption(option)
-    window.addEventListener('resize', handleResize)
+    chart.setOption(option, true)
   } catch (err) {
     console.error(err)
     ElMessage.error('获取ADR数据失败，请稍后重试')
@@ -163,7 +175,18 @@ const loadData = async () => {
 
 const handleResize = () => chart?.resize()
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  window.addEventListener('resize', handleResize)
+})
+
+// 断点切换时重算 option
+watch(isMobile, () => {
+  if (chart) {
+    loadData()
+    nextTick(() => chart?.resize())
+  }
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
@@ -187,4 +210,10 @@ watch(() => [props.days, props.startDate, props.endDate], () => {
 .adr-trend .header .subtitle { color: #909399; font-size: 12px; }
 .counts { color: #606266; font-size: 12px; margin: 6px 0 8px; display: flex; gap: 16px; }
 .chart { width: 100%; height: 380px; }
+@media (max-width: 768px) {
+  .chart { height: 300px; }
+  .adr-trend .header { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .adr-trend .header h2 { font-size: 16px; }
+  .counts { gap: 12px; flex-wrap: wrap; }
+}
 </style>

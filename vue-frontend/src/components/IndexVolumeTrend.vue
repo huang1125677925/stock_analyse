@@ -39,11 +39,14 @@
  * 返回值：无（组合式组件不返回值）
  * 事件（Emits）：无
  */
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchIndexDailyVolume, type IndexDailyVolumeItem } from '@/services/indexDailyApi'
 import { fetchIndexMacdUpPredictionDates } from '@/services/strategyIndexAnalysisApi'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 interface Props {
   tsCode?: string
@@ -58,6 +61,10 @@ const props = withDefaults(defineProps<Props>(), {
 const range = ref<'1y' | '3y' | '5y'>('1y')
 const chartRef = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
+let lastData: IndexDailyVolumeItem[] = []
+
+// 移动端压缩图表高度
+const effectiveHeight = computed(() => (isMobile.value ? '300px' : props.height))
 
 // 预测日期相关状态
 const predictedDates = ref<string[]>([])
@@ -121,6 +128,8 @@ function formatDateDisplay(dateStr: string): string {
 function renderChart(data: IndexDailyVolumeItem[]) {
   if (!chartRef.value) return
   if (!chart) chart = echarts.init(chartRef.value)
+  lastData = data
+  const mobile = isMobile.value
 
   const dates = data.map(d => d.date)
   const volumes = data.map(d => d.volume)
@@ -172,16 +181,22 @@ function renderChart(data: IndexDailyVolumeItem[]) {
         `
       }
     },
-    legend: { 
+    legend: {
       data: ['收盘价', '成交量', '成交额'],
-      top: 0 
+      type: 'scroll',
+      top: 0
     },
-    grid: { left: 60, right: 60, top: 40, bottom: 60 },
-    xAxis: { 
-      type: 'category', 
-      data: dates, 
-      axisLabel: { 
+    grid: mobile
+      ? { left: 44, right: 44, top: 34, bottom: 48, containLabel: true }
+      : { left: 60, right: 60, top: 40, bottom: 60, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLabel: {
         rotate: 0,
+        hideOverlap: true,
+        interval: 'auto',
+        fontSize: mobile ? 10 : 12,
         formatter: (value: string) => {
            // 简化日期显示，例如 20230101 -> 01/01
            if (value && value.length === 8) {
@@ -193,12 +208,13 @@ function renderChart(data: IndexDailyVolumeItem[]) {
       axisTick: { alignWithLabel: true }
     },
     yAxis: [
-      { 
-        type: 'value', 
-        name: '成交量/额', 
+      {
+        type: 'value',
+        name: mobile ? '' : '成交量/额',
         position: 'right',
         splitLine: { show: false },
         axisLabel: {
+          fontSize: mobile ? 10 : 12,
           formatter: (value: number) => {
             if (value >= 100000000) return (value / 100000000).toFixed(0) + '亿'
             if (value >= 10000) return (value / 10000).toFixed(0) + '万'
@@ -206,17 +222,19 @@ function renderChart(data: IndexDailyVolumeItem[]) {
           }
         }
       },
-      { 
-        type: 'value', 
-        name: '收盘价', 
+      {
+        type: 'value',
+        name: mobile ? '' : '收盘价',
         position: 'left',
         scale: true, // 自适应刻度，不从0开始
+        axisLabel: { fontSize: mobile ? 10 : 12 },
         splitLine: { show: true, lineStyle: { type: 'dashed', color: '#eee' } }
       }
     ],
     dataZoom: [
       { type: 'inside', start: 0, end: 100 },
-      { type: 'slider', start: 0, end: 100, bottom: 0 }
+      // 滑块独立留出高度，不与 x 轴标签重叠
+      { type: 'slider', start: 0, end: 100, height: mobile ? 14 : 20, bottom: mobile ? 4 : 8 }
     ],
     series: [
       {
@@ -254,12 +272,20 @@ function renderChart(data: IndexDailyVolumeItem[]) {
     ]
   }
 
-  chart.setOption(option)
+  chart.setOption(option, true)
 }
 
 function handleResize() {
   chart?.resize()
 }
+
+// 断点切换时重算 option（高度也随之变化）
+watch(isMobile, () => {
+  if (chart && lastData.length) {
+    renderChart(lastData)
+    nextTick(() => chart?.resize())
+  }
+})
 
 onMounted(() => {
   reload()
@@ -293,8 +319,14 @@ watch(() => props.tsCode, () => {
 
 .chart {
   width: 100%;
-  height: v-bind(height);
+  height: v-bind(effectiveHeight);
   margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .chart-controls .el-select {
+    width: 120px !important;
+  }
 }
 
 .prediction-section {

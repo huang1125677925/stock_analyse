@@ -152,8 +152,8 @@
           highlight-current-row
           @sort-change="handleSortChange"
         >
-          <el-table-column type="index" label="#" :width="isMobile ? 40 : 50" :fixed="isMobile ? false : 'left'" align="center" />
-          <el-table-column label="指数名称" :min-width="isMobile ? 120 : 180" sortable="custom" :fixed="isMobile ? false : 'left'" align="center">
+          <el-table-column type="index" label="#" :width="isMobile ? 34 : 50" :fixed="isMobile ? false : 'left'" align="center" />
+          <el-table-column label="指数名称" :min-width="isMobile ? 92 : 180" sortable="custom" :fixed="isMobile ? false : 'left'" align="center">
             <template #header>
               <div class="custom-header">
                 <span>指数名称</span>
@@ -175,7 +175,7 @@
           <el-table-column
             prop="RPS_today"
             label="当日涨跌幅 / RPS_today"
-            min-width="150"
+            :min-width="isMobile ? 118 : 150"
             sortable="custom"
             align="center"
           >
@@ -210,7 +210,7 @@
           <template v-for="period in rpsPeriods" :key="period">
             <el-table-column
               :label="`${period}日涨跌幅 / RPS_${period}`"
-              min-width="150"
+              :min-width="isMobile ? 118 : 150"
               sortable="custom"
               :prop="getRpsProp(period)"
               align="center"
@@ -345,8 +345,8 @@
         <el-dialog
           v-model="memberRpsDialogVisible"
           :title="`成分股RPS强度 - ${memberRpsBoardName || memberRpsBoardTsCode}`"
-          width="1400px"
-          top="5vh"
+          :width="isMobile ? '100%' : '1400px'"
+          :top="isMobile ? '0' : '5vh'"
           destroy-on-close
         >
           <div class="member-rps-dialog" v-loading="memberRpsLoading" element-loading-text="正在加载成分股RPS数据...">
@@ -584,13 +584,13 @@
               :row-class-name="memberRpsTableRowClassName"
               @sort-change="handleMemberRpsSortChange"
             >
-              <el-table-column type="index" label="#" :width="isMobile ? 40 : 50" align="center" :fixed="isMobile ? false : 'left'" />
-              <el-table-column prop="ts_code" label="ts_code" :min-width="isMobile ? 100 : 120" sortable="custom" :fixed="isMobile ? false : 'left'" align="center">
+              <el-table-column type="index" label="#" :width="isMobile ? 34 : 50" align="center" :fixed="isMobile ? false : 'left'" />
+              <el-table-column prop="ts_code" label="ts_code" :min-width="isMobile ? 92 : 120" sortable="custom" :fixed="isMobile ? false : 'left'" align="center">
                 <template #default="scope">
                   <el-tag size="small" effect="plain">{{ scope.row.ts_code }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="name" label="名称" :min-width="isMobile ? 100 : 150" sortable="custom" :fixed="isMobile ? false : 'left'">
+              <el-table-column prop="name" label="名称" :min-width="isMobile ? 80 : 150" sortable="custom" :fixed="isMobile ? false : 'left'">
                 <template #default="scope">
                   <el-button
                     type="primary"
@@ -616,7 +616,7 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" min-width="150" sortable="custom" align="center">
+              <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" :min-width="isMobile ? 118 : 150" sortable="custom" align="center">
                 <template #default="scope">
                   <div class="rps-cell rps-cell-with-change">
                     <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
@@ -641,7 +641,7 @@
                 <el-table-column
                   :prop="getDynamicRpsProp(period)"
                   :label="`${period}日涨跌幅 / RPS_${period}`"
-                  min-width="150"
+                  :min-width="isMobile ? 118 : 150"
                   sortable="custom"
                   align="center"
                 >
@@ -2085,6 +2085,26 @@ watch(() => route.query.level, (level) => {
   }
 
   .table-summary {
+    width: 100%;
+  }
+
+  /* 6 个时间范围按钮在窄屏左对齐换行，不再右对齐挤压 */
+  .trend-shortcuts {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .trend-shortcuts :deep(.el-radio-group) {
+    flex-wrap: wrap;
+  }
+
+  .price-range-input {
+    width: 100% !important;
+  }
+
+  /* 周期统计表在窄屏内横向滚动，避免撑破对话框 */
+  .period-statistics-table {
     width: 100%;
   }
 

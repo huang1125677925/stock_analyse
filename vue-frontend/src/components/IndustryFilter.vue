@@ -9,7 +9,7 @@
     collapse-tags
     collapse-tags-tooltip
     placeholder="筛选行业（默认全部）"
-    style="min-width: 220px; max-width: 400px;"
+    class="industry-filter-select"
   >
     <el-option
       v-for="name in displayList"
@@ -86,4 +86,17 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+.industry-filter-select {
+  min-width: 220px;
+  max-width: 400px;
+}
+
+// 移动端占满整行，避免与标题挤在一行溢出
+@media (max-width: 768px) {
+  .industry-filter-select {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+}
 </style>

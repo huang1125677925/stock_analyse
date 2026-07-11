@@ -250,7 +250,8 @@
         :data="filteredRows"
         stripe
         border
-        height="640"
+        :height="isMobile ? undefined : 640"
+        :max-height="isMobile ? 560 : undefined"
         style="width: 100%"
         empty-text="暂无股票RPS数据"
         highlight-current-row
@@ -258,9 +259,9 @@
         :row-class-name="tableRowClassName"
         @sort-change="handleSortChange"
       >
-        <el-table-column type="index" label="#" width="56" fixed="left" align="center" />
+        <el-table-column type="index" label="#" :width="isMobile ? 34 : 56" :fixed="isMobile ? false : 'left'" align="center" />
 
-        <el-table-column label="股票名称/代码" min-width="150" align="center" sortable="custom" prop="name" fixed="left" show-overflow-tooltip>
+        <el-table-column label="股票名称/代码" :min-width="isMobile ? 92 : 150" align="center" sortable="custom" prop="name" :fixed="isMobile ? false : 'left'" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="stock-name-cell">
               <el-button type="primary" link @click="openTrendDialog(row)">{{ row.name }}</el-button>
@@ -269,7 +270,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="industry" label="行业" min-width="140" align="center" show-overflow-tooltip sortable="custom">
+        <el-table-column prop="industry" label="行业" :min-width="isMobile ? 78 : 140" align="center" show-overflow-tooltip sortable="custom">
           <template #default="{ row }">
             <div class="industry-cell">
               <el-button
@@ -286,15 +287,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="latest_price" label="最新股价" min-width="110" align="center" sortable="custom">
+        <el-table-column prop="latest_price" label="最新股价" :min-width="isMobile ? 68 : 110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPrice(row.latest_price) }}</template>
         </el-table-column>
 
-        <el-table-column prop="circ_mv" label="流通市值" min-width="120" align="center" sortable="custom">
+        <el-table-column prop="circ_mv" label="流通市值" :min-width="isMobile ? 76 : 120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatMarketCap(row.circ_mv) }}</template>
         </el-table-column>
 
-        <el-table-column prop="RPS_today" label="当日涨跌幅/RPS" min-width="160" align="center" sortable="custom">
+        <el-table-column prop="RPS_today" label="当日涨跌幅/RPS" :min-width="isMobile ? 116 : 160" align="center" sortable="custom">
           <template #default="{ row }">
             <div class="rps-cell">
               <span :class="getChangeClass(row.pct_change)">{{ formatPercent(row.pct_change) }}</span>
@@ -316,7 +317,7 @@
           <el-table-column
             :prop="getRpsProp(period)"
             :label="`${period}日涨跌幅/RPS`"
-            min-width="160"
+            :min-width="isMobile ? 116 : 160"
             align="center"
             sortable="custom"
           >
@@ -394,6 +395,7 @@
 
             <div class="trend-shortcuts">
               <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
+                <el-radio-button label="2m">最近2月</el-radio-button>
                 <el-radio-button label="1y">最近1年</el-radio-button>
                 <el-radio-button label="3y">最近3年</el-radio-button>
                 <el-radio-button label="5y">最近5年</el-radio-button>
@@ -402,16 +404,16 @@
           </div>
         </div>
 
-        <el-card class="trend-preview-card" v-loading="trendLoading">
+        <div class="trend-preview-card" v-loading="trendLoading">
           <StockKLineChart
             v-if="trendData.length"
             :stock-code="selectedTrendStock.tsCode"
             :stock-name="selectedTrendStock.name"
             :kline-data="trendData"
-            height="420px"
+            :height="isMobile ? '300px' : '420px'"
           />
           <el-empty v-else-if="!trendLoading" description="当前区间暂无K线数据" :image-size="80" />
-        </el-card>
+        </div>
       </div>
     </el-dialog>
 
@@ -428,13 +430,16 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight, Search } from '@element-plus/icons-vue'
+import { useIsMobile } from '@/composables/useIsMobile'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import { getStockRps, type StockRpsData, type StockRpsItem, type IndustryMapping } from '@/services/strategyApi'
 
+const { isMobile } = useIsMobile()
+
 type StockRpsValue = number | string | null | undefined
-type TrendShortcut = '1y' | '3y' | '5y'
+type TrendShortcut = '2m' | '1y' | '3y' | '5y'
 type DynamicReturnField = `return_${number}`
 type DynamicRpsField = `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
@@ -548,7 +553,7 @@ let autoRefreshTimer: ReturnType<typeof setTimeout> | null = null
 const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendData = ref<StockHistoryDataItem[]>([])
-const trendShortcut = ref<TrendShortcut>('1y')
+const trendShortcut = ref<TrendShortcut>('2m')
 const trendDateRange = reactive({
   start: '',
   end: ''
@@ -1108,10 +1113,10 @@ const resetTradeDateToLatest = (): void => {
  * 事件：更新 `trendDateRange.start` 和 `trendDateRange.end`。
  */
 const applyTrendShortcut = (range: TrendShortcut) => {
-  const yearMap: Record<TrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const monthMap: Record<TrendShortcut, number> = { '2m': 2, '1y': 12, '3y': 36, '5y': 60 }
   const endDate = new Date()
   const startDate = new Date()
-  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+  startDate.setMonth(endDate.getMonth() - monthMap[range])
 
   const formatDate = (date: Date) => {
     const year = date.getFullYear()
@@ -1253,9 +1258,9 @@ const showTrendStock = (row: StockRpsItem) => {
   selectedTrendStock.name = row.name
   selectedTrendStock.industry = row.industry || ''
   selectedTrendStock.market = row.market || ''
-  trendShortcut.value = '1y'
+  trendShortcut.value = '2m'
   trendData.value = []
-  applyTrendShortcut('1y')
+  applyTrendShortcut('2m')
   loadTrendData()
 }
 

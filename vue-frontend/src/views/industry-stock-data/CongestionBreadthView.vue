@@ -80,5 +80,11 @@ const onIndustriesLoaded = (industries: string[]) => {
   .congestion-page {
     padding: 0;
   }
+
+  .header-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
 }
 </style>

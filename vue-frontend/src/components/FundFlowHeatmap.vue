@@ -31,6 +31,7 @@
 import { computed } from 'vue'
 import * as echarts from 'echarts'
 import HeatmapChart from './HeatmapChart.vue'
+import { useIsMobile } from '@/composables/useIsMobile'
 import { FUND_FLOW_METRICS, FundFlowMetricType } from '@/services/industry-fund-flow'
 import type { IndustryFundFlowData, IndustryFundFlowDataItem } from '@/services/industry-fund-flow'
 
@@ -71,6 +72,8 @@ const emit = defineEmits<{
   'chart-ready': [chart: echarts.ECharts]
   'chart-click': [payload: ChartClickPayload]
 }>()
+
+const { isMobile } = useIsMobile()
 
 // 过滤和排序后的行业数据
 const processedIndustries = computed(() => {
@@ -159,10 +162,57 @@ const chartOption = computed((): echarts.EChartsOption => {
   
   // 获取指标配置
   const metricConfig = FUND_FLOW_METRICS[props.selectedMetric]
+  const mobile = isMobile.value
+
+  // 移动端只保留主轴，去掉顶部/右侧镜像轴；日期去掉年份省宽
+  const xAxis: echarts.EChartsOption['xAxis'] = [
+    {
+      type: 'category',
+      data: mobile ? dates.map((d) => (d && d.length >= 10 ? d.slice(5) : d)) : dates,
+      splitArea: { show: true },
+      axisLabel: { rotate: 45, fontSize: mobile ? 9 : 10, hideOverlap: true, interval: 'auto' }
+    }
+  ]
+  const yAxis: echarts.EChartsOption['yAxis'] = [
+    {
+      type: 'category',
+      data: industries.map(industry => industry.indexName),
+      splitArea: { show: true },
+      axisLabel: {
+        fontSize: mobile ? 10 : 11,
+        ...(mobile ? { width: 52, overflow: 'truncate' as const } : {})
+      }
+    }
+  ]
+  if (!mobile) {
+    ;(xAxis as any[]).push({
+      type: 'category',
+      position: 'top',
+      data: dates,
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: { rotate: 45, fontSize: 10, margin: 6 },
+      name: '日期',
+      nameLocation: 'end',
+      nameTextStyle: { fontSize: 12 }
+    })
+    ;(yAxis as any[]).push({
+      type: 'category',
+      position: 'right',
+      data: industries.map(industry => industry.indexName),
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: { fontSize: 11 },
+      name: '行业',
+      nameLocation: 'end',
+      nameTextStyle: { fontSize: 12 }
+    })
+  }
 
   return {
     tooltip: {
       position: 'top',
+      confine: true,
       formatter: function (params: any) {
         const [dateIndex, industryIndex, value] = params.data
         const date = dates[dateIndex]
@@ -172,64 +222,27 @@ const chartOption = computed((): echarts.EChartsOption => {
       }
     },
     grid: {
-      height: Math.max(400, industries.length * 20) + 'px',
-      top: '2%',
-      left: '2%',
-      right: '16%',
-      bottom: '2%',
+      height: Math.max(mobile ? 320 : 400, industries.length * (mobile ? 18 : 20)) + 'px',
+      top: mobile ? 30 : '2%',
+      left: mobile ? 4 : '2%',
+      right: mobile ? 6 : '16%',
+      bottom: mobile ? 44 : '2%',
       containLabel: true
     },
-    xAxis: [
-      {
-        type: 'category',
-        data: dates,
-        splitArea: { show: true },
-        axisLabel: { rotate: 45, fontSize: 10 }
-      },
-      {
-        type: 'category',
-        position: 'top',
-        data: dates,
-        axisTick: { show: false },
-        axisLine: { show: false },
-        axisLabel: { rotate: 45, fontSize: 10, margin: 6 },
-        name: '日期',
-        nameLocation: 'end',
-        nameTextStyle: { fontSize: 12 }
-      }
-    ],
-    yAxis: [
-      {
-        type: 'category',
-        data: industries.map(industry => industry.indexName),
-        splitArea: { show: true },
-        axisLabel: { fontSize: 11 }
-      },
-      {
-        type: 'category',
-        position: 'right',
-        data: industries.map(industry => industry.indexName),
-        axisTick: { show: false },
-        axisLine: { show: false },
-        axisLabel: { fontSize: 11 },
-        name: '行业',
-        nameLocation: 'end',
-        nameTextStyle: { fontSize: 12 }
-      }
-    ],
+    xAxis,
+    yAxis,
     visualMap: {
       min: minValue,
       max: maxValue,
       calculable: true,
-      orient: 'vertical',
-      right: '2%',
-      top: '5%',
+      orient: mobile ? 'horizontal' : 'vertical',
+      ...(mobile ? { left: 'center', bottom: 2, itemWidth: 12, itemHeight: 70 } : { right: '2%', top: '5%' }),
       inRange: {
         color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
       },
       text: ['高', '低'],
       textStyle: {
-        fontSize: 12
+        fontSize: mobile ? 10 : 12
       }
     },
     series: [{
@@ -237,7 +250,8 @@ const chartOption = computed((): echarts.EChartsOption => {
       type: 'heatmap',
       data: heatmapData,
       label: {
-        show: true,
+        // 移动端隐藏格内文字避免重叠，数值由 tooltip 展示
+        show: !mobile,
         fontSize: 9,
         formatter: function (params: any) {
           const value = params.data[2]

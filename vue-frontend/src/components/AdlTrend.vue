@@ -9,10 +9,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchAdl, type AdlResponseData } from '@/services/marketBreadthAnalysisApi'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 // Props
 interface Props {
@@ -40,14 +43,21 @@ const loadData = async () => {
     if (!chartRef.value) return
     if (!chart) chart = echarts.init(chartRef.value)
 
+    const mobile = isMobile.value
     const option: echarts.EChartsOption = {
-      tooltip: { trigger: 'axis' },
-      legend: { data: ['每日差值', 'ADL累计'], top: 8 },
-      grid: { left: 50, right: 50, top: 70, bottom: 40 },
-      xAxis: { type: 'category', data: dates },
+      tooltip: { trigger: 'axis', confine: true },
+      legend: { data: ['每日差值', 'ADL累计'], type: 'scroll', top: 8 },
+      grid: mobile
+        ? { left: 42, right: 42, top: 64, bottom: 56, containLabel: true }
+        : { left: 50, right: 50, top: 70, bottom: 40, containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: dates,
+        axisLabel: { rotate: mobile ? 45 : 0, hideOverlap: true, interval: 'auto', fontSize: mobile ? 10 : 12 }
+      },
       yAxis: [
-        { type: 'value', name: '每日差值', position: 'left' },
-        { type: 'value', name: 'ADL累计', position: 'right' }
+        { type: 'value', name: '每日差值', position: 'left', nameTextStyle: { fontSize: mobile ? 10 : 12 } },
+        { type: 'value', name: 'ADL累计', position: 'right', nameTextStyle: { fontSize: mobile ? 10 : 12 } }
       ],
       series: [
         {
@@ -69,8 +79,7 @@ const loadData = async () => {
       ]
     }
 
-    chart.setOption(option)
-    window.addEventListener('resize', handleResize)
+    chart.setOption(option, true)
   } catch (err) {
     console.error(err)
     ElMessage.error('获取ADL数据失败，请稍后重试')
@@ -79,7 +88,18 @@ const loadData = async () => {
 
 const handleResize = () => chart?.resize()
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  window.addEventListener('resize', handleResize)
+})
+
+// 断点切换时重算 option
+watch(isMobile, () => {
+  if (chart) {
+    loadData()
+    nextTick(() => chart?.resize())
+  }
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
@@ -102,4 +122,9 @@ watch(() => [props.days, props.startDate, props.endDate], () => {
 .adl-trend .header h2 { margin: 0; font-size: 18px; }
 .adl-trend .header .subtitle { color: #909399; font-size: 12px; }
 .chart { width: 100%; height: 360px; }
+@media (max-width: 768px) {
+  .chart { height: 300px; }
+  .adl-trend .header { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .adl-trend .header h2 { font-size: 16px; }
+}
 </style>

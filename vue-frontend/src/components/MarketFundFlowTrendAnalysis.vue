@@ -98,6 +98,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { EChartsOption } from 'echarts'
 import HeatmapChart from '@/components/HeatmapChart.vue'
+import { useIsMobile } from '@/composables/useIsMobile'
 import {
   MARKET_FUND_FLOW_OBJECT_GROUPS,
   fetchMarketFundFlowTrend,
@@ -113,6 +114,8 @@ type ValueFilter = 'all' | 'positive' | 'negative'
 const DEFAULT_RANGE_DAYS = 20
 const PRESET_RANGE_DAYS = [20, 40, 60, 120] as const
 type PresetDays = typeof PRESET_RANGE_DAYS[number]
+
+const { isMobile } = useIsMobile()
 
 const loading = ref(false)
 const trendRows = ref<MarketFundFlowTrendItem[]>([])
@@ -176,10 +179,12 @@ const heatmapOption = computed<EChartsOption>(() => {
   }
 
   const bound = Math.max(Math.abs(minValue), Math.abs(maxValue), 1)
+  const mobile = isMobile.value
 
   return {
     tooltip: {
       position: 'top',
+      confine: true,
       formatter: (params: any) => {
         const [xIndex, yIndex, rawValue] = params.data as [number, number, number]
         const snapshot = trendRows.value[xIndex]
@@ -191,19 +196,21 @@ const heatmapOption = computed<EChartsOption>(() => {
         ].join('<br/>')
       },
     },
-    grid: {
-      left: 40,
-      right: 90,
-      top: 36,
-      bottom: 80,
-      containLabel: true,
-    },
+    // 移动端：visualMap 移到底部横向，为热力图腾出横向空间；底部留给它 + x 轴标签
+    grid: mobile
+      ? { left: 6, right: 10, top: 30, bottom: 96, containLabel: true }
+      : { left: 40, right: 90, top: 36, bottom: 80, containLabel: true },
     xAxis: {
       type: 'category',
       data: dates,
       splitArea: { show: true },
       axisLabel: {
-        rotate: 45,
+        rotate: mobile ? 90 : 45,
+        hideOverlap: true,
+        interval: 'auto',
+        fontSize: mobile ? 9 : 12,
+        // 移动端去掉年份省宽
+        formatter: mobile ? (v: string) => (v && v.length >= 10 ? v.slice(5) : v) : undefined,
       },
     },
     yAxis: {
@@ -212,16 +219,23 @@ const heatmapOption = computed<EChartsOption>(() => {
       splitArea: { show: true },
       axisLabel: {
         interval: 0,
+        fontSize: mobile ? 10 : 12,
       },
     },
+    // 移动端 x 轴日期较多时可横向拖动缩放
+    dataZoom: mobile
+      ? [{ type: 'inside', xAxisIndex: 0, start: 0, end: 100 }]
+      : undefined,
     visualMap: {
       min: -bound,
       max: bound,
       calculable: true,
-      orient: 'vertical',
-      right: 12,
-      top: 'center',
+      orient: mobile ? 'horizontal' : 'vertical',
+      ...(mobile ? { left: 'center', bottom: 4 } : { right: 12, top: 'center' }),
+      itemWidth: mobile ? 12 : 20,
+      itemHeight: mobile ? 80 : 140,
       text: ['净流入', '净流出'],
+      textStyle: { fontSize: mobile ? 10 : 12 },
       inRange: {
         color: ['#00C853', '#f7f7f7', '#FF1744'],
       },
@@ -449,7 +463,26 @@ onMounted(() => {
 
 @media (max-width: 960px) {
   .summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .summary-card {
+    min-height: 0;
+  }
+
+  .summary-value {
+    margin-top: 6px;
+    font-size: 18px;
+  }
+
+  .summary-meta {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .summary-label {
+    font-size: 12px;
   }
 
   .card-header {

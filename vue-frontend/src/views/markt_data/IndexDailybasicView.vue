@@ -44,7 +44,7 @@
         </div>
       </template>
       <el-table :data="comparisonRows" border stripe style="width: 100%" empty-text="暂无指数估值对比数据">
-        <el-table-column prop="label" label="指数" min-width="160" fixed="left" align="center" />
+        <el-table-column prop="label" label="指数" :min-width="isMobile ? 96 : 160" :fixed="isMobile ? false : 'left'" align="center" />
         <el-table-column prop="latestTradeDate" label="最新日期" min-width="120" align="center" />
         <el-table-column label="最新估值" min-width="140" align="center">
           <template #default="{ row }">
@@ -132,6 +132,9 @@ import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fetchIndexDailybasic, fetchMarketCombinedDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
 import * as echarts from 'echarts'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 // emits：对外发出 loaded 事件
 const emit = defineEmits<{ (e: 'loaded', count: number): void }>()
@@ -557,9 +560,17 @@ onUnmounted(() => {
 .range-buttons { margin-left: 8px; }
 .range-text { margin-left: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
 @media (max-width: 768px) {
+  .index-dailybasic-view { padding: 0; }
+  .page-header, .search-section, .table-section { margin-bottom: 12px; }
   .chart-carousel-toolbar { flex-direction: column; align-items: flex-start; }
   .chart-carousel-actions { width: 100%; }
   .chart-carousel-actions :deep(.el-button) { flex: 1; }
-  .chart-container { height: 360px; }
+  .chart-container { height: 300px; }
+  /* 指标下拉、日期、快捷范围按钮在窄屏占满整宽、整齐换行 */
+  .query-form :deep(.el-select) { width: 100% !important; }
+  .query-form :deep(.el-date-editor) { width: 100% !important; }
+  .range-buttons { margin-left: 0; margin-top: 8px; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
+  .range-buttons :deep(.el-button) { width: 100%; }
+  .range-text { margin-left: 0; margin-top: 8px; display: block; white-space: normal; }
 }
 </style>

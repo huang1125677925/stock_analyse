@@ -44,6 +44,7 @@
         </div>
         <div class="trend-shortcuts">
           <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
+            <el-radio-button label="2m">最近2月</el-radio-button>
             <el-radio-button label="1y">最近1年</el-radio-button>
             <el-radio-button label="3y">最近3年</el-radio-button>
             <el-radio-button label="5y">最近5年</el-radio-button>
@@ -51,20 +52,20 @@
         </div>
       </div>
 
-      <el-card class="trend-preview-card" v-loading="trendLoading">
+      <div class="trend-preview-card" v-loading="trendLoading">
         <StockKLineChart
           v-if="trendData.length"
           :stock-code="props.indexCode"
           :stock-name="displayIndexName"
           :kline-data="trendData"
-          height="420px"
+          :height="isMobile ? '300px' : '420px'"
         />
         <el-empty
           v-else-if="!trendLoading"
           :description="trendEmptyText"
           :image-size="80"
         />
-      </el-card>
+      </div>
     </div>
   </el-dialog>
 </template>
@@ -89,6 +90,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import StockKLineChart from '@/components/StockKLineChart.vue'
+import { useIsMobile } from '@/composables/useIsMobile'
 import {
   fetchMajorIndexDaily,
   type MajorIndexDailyScope,
@@ -96,7 +98,7 @@ import {
 } from '@/services/majorIndexDailyApi'
 import type { StockHistoryDataItem } from '@/services/stockHistoryApi'
 
-type TrendShortcut = '1y' | '3y' | '5y'
+type TrendShortcut = '2m' | '1y' | '3y' | '5y'
 
 interface Props {
   modelValue: boolean
@@ -113,8 +115,10 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
 
+const { isMobile } = useIsMobile()
+
 const trendLoading = ref(false)
-const trendShortcut = ref<TrendShortcut>('1y')
+const trendShortcut = ref<TrendShortcut>('2m')
 const trendData = ref<StockHistoryDataItem[]>([])
 const trendDateRange = reactive({
   start: '',
@@ -207,10 +211,10 @@ function resolveScopeByMarket(market?: string): MajorIndexDailyScope {
  * 事件：更新 trendDateRange
  */
 function applyTrendShortcut(range: TrendShortcut) {
-  const yearMap: Record<TrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const monthMap: Record<TrendShortcut, number> = { '2m': 2, '1y': 12, '3y': 36, '5y': 60 }
   const end = new Date()
   const start = new Date()
-  start.setFullYear(end.getFullYear() - yearMap[range])
+  start.setMonth(end.getMonth() - monthMap[range])
   trendDateRange.start = formatDate(start)
   trendDateRange.end = formatDate(end)
 }
@@ -301,9 +305,9 @@ watch(
       return
     }
 
-    trendShortcut.value = '1y'
+    trendShortcut.value = '2m'
     trendData.value = []
-    applyTrendShortcut('1y')
+    applyTrendShortcut('2m')
     loadTrendData()
   },
   { immediate: true }
