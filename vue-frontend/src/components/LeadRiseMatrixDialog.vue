@@ -12,16 +12,14 @@
   >
     <div class="lead-rise-matrix" v-loading="loading" element-loading-text="正在加载领涨数据...">
       <div class="matrix-caption">
-        近30天概念板块（领涨）：{{ idxType }}
-        <span class="matrix-hint">横轴为日期，纵轴为领涨股票；标色格子表示该股当日领涨，格内为领涨涨幅。点击股票名称可在上方趋势图查看其K线</span>
+        {{ rangeLabel }}概念板块（领涨）：{{ idxType }}
+        <span class="matrix-hint">横轴为日期，纵轴为领涨股票；标色格子表示该股当日领涨，格内为领涨涨幅。悬停日期列可在上方对比图查看当日K线</span>
       </div>
 
-      <!-- 趋势图：板块 + 全部领涨股 独立K线小图矩阵 -->
-      <div ref="trendPanelRef" class="trend-panel">
+      <!-- 日期区间选项：统一控制对比图K线与下方领涨表格的日期范围 -->
+      <div class="trend-panel">
         <div class="trend-toolbar">
-          <span class="trend-hint">
-            板块与各领涨股独立K线（A股红涨绿跌），每格一个标的、各自价格轴；悬停某日各图指针联动，标题显示当日收盘与涨跌幅
-          </span>
+          <span class="trend-hint">选择日期区间，对比图K线与下方领涨表格均按此范围展示</span>
           <el-radio-group
             v-model="trendRangeKey"
             size="small"
@@ -32,28 +30,10 @@
             <el-radio-button label="3y">最近3年</el-radio-button>
           </el-radio-group>
         </div>
-
-        <div
-          class="trend-chart-wrap"
-          v-loading="trendLoading"
-          :style="{ minHeight: trendChartHeight + 'px' }"
-        >
-          <div
-            ref="trendChartRef"
-            class="trend-chart"
-            :style="{ height: trendChartHeight + 'px' }"
-          ></div>
-          <el-empty
-            v-if="!trendLoading && !trendHasData"
-            class="trend-empty"
-            description="当前区间暂无走势数据"
-            :image-size="60"
-          />
-        </div>
       </div>
 
       <!-- 对比区：左=板块K线（固定），右=悬停日期当日领涨股K线；随下方矩阵日期列悬停切换 -->
-      <div class="compare-panel">
+      <div class="compare-panel" v-loading="trendLoading">
         <div class="compare-hint">
           悬停下方矩阵的<strong>日期列</strong>，右侧即显示当日领涨股K线，与左侧板块K线对照（紫色虚线标记该日）
         </div>
@@ -72,7 +52,7 @@
             <tr>
               <th class="corner-cell">领涨股票 \ 日期</th>
               <th
-                v-for="d in dates"
+                v-for="d in displayDates"
                 :key="d.date"
                 class="date-cell"
                 :class="{ 'date-focused': d.date === focusedDate }"
@@ -107,7 +87,7 @@
                 <div class="stock-count">领涨 {{ stock.count }} 天</div>
               </th>
               <td
-                v-for="d in dates"
+                v-for="d in displayDates"
                 :key="d.date"
                 class="value-cell"
                 :class="{ active: !!matrix[stock.name]?.[d.date], 'date-focused': d.date === focusedDate }"
@@ -187,6 +167,10 @@ const records = ref<DcIndexRecord[]>([])
 // 趋势图状态：板块 + 全部领涨股的归一化涨跌幅折线，叠加在同一张图
 const trendRangeKey = ref<TrendRangeKey>('3m')
 const trendRange = reactive({ start: '', end: '' })
+// 区间选项对应的天数：领涨矩阵按此天数拉取，与对比图K线区间保持一致
+const RANGE_DAYS: Record<TrendRangeKey, number> = { '3m': 90, '1y': 365, '3y': 1095 }
+const RANGE_LABELS: Record<TrendRangeKey, string> = { '3m': '近3月', '1y': '近1年', '3y': '近3年' }
+const rangeLabel = computed(() => RANGE_LABELS[trendRangeKey.value])
 const trendLoading = ref(false)
 const trendPanelRef = ref<HTMLElement>()
 const trendChartRef = ref<HTMLDivElement>()
@@ -212,7 +196,7 @@ const loadData = async () => {
   if (!props.tsCode && !props.name) return
   loading.value = true
   try {
-    const data = await fetchDcIndexLastNDays({ tsCode: props.tsCode, name: props.name }, 30)
+    const data = await fetchDcIndexLastNDays({ tsCode: props.tsCode, name: props.name }, RANGE_DAYS[trendRangeKey.value])
     records.value = (data.records || []).sort((a, b) => a.trade_date.localeCompare(b.trade_date))
   } catch (e) {
     console.error('获取dc_index领涨数据失败:', e)
@@ -226,11 +210,18 @@ const loadData = async () => {
 const boardTsCode = computed(() => props.tsCode || records.value[0]?.ts_code || '')
 
 watch(() => props.modelValue, (val) => {
-  if (val) loadData()
+  if (val) {
+    // 打开时重置为默认区间，保证矩阵与对比图区间一致
+    trendRangeKey.value = '3m'
+    applyTrendRange('3m')
+    candleCache.clear()
+    loadData()
+  }
 })
 
 watch([() => props.tsCode, () => props.name], () => {
   if (props.modelValue && (props.tsCode || props.name)) {
+    candleCache.clear()
     loadData()
     // 寻址变化时区间/图表保持，待 stocks 更新后由 watch(stocks) 重绘
     applyTrendRange(trendRangeKey.value)
@@ -252,6 +243,9 @@ const dates = computed(() => {
   }
   return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
 })
+
+// 表格列展示顺序：从左到右按日期递减（最新在左）。dates 仍保持升序供“默认聚焦最近交易日”等逻辑使用
+const displayDates = computed(() => [...dates.value].reverse())
 
 // 领涨股票维度：按领涨天数降序排列
 const stocks = computed(() => {
@@ -464,6 +458,15 @@ function renderTrendChart(
   seriesData: Array<{ target: TrendTarget; candles: Candle[] }>
 ) {
   lastSeriesData = seriesData
+
+  // 默认聚焦最近交易日；若当前聚焦日期已不在数据中则回退到最近交易日
+  const focusDates = dates.value
+  if (!focusedDate.value || !focusDates.some(d => d.date === focusedDate.value)) {
+    focusedDate.value = focusDates.length ? focusDates[focusDates.length - 1].date : ''
+  }
+  renderCompareChart()
+
+  // 小图矩阵已移除；若未初始化 trendChart（正常情况）则到此为止，仅保留对比图
   if (!trendChart) return
 
   const visible = seriesData.filter(s => s.candles.length > 0)
@@ -569,28 +572,77 @@ function renderTrendChart(
     trendChart?.resize()
     trendChart?.setOption(option, true)
   })
-
-  // 默认聚焦最近交易日；若当前聚焦日期已不在数据中则回退到最近交易日
-  const matrixDates = dates.value
-  if (!focusedDate.value || !matrixDates.some(d => d.date === focusedDate.value)) {
-    focusedDate.value = matrixDates.length ? matrixDates[matrixDates.length - 1].date : ''
-  }
-  renderCompareChart()
 }
 
 /**
  * 渲染对比区：左=板块K线（固定），右=当前聚焦日期的领涨股K线。
  * 复用 loadTrendData 已拉取的 OHLC（lastSeriesData），不额外发起请求；紫色虚线标记聚焦日。
  */
+// 按标的代码缓存已加载的K线，避免重复请求；区间/寻址变化时清空
+const candleCache = new Map<string, Candle[]>()
+let compareReqId = 0
+
+// 板块自身作为对比图左侧固定标的
+const boardTarget = computed<TrendTarget>(() => ({
+  kind: 'board',
+  code: boardTsCode.value,
+  name: `${props.name || boardTsCode.value}（板块）`,
+  color: BOARD_COLOR
+}))
+
+/** 按需拉取单个标的K线（命中缓存则直接返回），失败返回空序列 */
+async function getCandles(target: TrendTarget): Promise<Candle[]> {
+  if (!target.code) return []
+  const cached = candleCache.get(target.code)
+  if (cached) return cached
+  if (!trendRange.start || !trendRange.end) return []
+  const startYmd = normalizeYmd(trendRange.start)
+  const endYmd = normalizeYmd(trendRange.end)
+  const candles = await fetchTargetOHLC(target, startYmd, endYmd).catch(err => {
+    console.error(`加载K线失败: ${target.name}`, err)
+    return [] as Candle[]
+  })
+  candleCache.set(target.code, candles)
+  return candles
+}
+
+/** 默认聚焦最近交易日（数据变化后调用） */
+function setDefaultFocus() {
+  const ds = dates.value
+  if (!focusedDate.value || !ds.some(d => d.date === focusedDate.value)) {
+    focusedDate.value = ds.length ? ds[ds.length - 1].date : ''
+  }
+}
+
+/**
+ * 对比图数据按需加载：仅加载板块（缓存一次）与“当前聚焦日期”的那只领涨股K线，
+ * 不再一次性拉取全部领涨股。加载完成后渲染对比图。
+ */
+async function ensureCompareCandles() {
+  if (!compareChart) return
+  const reqId = ++compareReqId
+  const lead = focusedDate.value ? dateToLeading.value.get(focusedDate.value) : undefined
+  trendLoading.value = true
+  try {
+    const tasks: Array<Promise<Candle[]>> = [getCandles(boardTarget.value)]
+    if (lead?.code) {
+      tasks.push(getCandles({ kind: 'stock', code: lead.code, name: lead.name, color: STOCK_COLORS[0] }))
+    }
+    await Promise.all(tasks)
+    if (reqId !== compareReqId) return
+    renderCompareChart()
+  } finally {
+    if (reqId === compareReqId) trendLoading.value = false
+  }
+}
+
 function renderCompareChart() {
   if (!compareChart) return
 
-  const board = lastSeriesData.find(s => s.target.kind === 'board')
-  const boardCandles = board?.candles ?? []
+  const boardCandles = candleCache.get(boardTsCode.value) ?? []
 
   const lead = focusedDate.value ? dateToLeading.value.get(focusedDate.value) : undefined
-  const leadSeries = lead ? lastSeriesData.find(s => s.target.code === lead.code) : undefined
-  const leadCandles = leadSeries?.candles ?? []
+  const leadCandles = lead ? (candleCache.get(lead.code) ?? []) : []
 
   const toFull = (ymd: string) =>
     ymd.length === 8 ? `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}` : ymd
@@ -599,12 +651,50 @@ function renderCompareChart() {
   const focusFull = focusYmd ? toFull(focusYmd) : ''
   const focusMmdd = focusedDate.value ? formatDate(focusedDate.value) : ''
 
+  const mobile = isMobile.value
+
   const boardName = props.name || boardTsCode.value || '板块'
+  // 移动端标题空间小，领涨股标题用更紧凑的写法（去括号），避免居中时被裁切
   const leadTitle = lead
-    ? `${lead.name}（${focusMmdd} 领涨）`
+    ? (mobile ? `${lead.name} ${focusMmdd}领涨` : `${lead.name}（${focusMmdd} 领涨）`)
     : '悬停下方日期查看当日领涨股'
 
-  const mobile = isMobile.value
+  // 计算聚焦日期当日涨跌幅（相对前一交易日收盘，红涨绿跌），供标题展示
+  const focusPct = (candles: Candle[]): { txt: string; color: string } | null => {
+    if (!focusYmd) return null
+    const i = candles.findIndex(c => c.date === focusYmd)
+    if (i < 0) return null
+    const c = candles[i]
+    const prevClose = i > 0 ? candles[i - 1].close : c.open
+    const pct = prevClose > 0 ? ((c.close - prevClose) / prevClose) * 100 : 0
+    const sign = pct >= 0 ? '+' : ''
+    return { txt: `${sign}${pct.toFixed(2)}%`, color: pct >= 0 ? UP_COLOR : DOWN_COLOR }
+  }
+  const boardPct = focusPct(boardCandles)
+  const leadPct = focusPct(leadCandles)
+
+  // 用富文本把“当日涨幅”按红涨绿跌上色拼到标题后（富文本样式须放在 textStyle.rich 下）
+  const titleFontSize = mobile ? 11 : 13
+  const buildTitleText = (base: string, baseColor: string, pct: { txt: string; color: string } | null): echarts.TitleComponentOption => {
+    if (!pct) {
+      return {
+        text: `{n|${base}}`,
+        textStyle: { rich: { n: { fontSize: titleFontSize, fontWeight: 'bold' as const, color: baseColor } } }
+      }
+    }
+    return {
+      text: `{n|${base}}  {p|${pct.txt}}`,
+      textStyle: {
+        rich: {
+          n: { fontSize: titleFontSize, fontWeight: 'bold' as const, color: baseColor },
+          p: { fontSize: titleFontSize, fontWeight: 'bold' as const, color: pct.color }
+        }
+      }
+    }
+  }
+  const boardTitleText = buildTitleText(`${boardName}（板块）`, BOARD_COLOR, boardPct)
+  const leadTitleText = buildTitleText(leadTitle, leadCandles.length ? '#c0392b' : '#909399', leadPct)
+
   const grids: echarts.GridComponentOption[] = mobile
     ? [
         { left: '10%', right: '6%', top: 32, height: 150 },
@@ -616,12 +706,12 @@ function renderCompareChart() {
       ]
   const titles: echarts.TitleComponentOption[] = mobile
     ? [
-        { text: `${boardName}（板块）`, left: 'center', top: 8, textAlign: 'center', textStyle: { fontSize: 13, fontWeight: 'bold', color: BOARD_COLOR } },
-        { text: leadTitle, left: 'center', top: 230, textAlign: 'center', textStyle: { fontSize: 13, fontWeight: 'bold', color: leadCandles.length ? '#c0392b' : '#909399' } }
+        { ...boardTitleText, left: 'center', top: 8, textAlign: 'center' },
+        { ...leadTitleText, left: 'center', top: 230, textAlign: 'center' }
       ]
     : [
-        { text: `${boardName}（板块）`, left: '25%', top: 14, textAlign: 'center', textStyle: { fontSize: 13, fontWeight: 'bold', color: BOARD_COLOR } },
-        { text: leadTitle, left: '74%', top: 14, textAlign: 'center', textStyle: { fontSize: 13, fontWeight: 'bold', color: leadCandles.length ? '#c0392b' : '#909399' } }
+        { ...boardTitleText, left: '25%', top: 14, textAlign: 'center' },
+        { ...leadTitleText, left: '74%', top: 14, textAlign: 'center' }
       ]
 
   const buildAxes = (gridIndex: number, candles: Candle[]) => {
@@ -708,15 +798,13 @@ function renderCompareChart() {
 const handleTrendResize = () => {
   const mobile = window.innerWidth <= 768
   if (mobile !== isMobile.value) {
-    // 断点变化：小图矩阵列数与对比区横/纵排布都需按新尺寸重绘
+    // 断点变化：对比区横/纵排布需按新尺寸重绘
     isMobile.value = mobile
-    renderTrendChart(lastSeriesData)
     nextTick(() => {
       compareChart?.resize()
       renderCompareChart()
     })
   } else {
-    trendChart?.resize()
     compareChart?.resize()
   }
 }
@@ -780,7 +868,9 @@ function ensureTrendChart() {
 /** 切换趋势快捷区间 */
 function handleTrendRangeChange(range: TrendRangeKey) {
   applyTrendRange(range)
-  loadTrendData()
+  candleCache.clear()
+  // 重新拉取该区间的领涨矩阵（表格日期随之变化）；records 更新后经 watch(stocks) 级联刷新对比图K线
+  loadData()
 }
 
 /** 点击矩阵中的领涨股票名：滚动到趋势图并高亮该股折线 */
@@ -803,10 +893,11 @@ function initTrend() {
   trendRangeKey.value = '3m'
   trendHasData.value = false
   applyTrendRange('3m')
+  candleCache.clear()
   nextTick(() => {
     ensureTrendChart()
-    // 板块曲线可立即拉取；个股曲线待 loadData 完成后由 watch(stocks) 补入
-    loadTrendData()
+    // 板块K线立即加载；聚焦日期的领涨股K线待 loadData 完成后由 watch(stocks) 按需加载
+    ensureCompareCandles()
   })
 }
 
@@ -824,15 +915,16 @@ function disposeTrendChart() {
   focusedDate.value = ''
 }
 
-// 悬停矩阵日期列切换聚焦日期后，仅重绘对比区右侧的当日领涨股K线
+// 悬停矩阵日期列切换聚焦日期后，按需加载该日领涨股K线并重绘对比区
 watch(focusedDate, () => {
-  if (compareChart) renderCompareChart()
+  if (compareChart) ensureCompareCandles()
 })
 
-// stocks 数据到达（loadData 完成）后重新叠加渲染，确保个股折线纳入
+// 矩阵数据到达（loadData 完成）后，设定默认聚焦日并按需加载对比图K线
 watch(stocks, () => {
-  if (props.modelValue && trendChart) {
-    loadTrendData()
+  if (props.modelValue) {
+    setDefaultFocus()
+    ensureCompareCandles()
   }
 })
 
@@ -988,11 +1080,8 @@ onBeforeUnmount(() => {
 }
 
 /* -------- 对比区面板样式 -------- */
-/* 置顶显示，滚动到下方矩阵悬停日期时仍可见对比结果 */
+/* 紧贴领涨表格上方，随内容正常滚动（不再 sticky，避免覆盖下方表格） */
 .compare-panel {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   margin-bottom: 16px;
   border: 1px solid #ebeef5;
   border-radius: 6px;

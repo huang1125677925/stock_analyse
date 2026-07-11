@@ -81,17 +81,31 @@ const containerHeight = computed(() => {
   return minH
 })
 
+// 隐藏 tooltip
+const hideTip = () => chart?.dispatchAction({ type: 'hideTip' })
+
+// 触摸/点击图表外部时隐藏 tooltip（移动端 tap 触发的 tooltip 没有“指针移出”事件，
+// 不处理会一直悬浮；桌面端由 globalout 处理指针移出画布的情况）
+const handleOutsidePointer = (e: Event) => {
+  const target = e.target as Node | null
+  if (chartContainer.value && target && chartContainer.value.contains(target)) return
+  hideTip()
+}
+
 // 初始化图表
 const initChart = () => {
   if (!chartContainer.value) return
-  
+
   chart = echarts.init(chartContainer.value)
-  
+
   // 绑定点击事件
   chart.on('click', (params) => {
     emit('chartClick', params)
   })
-  
+
+  // 指针移出画布时隐藏 tooltip，避免标签残留
+  chart.getZr().on('globalout', hideTip)
+
   emit('chartReady', chart)
   updateChart()
 }
@@ -139,6 +153,9 @@ const handleResize = () => {
 
 onMounted(() => {
   initChart()
+  // 捕获阶段监听，触摸/点击图表外部时隐藏残留 tooltip
+  document.addEventListener('touchstart', handleOutsidePointer, true)
+  document.addEventListener('mousedown', handleOutsidePointer, true)
   if (props.autoResize) {
     window.addEventListener('resize', handleResize)
     if (typeof ResizeObserver !== 'undefined' && chartContainer.value) {
@@ -150,6 +167,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   cancelAnimationFrame(resizeRaf)
+  document.removeEventListener('touchstart', handleOutsidePointer, true)
+  document.removeEventListener('mousedown', handleOutsidePointer, true)
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
