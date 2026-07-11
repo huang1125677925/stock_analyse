@@ -79,6 +79,7 @@ export interface StockRpsItem {
   symbol: string
   name: string
   industry: string | null
+  industries?: string[] | null
   market: string | null
   list_date: string
   delist_date: string
@@ -104,11 +105,14 @@ export interface StockRpsData {
   query_time: string
 }
 
+export type IndustryMapping = 'default' | 'dc_concept' | 'dc_region' | 'dc_l1' | 'dc_l2' | 'dc_l3'
+
 export interface StockRpsParams {
   periods?: string
   trade_date?: string
   exchange?: string
   market?: string
+  industry_mapping?: IndustryMapping
   token?: string
 }
 

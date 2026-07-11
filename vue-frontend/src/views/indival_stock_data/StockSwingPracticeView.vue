@@ -66,6 +66,19 @@
             </el-form-item>
           </el-col>
 
+          <el-col :xs="24" :md="8" :lg="6">
+            <el-form-item label="行业映射">
+              <el-select v-model="filters.industryMapping" placeholder="请选择行业映射" class="full-width">
+                <el-option
+                  v-for="item in industryMappingOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+
           <el-col :xs="24">
             <el-form-item label="RPS 周期">
               <el-checkbox-group v-model="filters.periods">
@@ -375,7 +388,7 @@ import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight, Search } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
-import { getStockRps, type StockRpsData, type StockRpsItem } from '@/services/strategyApi'
+import { getStockRps, type StockRpsData, type StockRpsItem, type IndustryMapping } from '@/services/strategyApi'
 
 type StockRpsValue = number | string | null | undefined
 type TrendShortcut = '1y' | '3y' | '5y'
@@ -397,6 +410,7 @@ interface StockRpsFilters {
   tradeDate: string
   exchange: string
   market: string
+  industryMapping: IndustryMapping
 }
 
 /**
@@ -427,6 +441,14 @@ const allMarketOptions = [
   { label: '创业板', value: '创业板' },
   { label: '科创板', value: '科创板' },
   { label: '北交所', value: '北交所' }
+]
+const industryMappingOptions = [
+  { label: '默认行业', value: 'default' },
+  { label: '东财概念板块', value: 'dc_concept' },
+  { label: '东财地域板块', value: 'dc_region' },
+  { label: '东财一级行业', value: 'dc_l1' },
+  { label: '东财二级行业', value: 'dc_l2' },
+  { label: '东财三级行业', value: 'dc_l3' }
 ]
 
 /**
@@ -470,7 +492,8 @@ const filters = reactive<StockRpsFilters>({
   periods: [...defaultPeriods],
   tradeDate: latestSelectableTradeDate,
   exchange: 'SSE',
-  market: '主板'
+  market: '主板',
+  industryMapping: 'dc_l2'
 })
 
 const loading = ref(false)
@@ -1029,7 +1052,8 @@ const loadStockRpsData = async () => {
       periods: buildPeriodsParam(filters.periods),
       trade_date: filters.tradeDate || undefined,
       exchange: filters.exchange || undefined,
-      market: filters.market
+      market: filters.market,
+      industry_mapping: filters.industryMapping
     })
     if (requestId !== stockRpsRequestId) return
     stockRpsData.value = response
@@ -1187,7 +1211,7 @@ const tableRowClassName = ({ row }: { row: StockRpsItem }): string => {
 }
 
 watch(
-  () => [filters.tradeDate, filters.exchange, filters.market, [...filters.periods].sort((a, b) => a - b).join(',')],
+  () => [filters.tradeDate, filters.exchange, filters.market, filters.industryMapping, [...filters.periods].sort((a, b) => a - b).join(',')],
   () => {
     scheduleStockRpsReload()
   },

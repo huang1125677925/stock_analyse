@@ -11,7 +11,7 @@
     <div class="lead-rise-matrix" v-loading="loading" element-loading-text="正在加载领涨数据...">
       <div class="matrix-caption">
         近30天概念板块（领涨）：{{ idxType }}
-        <span class="matrix-hint">横轴为日期，纵轴为领涨股票；标色格子表示该股当日领涨，格内为领涨涨幅</span>
+        <span class="matrix-hint">横轴为日期，纵轴为领涨股票；标色格子表示该股当日领涨，格内为领涨涨幅。点击股票名称查看K线趋势图</span>
       </div>
 
       <div v-if="dates.length" class="matrix-scroll">
@@ -37,7 +37,14 @@
           <tbody>
             <tr v-for="stock in stocks" :key="stock.name">
               <th class="stock-cell">
-                <div class="stock-name">{{ stock.name }}</div>
+                <el-button
+                  type="primary"
+                  link
+                  class="stock-name-button"
+                  @click="openStockTrendDialog(stock)"
+                >
+                  <div class="stock-name">{{ stock.name }}</div>
+                </el-button>
                 <div class="stock-code">{{ stock.code }}</div>
                 <div class="stock-count">领涨 {{ stock.count }} 天</div>
               </th>
@@ -64,13 +71,77 @@
       <el-button @click="emit('update:modelValue', false)">关闭</el-button>
     </template>
   </el-dialog>
+
+  <!-- K线趋势图弹窗 -->
+  <el-dialog
+    v-model="stockTrendDialogVisible"
+    width="88%"
+    top="6vh"
+    :close-on-click-modal="false"
+    destroy-on-close
+    append-to-body
+  >
+    <template #header>
+      <div class="trend-dialog-header">
+        <div class="trend-dialog-title">
+          {{ stockTrendStock.name || stockTrendStock.code }} K线趋势图
+        </div>
+        <div class="trend-dialog-subtitle">
+          {{ stockTrendDateRange.start || '-' }} 至 {{ stockTrendDateRange.end || '-' }}
+        </div>
+      </div>
+    </template>
+
+    <div class="trend-dialog-body">
+      <div class="toolbar-row">
+        <div class="trend-tags">
+          <el-tag v-if="stockTrendStock.code" type="info" effect="plain">
+            {{ stockTrendStock.code }}
+          </el-tag>
+          <el-tag v-if="latestStockTrendData" type="info" effect="light">
+            最新收盘 {{ latestStockTrendData.close_price.toFixed(2) }}
+          </el-tag>
+          <el-tag
+            v-if="latestStockTrendData"
+            :type="latestStockTrendData.change_percent >= 0 ? 'danger' : 'success'"
+            effect="light"
+          >
+            涨跌幅 {{ formatPercent(latestStockTrendData.change_percent) }}
+          </el-tag>
+        </div>
+
+        <div class="trend-shortcuts">
+          <el-radio-group v-model="stockTrendShortcut" @change="handleStockTrendShortcutChange">
+            <el-radio-button label="1y">最近1年</el-radio-button>
+            <el-radio-button label="3y">最近3年</el-radio-button>
+            <el-radio-button label="5y">最近5年</el-radio-button>
+          </el-radio-group>
+        </div>
+      </div>
+
+      <el-card class="trend-preview-card" v-loading="stockTrendLoading">
+        <StockKLineChart
+          v-if="stockTrendData.length"
+          :stock-code="stockTrendStock.code"
+          :stock-name="stockTrendStock.name"
+          :kline-data="stockTrendData"
+          height="420px"
+        />
+        <el-empty
+          v-else-if="!stockTrendLoading"
+          description="当前区间暂无K线数据"
+          :image-size="80"
+        />
+      </el-card>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 /**
  * 组件：领涨数据详情矩阵弹窗（LeadRiseMatrixDialog）
  * 功能：以透视矩阵展示概念板块近30天领涨情况。横轴为日期（含板块涨幅、涨跌家数），
- *       纵轴为领涨股票，交叉格标色并展示领涨涨幅。
+ *       纵轴为领涨股票，交叉格标色并展示领涨涨幅。点击股票名称可查看K线趋势图。
  * 参数：
  *  - modelValue: 弹窗显隐
  *  - tsCode: 概念代码
@@ -78,8 +149,13 @@
  *  - name: 概念名称
  * 事件：update:modelValue
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
 import { fetchDcIndexLastNDays, type DcIndexRecord } from '@/services/dcIndexApi'
+import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
+import StockKLineChart from '@/components/StockKLineChart.vue'
+
+type TrendShortcut = '1y' | '3y' | '5y'
 
 const props = defineProps<{
   modelValue: boolean
@@ -94,6 +170,18 @@ const emit = defineEmits<{
 
 const loading = ref(false)
 const records = ref<DcIndexRecord[]>([])
+
+// K线趋势图状态
+const stockTrendDialogVisible = ref(false)
+const stockTrendLoading = ref(false)
+const stockTrendData = ref<StockHistoryDataItem[]>([])
+const stockTrendShortcut = ref<TrendShortcut>('1y')
+const stockTrendDateRange = reactive({ start: '', end: '' })
+const stockTrendStock = reactive({
+  code: '',
+  name: ''
+})
+let stockTrendRequestId = 0
 
 const loadData = async () => {
   if (!props.tsCode) return
@@ -159,6 +247,12 @@ const matrix = computed(() => {
   return result
 })
 
+const latestStockTrendData = computed(() =>
+  stockTrendData.value.length > 0
+    ? stockTrendData.value[stockTrendData.value.length - 1]
+    : null
+)
+
 const formatDate = (date: string) => {
   // YYYYMMDD 或 YYYY-MM-DD -> MM-DD
   const digits = date.replace(/-/g, '')
@@ -182,6 +276,77 @@ const cellStyle = (pct: number) => {
     backgroundColor: `rgba(245, 108, 108, ${intensity.toFixed(2)})`,
     color: intensity > 0.55 ? '#fff' : '#a52121'
   }
+}
+
+// -------- K线趋势图相关函数 --------
+
+/** 根据快捷区间计算起止日期（YYYY-MM-DD） */
+function applyStockTrendShortcut(range: TrendShortcut) {
+  const yearMap: Record<TrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+
+  const fmt = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  stockTrendDateRange.start = fmt(startDate)
+  stockTrendDateRange.end = fmt(endDate)
+}
+
+/** 加载趋势弹窗中的个股 K 线数据 */
+async function loadStockTrendData() {
+  const requestId = ++stockTrendRequestId
+  if (!stockTrendStock.code) {
+    stockTrendData.value = []
+    return
+  }
+
+  stockTrendLoading.value = true
+  try {
+    const response = await fetchStockHistoryData(
+      stockTrendStock.code,
+      stockTrendDateRange.start.replace(/-/g, ''),
+      stockTrendDateRange.end.replace(/-/g, ''),
+      'qfq'
+    )
+    if (requestId !== stockTrendRequestId) return
+    stockTrendData.value = [...response].sort((a, b) => a.date.localeCompare(b.date))
+  } catch (error) {
+    if (requestId !== stockTrendRequestId) return
+    console.error('加载领涨股票趋势图失败:', error)
+    stockTrendData.value = []
+    ElMessage.error('加载股票趋势图失败，请稍后重试')
+  } finally {
+    if (requestId === stockTrendRequestId) {
+      stockTrendLoading.value = false
+    }
+  }
+}
+
+/** 打开个股趋势弹窗 */
+function openStockTrendDialog(stock: { name: string; code: string; count: number }) {
+  const tsCode = stock.code || ''
+  if (!tsCode) {
+    ElMessage.warning('该股票缺少股票代码，无法查看趋势图')
+    return
+  }
+  stockTrendStock.code = tsCode
+  stockTrendStock.name = stock.name || ''
+  stockTrendShortcut.value = '1y'
+  stockTrendData.value = []
+  applyStockTrendShortcut('1y')
+  stockTrendDialogVisible.value = true
+  loadStockTrendData()
+}
+
+/** 切换趋势弹窗快捷区间 */
+function handleStockTrendShortcutChange(range: TrendShortcut) {
+  applyStockTrendShortcut(range)
+  loadStockTrendData()
 }
 </script>
 
@@ -289,9 +454,18 @@ const cellStyle = (pct: number) => {
   min-width: 120px;
 }
 
+.stock-name-button {
+  padding: 0;
+  height: auto;
+}
+
 .stock-name {
   font-weight: 600;
   color: #303133;
+}
+
+.stock-name-button:hover .stock-name {
+  color: #409eff;
 }
 
 .stock-code {
@@ -311,5 +485,47 @@ const cellStyle = (pct: number) => {
 
 .value-cell.active {
   font-weight: 600;
+}
+
+/* -------- K线趋势图弹窗样式 -------- */
+.trend-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trend-dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.trend-dialog-subtitle {
+  font-size: 12px;
+  color: #909399;
+}
+
+.trend-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trend-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trend-preview-card {
+  min-height: 440px;
 }
 </style>
