@@ -373,12 +373,32 @@
             </el-tag>
           </div>
 
-          <div class="trend-shortcuts">
-            <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
-              <el-radio-button label="1y">最近1年</el-radio-button>
-              <el-radio-button label="3y">最近3年</el-radio-button>
-              <el-radio-button label="5y">最近5年</el-radio-button>
-            </el-radio-group>
+          <div class="trend-toolbar-right">
+            <div class="trend-nav">
+              <el-button
+                :icon="ArrowLeft"
+                :disabled="!hasPrevTrendStock"
+                @click="stepTrendStock(-1)"
+              >
+                上一只
+              </el-button>
+              <span v-if="trendNavPositionText" class="trend-nav-position">{{ trendNavPositionText }}</span>
+              <el-button
+                :disabled="!hasNextTrendStock"
+                @click="stepTrendStock(1)"
+              >
+                下一只
+                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+
+            <div class="trend-shortcuts">
+              <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
+                <el-radio-button label="1y">最近1年</el-radio-button>
+                <el-radio-button label="3y">最近3年</el-radio-button>
+                <el-radio-button label="5y">最近5年</el-radio-button>
+              </el-radio-group>
+            </div>
           </div>
         </div>
 
@@ -540,6 +560,8 @@ const selectedTrendStock = reactive({
   industry: '',
   market: ''
 })
+// 趋势弹窗当前展示的股票在筛选结果 `filteredRows` 中的索引，用于左右翻阅
+const currentTrendIndex = ref(-1)
 let trendRequestId = 0
 
 // 领涨数据详情弹窗：点击“行业”列的行业名时，按板块代码打开该板块的领涨详情
@@ -1015,6 +1037,18 @@ const latestTrendPoint = computed(() => {
   return trendData.value.length ? trendData.value[trendData.value.length - 1] : null
 })
 
+// 是否存在上一只/下一只可翻阅的股票（基于当前筛选结果 `filteredRows`）
+const hasPrevTrendStock = computed(() => currentTrendIndex.value > 0)
+const hasNextTrendStock = computed(
+  () => currentTrendIndex.value >= 0 && currentTrendIndex.value < filteredRows.value.length - 1
+)
+
+// 翻阅进度文本，如 “3 / 128”
+const trendNavPositionText = computed(() => {
+  if (currentTrendIndex.value < 0 || !filteredRows.value.length) return ''
+  return `${currentTrendIndex.value + 1} / ${filteredRows.value.length}`
+})
+
 /**
  * 工具：生成 `stock-rps` 接口所需周期参数。
  * 参数：periods 为当前勾选的周期数组。
@@ -1208,12 +1242,12 @@ const loadTrendData = async () => {
 }
 
 /**
- * 事件：打开个股趋势弹窗。
- * 参数：row 为当前表格行对应的股票记录。
+ * 工具：将指定股票记录载入趋势弹窗并请求其 K 线数据。
+ * 参数：row 为目标股票记录。
  * 返回值：void。
- * 事件：设置弹窗股票信息、默认区间并加载趋势数据。
+ * 事件：更新 `selectedTrendStock`，重置区间为最近1年并加载趋势数据。
  */
-const openTrendDialog = (row: StockRpsItem) => {
+const showTrendStock = (row: StockRpsItem) => {
   selectedTrendStock.tsCode = row.ts_code
   selectedTrendStock.symbol = row.symbol
   selectedTrendStock.name = row.name
@@ -1222,8 +1256,33 @@ const openTrendDialog = (row: StockRpsItem) => {
   trendShortcut.value = '1y'
   trendData.value = []
   applyTrendShortcut('1y')
-  trendDialogVisible.value = true
   loadTrendData()
+}
+
+/**
+ * 事件：打开个股趋势弹窗。
+ * 参数：row 为当前表格行对应的股票记录。
+ * 返回值：void。
+ * 事件：记录该股票在筛选结果中的位置、设置弹窗信息并加载趋势数据。
+ */
+const openTrendDialog = (row: StockRpsItem) => {
+  currentTrendIndex.value = filteredRows.value.findIndex((item) => item.ts_code === row.ts_code)
+  showTrendStock(row)
+  trendDialogVisible.value = true
+}
+
+/**
+ * 事件：翻阅到筛选结果中的上一只/下一只股票。
+ * 参数：step 为方向，`-1` 表示上一只，`1` 表示下一只。
+ * 返回值：void。
+ * 事件：更新 `currentTrendIndex` 并加载对应股票的趋势数据。
+ */
+const stepTrendStock = (step: -1 | 1) => {
+  const nextIndex = currentTrendIndex.value + step
+  const targetRow = filteredRows.value[nextIndex]
+  if (!targetRow) return
+  currentTrendIndex.value = nextIndex
+  showTrendStock(targetRow)
 }
 
 /**
@@ -1571,6 +1630,27 @@ watch(
   gap: 16px;
 }
 
+.trend-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.trend-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trend-nav-position {
+  min-width: 56px;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7280;
+}
+
 .trend-shortcuts {
   display: flex;
   justify-content: flex-end;
@@ -1603,8 +1683,13 @@ watch(
     padding: 14px;
   }
 
+  .trend-toolbar-right,
   .trend-shortcuts {
     justify-content: flex-start;
+  }
+
+  .trend-toolbar-right {
+    width: 100%;
   }
 }
 </style>
