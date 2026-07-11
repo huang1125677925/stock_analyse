@@ -79,6 +79,7 @@ export interface StockRpsItem {
   symbol: string
   name: string
   industry: string | null
+  industry_code?: string | null
   industries?: string[] | null
   market: string | null
   list_date: string

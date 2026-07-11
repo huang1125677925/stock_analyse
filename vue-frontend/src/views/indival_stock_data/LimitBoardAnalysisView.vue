@@ -40,7 +40,7 @@
 
       <el-card shadow="never" class="trend-card" v-if="hasIndustryTrendDaily">
         <template #header>行业涨停趋势矩阵</template>
-        <LimitBoardIndustryTrendMatrix :daily="industryTrendDaily" />
+        <LimitBoardIndustryTrendMatrix :daily="industryTrendDaily" :idx-type="industryIdxType" />
       </el-card>
 
       <SourceCounts :counts="industryTrendData?.source_counts" />
@@ -133,6 +133,13 @@ const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> =
 
 const trendRange = ref<TrendRange>('2w')
 const industryMapping = ref<IndustryMapping>('dc_l2')
+
+/** 行业映射 -> 东财板块类型，供领涨数据详情按 idx_type 拉取板块K线 */
+const industryIdxType = computed(() => {
+  if (industryMapping.value === 'dc_concept') return '概念板块'
+  if (industryMapping.value === 'dc_region') return '地域板块'
+  return '行业板块'
+})
 const trendEndDate = ref(getRecentTradeDate())
 const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
 const loading = ref(false)

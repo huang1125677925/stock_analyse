@@ -7,7 +7,7 @@
     <template v-else>
       <div class="matrix-legend">
         <span class="legend-label">纵轴按最近交易日（{{ formatDisplayDate(lastDate) }}）行业涨停数量倒序排列</span>
-        <span class="legend-tip">点击日期在表头查看当日情绪摘要；点击单元格顶部涨停数量查看当日行业涨停详情，点击个股标签查看该股趋势图</span>
+        <span class="legend-tip">点击日期在表头查看当日情绪摘要；点击行业名查看该板块领涨数据详情；点击单元格顶部涨停数量查看当日行业涨停详情，点击个股标签查看该股趋势图</span>
         <el-switch
           v-model="showStockList"
           class="legend-switch"
@@ -253,11 +253,11 @@
       </div>
     </el-dialog>
 
-    <IndustryTrendDialog
+    <LeadRiseMatrixDialog
       v-model="industryTrendDialogVisible"
-      :sector-code="selectedIndustryCode"
-      :sector-name="selectedIndustryName"
-      @data-loaded="handleIndustryDataLoaded"
+      :ts-code="selectedIndustryCode"
+      :idx-type="props.idxType"
+      :name="selectedIndustryName"
     />
   </div>
 </template>
@@ -279,7 +279,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import StockKLineChart from '@/components/StockKLineChart.vue'
-import IndustryTrendDialog from '@/components/IndustryTrendDialog.vue'
+import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import type {
   IndustryTrendDaily,
@@ -299,9 +299,13 @@ const STATUS_META: Array<{ key: keyof IndustryTrendStatusCounts; symbol: string;
 interface Props {
   /** 以交易日 YYYYMMDD 为 key 的日度三维明细 */
   daily: Record<string, IndustryTrendDaily>
+  /** 东财板块类型（概念板块/地域板块/行业板块），供领涨数据详情弹窗按 idx_type 拉取板块K线 */
+  idxType?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  idxType: '行业板块'
+})
 
 /** 是否在交叉块中展示个股涨停列表，默认开启 */
 const showStockList = ref(true)
@@ -832,25 +836,16 @@ function openDetail(date: string, industry: string) {
   detailVisible.value = true
 }
 
-/** 打开行业趋势图弹窗 */
+/** 打开该行业（东财板块）的领涨数据详情弹窗 */
 function openIndustryTrendDialog(industry: string) {
   const industryCode = getIndustryCode(industry)
   if (!industryCode) {
-    ElMessage.warning('该行业暂无行业代码，无法查看趋势图')
+    ElMessage.warning('该行业暂无行业代码，无法查看领涨数据详情')
     return
   }
   selectedIndustryCode.value = industryCode
   selectedIndustryName.value = industry
   industryTrendDialogVisible.value = true
-}
-
-/** 处理行业行情数据加载完成 */
-function handleIndustryDataLoaded(data: { sectorCode: string; records: Array<{ trade_date: string; pct_change: number }> }) {
-  const dateMap = new Map<string, number>()
-  data.records.forEach(record => {
-    dateMap.set(record.trade_date, record.pct_change)
-  })
-  industryPctChangeCache.value.set(data.sectorCode, dateMap)
 }
 
 // -------- 个股趋势图弹窗 --------

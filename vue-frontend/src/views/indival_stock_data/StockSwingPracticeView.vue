@@ -269,7 +269,22 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="industry" label="行业" min-width="140" align="center" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="industry" label="行业" min-width="140" align="center" show-overflow-tooltip sortable="custom">
+          <template #default="{ row }">
+            <div class="industry-cell">
+              <el-button
+                v-if="isDcIndustryMapping && row.industry"
+                type="primary"
+                link
+                @click="openIndustryLeadRise(row)"
+              >
+                {{ row.industry }}
+              </el-button>
+              <span v-else>{{ row.industry || '-' }}</span>
+              <span v-if="row.industry_code" class="industry-code">{{ row.industry_code }}</span>
+            </div>
+          </template>
+        </el-table-column>
 
         <el-table-column prop="latest_price" label="最新股价" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPrice(row.latest_price) }}</template>
@@ -379,6 +394,13 @@
         </el-card>
       </div>
     </el-dialog>
+
+    <LeadRiseMatrixDialog
+      v-model="leadRiseVisible"
+      :ts-code="leadRiseTsCode"
+      :idx-type="leadRiseIdxType"
+      :name="leadRiseName"
+    />
   </div>
 </template>
 
@@ -387,6 +409,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight, Search } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
+import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import { getStockRps, type StockRpsData, type StockRpsItem, type IndustryMapping } from '@/services/strategyApi'
 
@@ -518,6 +541,43 @@ const selectedTrendStock = reactive({
   market: ''
 })
 let trendRequestId = 0
+
+// 领涨数据详情弹窗：点击“行业”列的行业名时，按板块代码打开该板块的领涨详情
+const leadRiseVisible = ref(false)
+const leadRiseTsCode = ref('')
+const leadRiseName = ref('')
+const leadRiseIdxType = ref('行业板块')
+
+// 行业映射 -> 东财板块类型（供领涨详情的板块K线按 idx_type 拉取）；default 非东财板块，不可下钻
+const dcIdxTypeByMapping: Partial<Record<IndustryMapping, string>> = {
+  dc_concept: '概念板块',
+  dc_region: '地域板块',
+  dc_l1: '行业板块',
+  dc_l2: '行业板块',
+  dc_l3: '行业板块'
+}
+
+// 当前行业映射是否为东财板块（default 为个股默认行业，无对应板块领涨数据）
+const isDcIndustryMapping = computed(() => filters.industryMapping !== 'default')
+
+/**
+ * 事件：打开行业领涨数据详情
+ * 功能：点击表格“行业”列中的东财板块名时，按名称打开领涨数据详情弹窗
+ * 参数：row(StockRpsItem) 当前行数据
+ * 返回值：无
+ */
+const openIndustryLeadRise = (row: StockRpsItem) => {
+  const name = row.industry || ''
+  if (!name) {
+    ElMessage.warning('该股票暂无所属板块信息')
+    return
+  }
+  // 优先按板块代码寻址（更精确），无代码时回退为按名称寻址
+  leadRiseTsCode.value = row.industry_code || ''
+  leadRiseName.value = name
+  leadRiseIdxType.value = dcIdxTypeByMapping[filters.industryMapping] || '行业板块'
+  leadRiseVisible.value = true
+}
 
 /**
  * 工具：将 `Date` 对象格式化为 `YYYYMMDD`。
@@ -1418,6 +1478,18 @@ watch(
 }
 
 .stock-name-cell span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.industry-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.industry-code {
   color: #6b7280;
   font-size: 12px;
 }
