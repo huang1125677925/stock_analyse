@@ -1,15 +1,6 @@
 <template>
   <div class="major-index-rps-view" v-loading="loading" element-loading-text="正在加载大盘指数RPS数据...">
     <el-card class="page-header" shadow="never">
-      <template #header>
-        <div class="header-content">
-          <div>
-            <h2>大盘指数RPS</h2>
-            <p class="page-desc">展示国内与国际主要指数在不同周期下的涨跌幅与相对强度，便于横向观察强弱切换。</p>
-          </div>
-        </div>
-      </template>
-
       <el-form :inline="!isMobile" class="query-form">
         <el-form-item label="截止日期">
           <el-date-picker
@@ -27,40 +18,7 @@
             <el-option label="国际" value="国际" />
           </el-select>
         </el-form-item>
-        <el-form-item label="名称搜索">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="输入指数名称或代码"
-            clearable
-            :prefix-icon="Search"
-            style="width: 220px"
-            @keyup.enter="fetchData"
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="fetchData">查询</el-button>
-          <el-button :icon="RefreshRight" @click="resetFilters">重置</el-button>
-        </el-form-item>
       </el-form>
-
-      <div class="summary-grid">
-        <el-card shadow="never" class="summary-card">
-          <div class="summary-label">指数总数</div>
-          <div class="summary-value">{{ rows.length }}</div>
-        </el-card>
-        <el-card shadow="never" class="summary-card">
-          <div class="summary-label">国内指数</div>
-          <div class="summary-value">{{ domesticCount }}</div>
-        </el-card>
-        <el-card shadow="never" class="summary-card">
-          <div class="summary-label">国际指数</div>
-          <div class="summary-value">{{ internationalCount }}</div>
-        </el-card>
-        <el-card shadow="never" class="summary-card">
-          <div class="summary-label">最强指数</div>
-          <div class="summary-value summary-name">{{ strongestIndexName }}</div>
-        </el-card>
-      </div>
     </el-card>
 
     <el-card class="table-card" shadow="never">
@@ -190,9 +148,9 @@
  * 返回值：无
  * 事件（emits）：无
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { InfoFilled, RefreshRight, Search } from '@element-plus/icons-vue'
+import { InfoFilled } from '@element-plus/icons-vue'
 import MajorIndexTrendDialog from '@/components/MajorIndexTrendDialog.vue'
 import {
   getMajorIndexRps,
@@ -214,11 +172,10 @@ const loading = ref(false)
 const rows = ref<MajorIndexRpsItem[]>([])
 const availablePeriods = ref<number[]>([...DEFAULT_PERIODS])
 const queryTime = ref('')
-const searchKeyword = ref('')
 const selectedMarket = ref<MarketFilter>('国内')
 const tradeDate = ref('')
 const sortState = ref<SortState>({
-  prop: 'RPS_today',
+  prop: 'RPS_5',
   order: 'descending',
 })
 const trendDialogVisible = ref(false)
@@ -229,24 +186,10 @@ const trendIndex = ref({
 })
 const isMobile = ref(window.innerWidth < 768)
 
-const domesticCount = computed(() => rows.value.filter(item => item.market === '国内').length)
-const internationalCount = computed(() => rows.value.filter(item => item.market === '国际').length)
-const strongestIndexName = computed(() => {
-  const sorted = [...filteredRows.value].sort((a, b) => getNumericValue(b.RPS_today) - getNumericValue(a.RPS_today))
-  return sorted[0]?.name || '--'
-})
-
 const filteredRows = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
-
-  const filtered = rows.value.filter(item => {
-    const matchesMarket = selectedMarket.value === '全部' || item.market === selectedMarket.value
-    const matchesKeyword = !keyword
-      || item.name.toLowerCase().includes(keyword)
-      || item.ts_code.toLowerCase().includes(keyword)
-
-    return matchesMarket && matchesKeyword
-  })
+  const filtered = rows.value.filter(item =>
+    selectedMarket.value === '全部' || item.market === selectedMarket.value
+  )
 
   return [...filtered].sort((a, b) => compareRows(a, b, sortState.value))
 })
@@ -358,12 +301,10 @@ async function fetchData() {
   }
 }
 
-function resetFilters() {
-  searchKeyword.value = ''
-  selectedMarket.value = '国内'
-  tradeDate.value = ''
+// 截止日期变化后自动向接口请求最新数据；市场筛选为前端过滤，随 filteredRows 实时更新
+watch(tradeDate, () => {
   fetchData()
-}
+})
 
 function handleSortChange({ prop, order }: { prop: string; order: SortOrder }) {
   sortState.value = {
@@ -431,52 +372,22 @@ function handleResize() {
   padding: 18px 0 16px;
 }
 
-:deep(.page-header .el-card__body),
 :deep(.table-card .el-card__body) {
   padding: 0 0 20px;
 }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.page-desc {
-  margin: 8px 0 0;
-  color: var(--el-text-color-secondary);
-  line-height: 1.6;
+/* 筛选卡片仅保留表单，上下留白收紧 */
+:deep(.page-header .el-card__body) {
+  padding: 16px 0;
 }
 
 .query-form {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.summary-card :deep(.el-card__body) {
-  padding: 16px;
-}
-
-.summary-label {
-  margin-bottom: 8px;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-
-.summary-value {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.summary-name {
-  font-size: 18px;
+/* 表单只有一行，去掉表单项底部默认外边距，消除卡片内多余空白 */
+.query-form :deep(.el-form-item) {
+  margin-bottom: 0;
 }
 
 .table-header {
@@ -567,10 +478,6 @@ function handleResize() {
 }
 
 @media (max-width: 992px) {
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .table-header {
     flex-direction: column;
     align-items: flex-start;
@@ -595,29 +502,6 @@ function handleResize() {
   :deep(.page-header .el-card__body),
   :deep(.table-card .el-card__body) {
     padding: 0 0 10px;
-  }
-
-  /* 摘要卡片在手机上 2 列排布，提升单屏信息密度 */
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .summary-card :deep(.el-card__body) {
-    padding: 10px;
-  }
-
-  .summary-label {
-    margin-bottom: 4px;
-    font-size: 12px;
-  }
-
-  .summary-value {
-    font-size: 18px;
-  }
-
-  .summary-name {
-    font-size: 15px;
   }
 
   .query-form {

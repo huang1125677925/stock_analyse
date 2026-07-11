@@ -56,10 +56,10 @@ const router = createRouter({
           meta: { title: '大盘指数RPS' }
         },
         {
-          path: '/market-fund-flow',
-          name: 'market-fund-flow',
-          component: () => import('@/views/markt_data/MarketFundFlowView.vue'),
-          meta: { title: '大盘资金分析' }
+          path: '/market-overview/index-breadth',
+          name: 'market-index-breadth',
+          component: () => import('@/views/markt_data/MarketIndexBreadthView.vue'),
+          meta: { title: '大盘指数宽度分析' }
         }
       ]
     },

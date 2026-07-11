@@ -130,7 +130,7 @@
  */
 import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchIndexDailybasic, fetchMarketCombinedDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
+import { fetchIndexDailybasic, type IndexDailybasicItem } from '@/services/indexDailybasicApi'
 import * as echarts from 'echarts'
 import { useIsMobile } from '@/composables/useIsMobile'
 
@@ -144,15 +144,13 @@ const loading = ref(false)
 
 // 指数代码选项
 const indexOptions = [
-  { label: '全市场综指', value: 'all_market' },
-  { label: '沪深300', value: '000300.SH' },
-  { label: '中证500', value: '000905.SH' },
-  { label: '深证成指', value: '399001.SZ' },
-  { label: '中小板指', value: '399005.SZ' },
-  { label: '创业板指', value: '399006.SZ' },
-  { label: '深证创新', value: '399016.SZ' },
-  { label: '沪深300(深)', value: '399300.SZ' },
   { label: '上证综指', value: '000001.SH' },
+  { label: '上证50', value: '000016.SH' },
+  { label: '中证500', value: '000905.SH' },
+  { label: '沪深300', value: '000300.SH' },
+  { label: '深证成指', value: '399001.SZ' },
+  { label: '创业板指', value: '399006.SZ' },
+  { label: '科创50', value: '000688.SH' },
 ]
 
 // 指标选项
@@ -367,9 +365,7 @@ async function fetchData() {
     
     const [startDate, endDateValue] = dateRange.value
     const loaded = await Promise.all(indexOptions.map(async option => {
-      const res = option.value === 'all_market'
-        ? await fetchMarketCombinedDailybasic({ startDate, endDate: endDateValue })
-        : await fetchIndexDailybasic({ tsCode: option.value, startDate, endDate: endDateValue })
+      const res = await fetchIndexDailybasic({ tsCode: option.value, startDate, endDate: endDateValue })
 
       const records = (res.records || []).sort((a, b) => {
         const dateA = String(a.trade_date || '')

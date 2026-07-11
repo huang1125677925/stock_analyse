@@ -309,7 +309,7 @@ const marketOverviewMegaMenuSections = [
     items: [
       { title: '大盘指数RPS', path: '/major-index-rps' },
       { title: '大盘指数估值', path: '/market-overview/index-valuation' },
-      { title: '大盘资金分析', path: '/market-fund-flow' },
+      { title: '大盘指数宽度分析', path: '/market-overview/index-breadth' },
     ],
   },
 ]
@@ -360,7 +360,7 @@ function hasMegaMenu(path: string) {
 function isMegaMenuActive(path: string) {
   switch (path) {
     case '/market-overview':
-      return route.path === '/market-overview/index-valuation' || route.path === '/major-index-rps' || route.path === '/market-fund-flow'
+      return route.path === '/market-overview/index-valuation' || route.path === '/major-index-rps' || route.path === '/market-overview/index-breadth'
     case '/etf':
       return route.matched.some((record) => record.path === '/analysis')
     case '/stock-picker':
