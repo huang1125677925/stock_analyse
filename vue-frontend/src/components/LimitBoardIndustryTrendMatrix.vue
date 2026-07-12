@@ -108,7 +108,7 @@
                       class="stock-chip"
                       :class="tagClass(stock)"
                       :title="stockTooltip(stock)"
-                      @click="openTrendDialog(stock)"
+                      @click="openTrendDialog(stock, allDayStocks(date), date)"
                     >
                       <span class="chip-name">{{ stock.name || stock.ts_code || '-' }}</span>
                       <span
@@ -139,7 +139,7 @@
         <el-table-column type="index" label="#" width="52" align="center" fixed />
         <el-table-column prop="name" label="名称" min-width="120" fixed show-overflow-tooltip>
           <template #default="{ row }">
-            <el-button type="primary" link @click="openTrendDialog(row)">{{ row.name || row.ts_code || '-' }}</el-button>
+            <el-button type="primary" link @click="openTrendDialog(row, allDayStocks(detailDate), detailDate)">{{ row.name || row.ts_code || '-' }}</el-button>
           </template>
         </el-table-column>
         <el-table-column prop="ts_code" label="代码" min-width="110" fixed />
@@ -221,6 +221,7 @@
             <el-tag v-if="selectedTrendStock.tsCode" type="info" effect="plain">{{ selectedTrendStock.tsCode }}</el-tag>
             <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">{{ selectedTrendStock.industry }}</el-tag>
             <el-tag v-if="selectedTrendStock.tag" type="danger" effect="light">{{ selectedTrendStock.tag }}</el-tag>
+            <el-tag v-if="trendLimitUpDate" type="danger" effect="plain">涨停日 {{ formatDisplayDate(trendLimitUpDate) }}</el-tag>
             <el-tag v-if="latestTrendPoint" type="info" effect="light">最新收盘 {{ latestTrendPoint.close_price.toFixed(2) }}</el-tag>
             <el-tag
               v-if="latestTrendPoint"
@@ -231,12 +232,34 @@
             </el-tag>
           </div>
 
-          <div class="trend-shortcuts">
-            <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
-              <el-radio-button label="1y">最近1年</el-radio-button>
-              <el-radio-button label="3y">最近3年</el-radio-button>
-              <el-radio-button label="5y">最近5年</el-radio-button>
-            </el-radio-group>
+          <div class="trend-controls">
+            <div class="trend-nav">
+              <el-button
+                size="small"
+                :disabled="!hasPrevTrendStock"
+                @click="stepTrendStock(-1)"
+              >
+                <el-icon><ArrowLeft /></el-icon>
+                上一条
+              </el-button>
+              <el-button
+                size="small"
+                :disabled="!hasNextTrendStock"
+                @click="stepTrendStock(1)"
+              >
+                下一条
+                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+
+            <div class="trend-shortcuts">
+              <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
+                <el-radio-button label="6m">最近6月</el-radio-button>
+                <el-radio-button label="1y">最近1年</el-radio-button>
+                <el-radio-button label="3y">最近3年</el-radio-button>
+                <el-radio-button label="5y">最近5年</el-radio-button>
+              </el-radio-group>
+            </div>
           </div>
         </div>
 
@@ -246,6 +269,7 @@
             :stock-code="selectedTrendStock.tsCode"
             :stock-name="selectedTrendStock.name"
             :kline-data="trendData"
+            :pattern-markers="trendPatternMarkers"
             height="420px"
           />
           <el-empty v-else-if="!trendLoading" description="当前区间暂无K线数据" :image-size="80" />
@@ -278,6 +302,7 @@
  */
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
@@ -287,7 +312,7 @@ import type {
   IndustryTrendStock
 } from '@/services/limitBoardStrategyApi'
 
-type TrendShortcut = '1y' | '3y' | '5y'
+type TrendShortcut = '6m' | '1y' | '3y' | '5y'
 
 /** 涨停状态展示配置：符号 + 全称，用于矩阵单元格节省空间 */
 const STATUS_META: Array<{ key: keyof IndustryTrendStatusCounts; symbol: string; label: string }> = [
@@ -674,6 +699,31 @@ function cellStocks(date: string, industry: string): IndustryTrendStock[] {
 }
 
 /**
+ * 汇总当日所有行业的涨停股，按 ts_code 去重（同股跨行业只保留一条，并回填行业名），
+ * 供趋势弹窗“上一条/下一条”跨行业连续翻阅使用。
+ */
+function allDayStocks(date: string): IndustryTrendStock[] {
+  const stocksByIndustry = props.daily[date]?.stocks
+  if (!stocksByIndustry) return []
+  const seen = new Map<string, IndustryTrendStock>()
+  Object.keys(stocksByIndustry).forEach((industry) => {
+    const list = stocksByIndustry[industry]
+    if (!Array.isArray(list)) return
+    list.forEach((stock) => {
+      const key = stock.ts_code || stock.name || ''
+      if (!key || seen.has(key)) return
+      seen.set(key, { ...stock, industry: stock.industry || industry })
+    })
+  })
+  // 连板数高者优先，其次按换手率
+  return Array.from(seen.values()).sort((a, b) => {
+    const boardDiff = boardOfStock(b) - boardOfStock(a)
+    if (boardDiff !== 0) return boardDiff
+    return numberOr(b.turnover_rate) - numberOr(a.turnover_rate)
+  })
+}
+
+/**
  * 热度色阶：浅黄 → 黄 → 橙 → 红 → 深红。
  * 相比单一红色调仅变透明度，多色渐变能显著提升不同涨停数量之间的区分度。
  */
@@ -852,7 +902,7 @@ function openIndustryTrendDialog(industry: string) {
 const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendData = ref<StockHistoryDataItem[]>([])
-const trendShortcut = ref<TrendShortcut>('1y')
+const trendShortcut = ref<TrendShortcut>('6m')
 const trendDateRange = reactive({ start: '', end: '' })
 const selectedTrendStock = reactive({
   tsCode: '',
@@ -860,23 +910,50 @@ const selectedTrendStock = reactive({
   industry: '',
   tag: ''
 })
+// 趋势弹窗当前浏览的涨停股列表及其索引，用于上一条/下一条连续查看
+const trendStockList = ref<IndustryTrendStock[]>([])
+const currentTrendIndex = ref(-1)
+// 该股涨停当日日期（YYYYMMDD），用于在趋势图上标记光标虚线
+const trendLimitUpDate = ref('')
 let trendRequestId = 0
+
+// 涨停日期在 K 线图上的光标虚线标记
+const trendPatternMarkers = computed(() => {
+  if (!trendLimitUpDate.value) return []
+  return [
+    {
+      date: trendLimitUpDate.value,
+      label: `涨停 ${formatDisplayDate(trendLimitUpDate.value)}`,
+      direction: 'bullish' as const
+    }
+  ]
+})
 
 const latestTrendPoint = computed(() =>
   trendData.value.length ? trendData.value[trendData.value.length - 1] : null
 )
 
+// 是否存在可翻阅的上一只/下一只涨停股
+const hasPrevTrendStock = computed(() => currentTrendIndex.value > 0)
+const hasNextTrendStock = computed(
+  () => currentTrendIndex.value >= 0 && currentTrendIndex.value < trendStockList.value.length - 1
+)
+
 const trendDialogTitle = computed(() => {
   const label = selectedTrendStock.name || selectedTrendStock.tsCode
-  return label ? `${label} 趋势图` : '个股趋势图'
+  const base = label ? `${label} 趋势图` : '个股趋势图'
+  if (trendStockList.value.length > 1 && currentTrendIndex.value >= 0) {
+    return `${base}（${currentTrendIndex.value + 1}/${trendStockList.value.length}）`
+  }
+  return base
 })
 
 /** 根据快捷区间计算起止日期（YYYY-MM-DD） */
 function applyTrendShortcut(range: TrendShortcut) {
-  const yearMap: Record<TrendShortcut, number> = { '1y': 1, '3y': 3, '5y': 5 }
+  const monthMap: Record<TrendShortcut, number> = { '6m': 6, '1y': 12, '3y': 36, '5y': 60 }
   const endDate = new Date()
   const startDate = new Date()
-  startDate.setFullYear(endDate.getFullYear() - yearMap[range])
+  startDate.setMonth(endDate.getMonth() - monthMap[range])
 
   const fmt = (date: Date) => {
     const year = date.getFullYear()
@@ -918,22 +995,49 @@ async function loadTrendData() {
   }
 }
 
-/** 打开个股趋势弹窗 */
-function openTrendDialog(stock: IndustryTrendStock) {
+/** 设置当前展示的涨停股并加载其 K 线数据 */
+function showTrendStock(stock: IndustryTrendStock) {
+  selectedTrendStock.tsCode = stock.ts_code || ''
+  selectedTrendStock.name = stock.name || ''
+  selectedTrendStock.industry = stock.industry || detailIndustry.value || ''
+  selectedTrendStock.tag = stock.tag || ''
+  trendData.value = []
+  loadTrendData()
+}
+
+/**
+ * 打开个股趋势弹窗。
+ * @param stock 被点击的涨停股
+ * @param list  该股所在的涨停股列表（单元格个股或详情表格），用于上一条/下一条翻阅；缺省时仅展示单只
+ * @param limitUpDate 该股涨停当日日期（YYYYMMDD），用于图上光标虚线标记
+ */
+function openTrendDialog(stock: IndustryTrendStock, list?: IndustryTrendStock[], limitUpDate = '') {
   const tsCode = stock.ts_code || ''
   if (!tsCode) {
     ElMessage.warning('该个股缺少股票代码，无法查看趋势图')
     return
   }
-  selectedTrendStock.tsCode = tsCode
-  selectedTrendStock.name = stock.name || ''
-  selectedTrendStock.industry = stock.industry || detailIndustry.value || ''
-  selectedTrendStock.tag = stock.tag || ''
-  trendShortcut.value = '1y'
-  trendData.value = []
-  applyTrendShortcut('1y')
+  const browseList = list && list.length ? list : [stock]
+  trendStockList.value = browseList
+  trendLimitUpDate.value = limitUpDate
+  const foundIndex = browseList.findIndex((item) => (item.ts_code || '') === tsCode)
+  currentTrendIndex.value = foundIndex >= 0 ? foundIndex : 0
+  trendShortcut.value = '6m'
+  applyTrendShortcut('6m')
   trendDialogVisible.value = true
-  loadTrendData()
+  showTrendStock(browseList[currentTrendIndex.value] || stock)
+}
+
+/**
+ * 翻阅到列表中的上一只/下一只涨停股。
+ * @param step -1 表示上一只，1 表示下一只
+ */
+function stepTrendStock(step: -1 | 1) {
+  const nextIndex = currentTrendIndex.value + step
+  const targetStock = trendStockList.value[nextIndex]
+  if (!targetStock) return
+  currentTrendIndex.value = nextIndex
+  showTrendStock(targetStock)
 }
 
 /** 切换趋势弹窗快捷区间 */
@@ -1508,6 +1612,19 @@ function formatDisplayDate(value: string): string {
   flex-wrap: wrap;
 }
 
+.trend-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.trend-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .trend-shortcuts {
   display: flex;
   justify-content: flex-end;
@@ -1515,5 +1632,16 @@ function formatDisplayDate(value: string): string {
 
 .trend-preview-card {
   min-height: 220px;
+}
+
+/* 去掉趋势图弹窗预览卡片的外框（边框/阴影/内边距） */
+.trend-preview-card.el-card {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.trend-preview-card :deep(.el-card__body) {
+  padding: 0;
 }
 </style>

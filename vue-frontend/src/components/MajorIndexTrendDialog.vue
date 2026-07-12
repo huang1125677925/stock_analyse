@@ -41,8 +41,16 @@
           <el-tag v-if="latestTrendData" type="info" effect="light">
             最新成交额 {{ formatAmount(latestTrendData.amount) }}
           </el-tag>
+          <el-tag
+            v-for="item in latestBreadthValues"
+            :key="item.name"
+            type="info"
+            effect="plain"
+          >
+            {{ item.name }} {{ formatRatio(item.value) }}
+          </el-tag>
         </div>
-        <div class="trend-shortcuts">
+        <div v-if="!hasFixedDateRange" class="trend-shortcuts">
           <el-radio-group v-model="trendShortcut" @change="handleTrendShortcutChange">
             <el-radio-button label="2m">最近2月</el-radio-button>
             <el-radio-button label="1y">最近1年</el-radio-button>
@@ -58,6 +66,7 @@
           :stock-code="props.indexCode"
           :stock-name="displayIndexName"
           :kline-data="trendData"
+          :overlay-lines="props.breadthLines"
           :height="isMobile ? '300px' : '420px'"
         />
         <el-empty
@@ -83,6 +92,8 @@
  * - indexCode(string): 指数代码
  * - indexName(string): 指数名称
  * - market(string): 市场类型，支持国内/国际
+ * - startDate/endDate(string): 可选固定日期范围，传入后趋势图范围与父级页面保持一致
+ * - breadthLines(array): 可选指数 MA 宽度叠加线
  * 返回值：无
  * 事件：
  * - update:modelValue: 更新弹窗显示状态
@@ -100,15 +111,37 @@ import type { StockHistoryDataItem } from '@/services/stockHistoryApi'
 
 type TrendShortcut = '2m' | '1y' | '3y' | '5y'
 
+interface OverlayLinePoint {
+  date: string
+  value: number
+}
+
+interface OverlayLine {
+  name: string
+  points: OverlayLinePoint[]
+  color?: string
+  width?: number
+  type?: 'solid' | 'dashed' | 'dotted'
+  showSymbol?: boolean
+  yAxisIndex?: number
+  valueFormat?: 'percent' | 'raw'
+}
+
 interface Props {
   modelValue: boolean
   indexCode: string
   indexName: string
   market?: string
+  startDate?: string
+  endDate?: string
+  breadthLines?: OverlayLine[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   market: '',
+  startDate: '',
+  endDate: '',
+  breadthLines: () => [],
 })
 
 const emit = defineEmits<{
@@ -128,6 +161,8 @@ let trendRequestId = 0
 
 const displayIndexName = computed(() => props.indexName || props.indexCode || '大盘指数')
 
+const hasFixedDateRange = computed(() => !!props.startDate && !!props.endDate)
+
 const displayMarketLabel = computed(() => {
   if (props.market === '国内' || props.market === '国际') {
     return props.market
@@ -145,6 +180,20 @@ const trendEmptyText = computed(() => {
   return props.indexCode
     ? '暂无该指数区间K线数据'
     : '请选择指数查看趋势看板'
+})
+
+const latestBreadthValues = computed(() => {
+  return (props.breadthLines || [])
+    .map(line => {
+      const sortedPoints = [...line.points]
+        .sort((a, b) => a.date.localeCompare(b.date))
+      const latestPoint = sortedPoints[sortedPoints.length - 1]
+
+      return latestPoint
+        ? { name: line.name, value: latestPoint.value }
+        : null
+    })
+    .filter((item): item is { name: string; value: number } => item !== null)
 })
 
 function formatDate(date: Date): string {
@@ -185,6 +234,14 @@ function formatPercent(value: unknown): string {
   return `${sign}${num.toFixed(2)}%`
 }
 
+function formatRatio(value: unknown): string {
+  const num = getNumericValue(value)
+  if (!Number.isFinite(num)) {
+    return '-'
+  }
+  return `${(num * 100).toFixed(2)}%`
+}
+
 function formatAmount(value: unknown): string {
   const numericValue = getNumericValue(value)
   if (!Number.isFinite(numericValue) || numericValue === 0) {
@@ -217,6 +274,11 @@ function applyTrendShortcut(range: TrendShortcut) {
   start.setMonth(end.getMonth() - monthMap[range])
   trendDateRange.start = formatDate(start)
   trendDateRange.end = formatDate(end)
+}
+
+function applyFixedDateRange() {
+  trendDateRange.start = props.startDate || ''
+  trendDateRange.end = props.endDate || ''
 }
 
 function mapRecordToKlineItem(record: MajorIndexDailyRecord): StockHistoryDataItem {
@@ -294,12 +356,18 @@ async function loadTrendData() {
  * 事件：更新趋势查询区间并刷新图表
  */
 function handleTrendShortcutChange(range: TrendShortcut) {
+  if (hasFixedDateRange.value) {
+    applyFixedDateRange()
+    loadTrendData()
+    return
+  }
+
   applyTrendShortcut(range)
   loadTrendData()
 }
 
 watch(
-  () => [props.modelValue, props.indexCode, props.indexName, props.market] as const,
+  () => [props.modelValue, props.indexCode, props.indexName, props.market, props.startDate, props.endDate] as const,
   ([visible, indexCode]) => {
     if (!visible || !indexCode) {
       return
@@ -307,7 +375,11 @@ watch(
 
     trendShortcut.value = '2m'
     trendData.value = []
-    applyTrendShortcut('2m')
+    if (hasFixedDateRange.value) {
+      applyFixedDateRange()
+    } else {
+      applyTrendShortcut('2m')
+    }
     loadTrendData()
   },
   { immediate: true }

@@ -3,18 +3,6 @@
     <el-card class="control-card" shadow="never">
       <div class="controls">
         <div class="control-group">
-          <span class="control-label">市场：</span>
-          <el-select
-            v-model="selectedMarket"
-            :disabled="loading"
-            @change="fetchData"
-            style="width: 140px"
-          >
-            <el-option label="国内" value="国内" />
-            <el-option label="全部" value="全部" />
-          </el-select>
-        </div>
-        <div class="control-group">
           <span class="control-label">时间范围：</span>
           <el-select
             v-model="rangeDays"
@@ -46,22 +34,6 @@
           />
         </div>
         <div class="control-group">
-          <span class="control-label">MA窗口：</span>
-          <el-select
-            v-model="maWindow"
-            :disabled="loading"
-            @change="fetchData"
-            style="width: 140px"
-          >
-            <el-option
-              v-for="option in maWindowOptions"
-              :key="option"
-              :label="`MA${option}`"
-              :value="option"
-            />
-          </el-select>
-        </div>
-        <div class="control-group">
           <el-button type="primary" :loading="loading" @click="fetchData">刷新</el-button>
         </div>
         <div class="control-group">
@@ -80,7 +52,7 @@
     <el-card class="chart-card" shadow="never" v-loading="loading" element-loading-text="正在加载指数宽度数据...">
       <template #header>
         <div class="card-header">
-          <span>大盘指数宽度热力图（MA{{ maWindow }}）</span>
+          <span>大盘指数宽度热力图（MA5 / MA10 / MA20）</span>
           <div class="header-right">
             <span class="count-info">指数数量：{{ displayedIndexCount }}</span>
             <span class="tips">数据来源：指数MA宽度接口</span>
@@ -90,22 +62,13 @@
 
       <div class="methodology">
         <p>
-          统计口径：基于各大盘指数的成分股，汇总每个指数中收盘价高于 MA{{ maWindow }} 的成分股占比。
+          统计口径：基于各大盘指数的成分股，同时汇总每个指数中收盘价高于 MA5、MA10、MA20 的成分股占比。
         </p>
         <p>
           计算方式：市场宽度 = count_above_ma / eligible_count。数值越高，表示该指数内站上均线的成分股占比越高，整体走势越强。
         </p>
         <p>点击热力图单元格可查看对应指数的趋势看板 K 线图。</p>
       </div>
-
-      <el-alert
-        v-if="skippedTip"
-        class="skipped-tip"
-        type="info"
-        :closable="false"
-        show-icon
-        :title="skippedTip"
-      />
 
       <HeatmapChart
         v-if="heatmapOption"
@@ -121,6 +84,9 @@
       :index-code="trendIndex.code"
       :index-name="trendIndex.name"
       :market="trendIndex.market"
+      :start-date="trendDateRange.start"
+      :end-date="trendDateRange.end"
+      :breadth-lines="trendBreadthLines"
     />
   </div>
 </template>
@@ -129,8 +95,8 @@
 /**
  * 组件名称：MarketIndexBreadthView
  * 功能：
- * - 使用 /django/api/strategy/index-ma-breadth/ 接口渲染大盘指数 MA 市场宽度热力图（日期 × 指数，值为宽度比例）
- * - 支持选择市场（国内 / 全部）、时间范围、结束日期与 MA 窗口
+ * - 使用 /django/api/strategy/index-ma-breadth/ 接口渲染大盘指数 MA 市场宽度热力图（日期 × 指数-MA周期，值为宽度比例）
+ * - 支持选择时间范围、结束日期
  * - 支持按最后一列（最新交易日）宽度值对指数排序
  * 参数（props）：无
  * 返回值：无
@@ -158,15 +124,41 @@ const DOMESTIC_INDEX_CODES = [
   '399006.SZ', // 创业板指
 ]
 
-type MarketFilter = '国内' | '全部'
+type DisplayMaWindow = 5 | 10 | 20
+type HeatmapPoint = [number, number, number, DisplayMaWindow]
+
+interface IndexMaBreadthHeatmapItem extends IndexMaBreadthItem {
+  ma_window: DisplayMaWindow
+}
+
+interface HeatmapRow {
+  key: string
+  label: string
+  indexName: string
+  maWindow: DisplayMaWindow
+}
+
+interface BreadthLinePoint {
+  date: string
+  value: number
+}
+
+interface BreadthOverlayLine {
+  name: string
+  points: BreadthLinePoint[]
+  color?: string
+  width?: number
+  type?: 'solid' | 'dashed' | 'dotted'
+  showSymbol?: boolean
+  yAxisIndex?: number
+  valueFormat?: 'percent' | 'raw'
+}
 
 const { isMobile } = useIsMobile()
 
 const loading = ref(false)
-const selectedMarket = ref<MarketFilter>('国内')
 const endDate = ref<string>(formatDate(new Date()))
 const rangeDays = ref<number>(60)
-const maWindow = ref<number>(10)
 const sortByLastColumn = ref(true)
 
 const rangeDaysOptions = [
@@ -175,10 +167,9 @@ const rangeDaysOptions = [
   { label: '最近30天', value: 30 },
   { label: '最近60天', value: 60 },
 ]
-const maWindowOptions = [5, 10, 20, 30, 60, 90, 250]
+const displayMaWindows: DisplayMaWindow[] = [5, 10, 20]
 
-const rawData = ref<IndexMaBreadthItem[]>([])
-const errors = ref<string[]>([])
+const rawData = ref<IndexMaBreadthHeatmapItem[]>([])
 
 // 指数趋势看板弹窗状态：点击热力图单元格后打开对应指数的 K 线趋势图
 const trendDialogVisible = ref(false)
@@ -187,6 +178,12 @@ const trendIndex = ref({
   name: '',
   market: '国内',
 })
+
+const maLineColors: Record<DisplayMaWindow, string> = {
+  5: '#e11d48',
+  10: '#2563eb',
+  20: '#16a34a',
+}
 
 // 日期工具
 function formatDate(d: Date): string {
@@ -216,12 +213,6 @@ const toggleLastColumnSort = () => {
   sortByLastColumn.value = !sortByLastColumn.value
 }
 
-// 当选择“全部”且存在被跳过的指数时，给出提示（如国际指数无成分股数据）
-const skippedTip = computed<string>(() => {
-  if (selectedMarket.value !== '全部' || errors.value.length === 0) return ''
-  return `部分指数无成分股数据已跳过（${errors.value.length} 个），仅展示可计算的指数。`
-})
-
 // 日期维度（升序）
 const dates = computed<string[]>(() => {
   return Array.from(new Set(rawData.value.map(d => d.date))).sort()
@@ -233,14 +224,21 @@ const indexNames = computed<string[]>(() => {
 
   if (sortByLastColumn.value && dates.value.length > 0) {
     const lastDate = dates.value[dates.value.length - 1]
-    const lastValues = new Map<string, number>()
+    const lastValues = new Map<string, number[]>()
     rawData.value.forEach(item => {
       if (item.date === lastDate && names.includes(item.index_name)) {
         const val = Number(item.breadth_ratio)
-        lastValues.set(item.index_name, Number.isNaN(val) ? 0 : val)
+        const values = lastValues.get(item.index_name) ?? []
+        values.push(Number.isNaN(val) ? 0 : val)
+        lastValues.set(item.index_name, values)
       }
     })
-    names.sort((a, b) => (lastValues.get(a) || 0) - (lastValues.get(b) || 0))
+    const getAverageLastValue = (name: string) => {
+      const values = lastValues.get(name) ?? []
+      if (!values.length) return 0
+      return values.reduce((sum, value) => sum + value, 0) / values.length
+    }
+    names.sort((a, b) => getAverageLastValue(a) - getAverageLastValue(b))
   } else {
     names.sort()
   }
@@ -250,24 +248,74 @@ const indexNames = computed<string[]>(() => {
 
 const displayedIndexCount = computed<number>(() => indexNames.value.length)
 
-// 热力图矩阵数据 [x(dateIndex), y(indexIndex), value]
-const heatmapData = computed<[number, number, number][]>(() => {
+const trendDateRange = computed(() => {
+  if (dates.value.length > 0) {
+    return {
+      start: dates.value[0],
+      end: dates.value[dates.value.length - 1],
+    }
+  }
+
+  const [start, end] = computeDateRangeByEndDate(endDate.value, rangeDays.value)
+  return { start, end }
+})
+
+const heatmapRows = computed<HeatmapRow[]>(() => {
+  return indexNames.value.flatMap(indexName =>
+    displayMaWindows.map(maWindow => ({
+      key: `${indexName}__MA${maWindow}`,
+      label: `${indexName} MA${maWindow}`,
+      indexName,
+      maWindow
+    }))
+  )
+})
+
+// 热力图矩阵数据 [x(dateIndex), y(rowIndex), value, maWindow]
+const heatmapData = computed<HeatmapPoint[]>(() => {
   const dateIndex = new Map(dates.value.map((d, i) => [d, i]))
-  const nameIndex = new Map(indexNames.value.map((n, i) => [n, i]))
-  const points: [number, number, number][] = []
+  const rowIndex = new Map(heatmapRows.value.map((row, i) => [row.key, i]))
+  const points: HeatmapPoint[] = []
   rawData.value.forEach(item => {
     const di = dateIndex.get(item.date)
-    const ii = nameIndex.get(item.index_name)
-    if (di !== undefined && ii !== undefined) {
+    const ri = rowIndex.get(`${item.index_name}__MA${item.ma_window}`)
+    if (di !== undefined && ri !== undefined) {
       const val = Number(item.breadth_ratio)
-      points.push([di, ii, Number.isNaN(val) ? 0 : val])
+      points.push([di, ri, Number.isNaN(val) ? 0 : val, item.ma_window])
     }
   })
   return points
 })
 
+const trendBreadthLines = computed<BreadthOverlayLine[]>(() => {
+  if (!trendIndex.value.code) return []
+
+  return displayMaWindows
+    .map(maWindow => {
+      const points = rawData.value
+        .filter(item => item.index_code === trendIndex.value.code && item.ma_window === maWindow)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(item => ({
+          date: item.date,
+          value: Number(item.breadth_ratio)
+        }))
+        .filter(point => Number.isFinite(point.value))
+
+      return {
+        name: `MA${maWindow}宽度`,
+        points,
+        color: maLineColors[maWindow],
+        width: 1.6,
+        showSymbol: false,
+        yAxisIndex: 1,
+        valueFormat: 'percent' as const,
+      }
+    })
+    .filter(line => line.points.length > 0)
+})
+
 const heatmapOption = computed<echarts.EChartsOption | null>(() => {
-  if (dates.value.length === 0 || indexNames.value.length === 0 || heatmapData.value.length === 0) return null
+  if (dates.value.length === 0 || heatmapRows.value.length === 0 || heatmapData.value.length === 0) return null
   const mobile = isMobile.value
   return {
     animation: false,
@@ -275,10 +323,11 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
       position: 'top',
       confine: true,
       formatter: (params: any) => {
-        const [x, y, v] = params?.data ?? []
+        const [x, y, v, ma] = params?.data ?? []
         const date = typeof x === 'number' ? dates.value[x] : ''
-        const name = typeof y === 'number' ? indexNames.value[y] : ''
-        return `${date}<br/>${name}<br/>宽度比例: ${(Number(v) * 100).toFixed(2)}%`
+        const row = typeof y === 'number' ? heatmapRows.value[y] : undefined
+        const maLabel = ma ? `MA${ma}` : row ? `MA${row.maWindow}` : ''
+        return `${date}<br/>${row?.indexName ?? ''} ${maLabel}<br/>宽度比例: ${(Number(v) * 100).toFixed(2)}%`
       }
     },
     grid: mobile
@@ -298,13 +347,14 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
     },
     yAxis: {
       type: 'category',
-      data: indexNames.value,
+      data: heatmapRows.value.map(row => row.label),
       axisLabel: {
-        fontSize: mobile ? 10 : 12,
-        ...(mobile ? { width: 52, overflow: 'truncate' as const } : {})
+        fontSize: mobile ? 9 : 12,
+        ...(mobile ? { width: 72, overflow: 'truncate' as const } : {})
       }
     },
     visualMap: {
+      dimension: 2,
       min: 0,
       max: 1,
       calculable: true,
@@ -342,19 +392,23 @@ const fetchData = async () => {
   loading.value = true
   try {
     const [start, end] = computeDateRangeByEndDate(endDate.value, rangeDays.value)
-    const result = await fetchIndexMaBreadth({
-      startDate: start,
-      endDate: end,
-      maWindow: maWindow.value,
-      indexCodes: selectedMarket.value === '国内' ? DOMESTIC_INDEX_CODES : undefined
-    })
-    rawData.value = result.data ?? []
-    errors.value = result.errors ?? []
+    const results = await Promise.all(displayMaWindows.map(async maWindow => {
+      const result = await fetchIndexMaBreadth({
+        startDate: start,
+        endDate: end,
+        maWindow,
+        indexCodes: DOMESTIC_INDEX_CODES
+      })
+      return {
+        ...result,
+        data: (result.data ?? []).map(item => ({ ...item, ma_window: maWindow }))
+      }
+    }))
+    rawData.value = results.flatMap(result => result.data)
   } catch (err: any) {
     console.error('获取大盘指数MA宽度数据失败:', err)
     ElMessage.error(err?.message || '获取大盘指数MA宽度数据失败')
     rawData.value = []
-    errors.value = []
   } finally {
     loading.value = false
   }
@@ -369,7 +423,8 @@ const fetchData = async () => {
  */
 const onHeatmapClick = (params: any) => {
   const [, y] = (params?.data ?? []) as [number, number, number]
-  const name = typeof y === 'number' ? indexNames.value[y] : ''
+  const row = typeof y === 'number' ? heatmapRows.value[y] : undefined
+  const name = row?.indexName ?? ''
   if (!name) return
 
   const matched = rawData.value.find(item => item.index_name === name)
