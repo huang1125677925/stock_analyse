@@ -31,13 +31,6 @@
     </el-card>
 
     <section v-loading="loading" class="tab-panel">
-      <div v-if="industryTrendData" class="summary-grid compact">
-        <div v-for="item in industryTrendSummaryCards" :key="item.key" class="metric-card">
-          <div class="metric-label">{{ item.label }}</div>
-          <div class="metric-value">{{ formatValue(item.value, item.suffix) }}</div>
-        </div>
-      </div>
-
       <el-card shadow="never" class="trend-card" v-if="hasIndustryTrendDaily">
         <template #header>行业涨停趋势矩阵</template>
         <LimitBoardIndustryTrendMatrix :daily="industryTrendDaily" :idx-type="industryIdxType" />
@@ -72,14 +65,6 @@ import {
   type IndustryMapping,
   type IndustryTrendStrengthData
 } from '@/services/limitBoardStrategyApi'
-
-interface SummaryCardItem {
-  key: string
-  label: string
-  value: unknown
-  suffix?: string
-  className?: string
-}
 
 /**
  * 数据来源计数组件
@@ -144,17 +129,6 @@ const trendEndDate = ref(getRecentTradeDate())
 const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
 const loading = ref(false)
 const industryTrendData = ref<IndustryTrendStrengthData | null>(null)
-
-const industryTrendSummaryCards = computed<SummaryCardItem[]>(() => {
-  const s = industryTrendData.value?.summary || {}
-  return [
-    { key: 'industry_mapping_label', label: '行业映射', value: s.industry_mapping_label },
-    { key: 'trade_day_count', label: '交易日数量', value: s.trade_day_count },
-    { key: 'industry_count', label: '行业数量', value: s.industry_count },
-    { key: 'total_limit_up_count', label: '累计涨停家数', value: s.total_limit_up_count },
-    { key: 'industry_matched_count', label: '匹配行业记录', value: s.industry_matched_count }
-  ]
-})
 
 const industryTrendDaily = computed(() => industryTrendData.value?.data || {})
 const hasIndustryTrendDaily = computed(() => Object.keys(industryTrendDaily.value).length > 0)
@@ -245,12 +219,6 @@ function onIndustryMappingChange(mapping: string | number | boolean | undefined)
   loadIndustryTrend(true)
 }
 
-function formatValue(value: unknown, suffix = ''): string {
-  if (value === null || value === undefined || value === '') return '-'
-  if (typeof value === 'number') return `${Number.isInteger(value) ? value : value.toFixed(2)}${suffix}`
-  return `${value}${suffix}`
-}
-
 onMounted(() => {
   loadIndustryTrend()
 })
@@ -273,36 +241,6 @@ onMounted(() => {
   min-height: 360px;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.summary-grid.compact {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-.metric-card {
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 12px;
-  background: #fafafa;
-}
-
-.metric-label {
-  color: #606266;
-  font-size: 13px;
-  margin-bottom: 8px;
-}
-
-.metric-value {
-  color: #303133;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
-}
 
 .source-counts {
   display: flex;
