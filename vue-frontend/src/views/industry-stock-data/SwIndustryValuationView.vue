@@ -197,7 +197,17 @@
                 <el-descriptions-item label="行业等级">
                   <el-tag :type="getLevelTagType(dialogIndustry.level)">{{ dialogIndustry.level }}</el-tag>
                 </el-descriptions-item>
-                <el-descriptions-item label="父级代码">{{ dialogIndustry.parent_code || '无' }}</el-descriptions-item>
+                <el-descriptions-item label="父级代码">
+                  <el-link
+                    v-if="dialogIndustry.parent_code"
+                    type="primary"
+                    :underline="false"
+                    @click="handleParentClick"
+                  >
+                    {{ dialogIndustry.parent_code }}
+                  </el-link>
+                  <span v-else>无</span>
+                </el-descriptions-item>
                 <el-descriptions-item label="来源标准">{{ dialogIndustry.src || 'SW2021' }}</el-descriptions-item>
                 <el-descriptions-item label="下级行业数量">{{ dialogChildren.length }}</el-descriptions-item>
               </el-descriptions>
@@ -566,6 +576,46 @@ const openIndustryDialog = async (item: BoardItem) => {
 
 const handleChildRowClick = async (row: DialogChildRow) => {
   await loadDialogIndustry(row)
+}
+
+const handleParentClick = async () => {
+  if (!dialogIndustry.value?.parent_code) return
+
+  const currentIndustry = dialogIndustry.value
+
+  // 确定父级的 level
+  const currentLevel = currentIndustry.level
+  let parentLevel: string
+  if (currentLevel === 'L3') {
+    parentLevel = 'L2'
+  } else if (currentLevel === 'L2') {
+    parentLevel = 'L1'
+  } else {
+    ElMessage.warning('当前行业已是顶级，无父级')
+    return
+  }
+
+  try {
+    // 查询父级 level 的所有行业
+    const allParentLevelIndustries = await fetchSwIndexClassify({
+      level: parentLevel,
+      src: currentIndustry.src || 'SW2021'
+    })
+
+    // 从中找到 industry_code 匹配的父级
+    const parentIndustry = allParentLevelIndustries.find(
+      item => item.industry_code === currentIndustry.parent_code
+    )
+
+    if (!parentIndustry) {
+      ElMessage.warning(`未找到父级行业：${currentIndustry.parent_code}`)
+      return
+    }
+
+    await loadDialogIndustry(parentIndustry)
+  } catch (error: any) {
+    ElMessage.error(error?.message || '查找父级行业失败')
+  }
 }
 
 onMounted(() => {

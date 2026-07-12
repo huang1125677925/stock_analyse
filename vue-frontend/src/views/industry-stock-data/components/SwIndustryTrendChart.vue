@@ -14,7 +14,6 @@
 
       <div class="form-row">
         <el-form :inline="true" label-width="80px">
-          <!-- 移除行业代码输入框，因为是作为组件使用，代码由父组件传入 -->
           <el-form-item label="指标">
             <el-select v-model="selectedMetric" placeholder="选择指标" style="width: 150px" @change="handleMetricChange">
               <el-option
@@ -25,21 +24,24 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="日期范围">
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="YYYYMMDD"
-              value-format="YYYYMMDD"
-              :shortcuts="dateShortcuts"
-              style="width: 320px"
-            />
+          <el-form-item label="时间范围">
+            <el-button-group>
+              <el-button :type="selectedYears === 1 ? 'primary' : 'default'" @click="setYearRange(1)">1年</el-button>
+              <el-button :type="selectedYears === 3 ? 'primary' : 'default'" @click="setYearRange(3)">3年</el-button>
+              <el-button :type="selectedYears === 5 ? 'primary' : 'default'" @click="setYearRange(5)">5年</el-button>
+              <el-button :type="selectedYears === 10 ? 'primary' : 'default'" @click="setYearRange(10)">10年</el-button>
+            </el-button-group>
           </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="loading" @click="fetchData">查询</el-button>
+          <el-form-item label="截止日期">
+            <el-date-picker
+              v-model="endDate"
+              type="date"
+              placeholder="选择截止日期"
+              format="YYYY-MM-DD"
+              value-format="YYYYMMDD"
+              style="width: 160px"
+              @change="updateDateRange"
+            />
           </el-form-item>
         </el-form>
       </div>
@@ -67,47 +69,9 @@ let chartInstance: echarts.ECharts | null = null
 const loading = ref(false)
 const error = ref('')
 
+const selectedYears = ref(1)
+const endDate = ref('')
 const dateRange = ref<[string, string] | null>(null)
-
-// 日期快捷选项
-const dateShortcuts = [
-  {
-    text: '最近一年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 1)
-      return [start, end]
-    },
-  },
-  {
-    text: '最近三年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 3)
-      return [start, end]
-    },
-  },
-  {
-    text: '最近五年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 5)
-      return [start, end]
-    },
-  },
-  {
-    text: '最近十年',
-    value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setFullYear(start.getFullYear() - 10)
-      return [start, end]
-    },
-  },
-]
 
 interface DailyRecord {
   ts_code: string
@@ -168,20 +132,38 @@ const currentValuation = ref<{
   type: 'success' | 'warning' | 'danger' | 'info' | 'primary'
 } | null>(null)
 
-// 初始化默认日期范围（最近十年）
-function initDateRange() {
-  const end = new Date()
-  const start = new Date()
-  start.setFullYear(start.getFullYear() - 10)
-  
-  const formatDate = (date: Date) => {
-    const y = date.getFullYear()
-    const m = String(date.getMonth() + 1).padStart(2, '0')
-    const d = String(date.getDate()).padStart(2, '0')
-    return `${y}${m}${d}`
-  }
-  
+const formatDate = (date: Date) => {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}${m}${d}`
+}
+
+// 根据年数和截止日期计算日期范围
+function setYearRange(years: number) {
+  selectedYears.value = years
+  updateDateRange()
+  fetchData()
+}
+
+// 更新日期范围（基于 selectedYears 和 endDate）
+function updateDateRange() {
+  if (!endDate.value) return
+
+  const end = new Date(endDate.value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
+  const start = new Date(end)
+  start.setFullYear(start.getFullYear() - selectedYears.value)
+
   dateRange.value = [formatDate(start), formatDate(end)]
+  fetchData()
+}
+
+// 初始化默认日期范围（最近一年，截止日期为今天）
+function initDateRange() {
+  const today = new Date()
+  endDate.value = formatDate(today)
+  selectedYears.value = 1
+  updateDateRange()
 }
 
 function initChart() {
@@ -387,7 +369,7 @@ function updateChart(data: DailyRecord[] = records.value) {
 }
 
 function handleMetricChange() {
-  updateChart()
+  fetchData()
 }
 
 async function fetchData() {
