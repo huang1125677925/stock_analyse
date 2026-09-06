@@ -49,7 +49,6 @@ export interface AuthResponseData {
   username: string;
   email: string;
   is_admin: boolean;
-  token: string;
 }
 
 // 邀请码接口
@@ -113,16 +112,7 @@ export async function validateInviteCode(code: string): Promise<ApiResponse> {
  */
 export async function getCurrentUser(): Promise<ApiResponse<User>> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('未登录');
-    }
-    
-    const response = await axios.get(`${API_BASE_URL}/info/`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+    const response = await axios.get(`${API_BASE_URL}/info/`);
     return response.data;
   } catch (error) {
     console.error('获取用户信息失败:', error);
@@ -136,16 +126,7 @@ export async function getCurrentUser(): Promise<ApiResponse<User>> {
  */
 export async function logoutApi(): Promise<ApiResponse> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('未登录');
-    }
-    
-    const response = await axios.post(`${API_BASE_URL}/logout/`, {}, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+    const response = await axios.post(`${API_BASE_URL}/logout/`, {});
     return response.data;
   } catch (error) {
     console.error('登出失败:', error);
@@ -158,7 +139,7 @@ export async function logoutApi(): Promise<ApiResponse> {
  * @returns 是否已认证
  */
 export function isAuthenticated(): boolean {
-  return !!localStorage.getItem('token');
+  return false;
 }
 
 /**
@@ -181,17 +162,7 @@ export async function resetPasswordApi(data: ResetPasswordRequest): Promise<ApiR
  */
 export async function getInvitationCodes(): Promise<InvitationCode[]> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('未登录');
-    }
-    
-    const response = await axios.get(`${API_BASE_URL}/invitation/`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      withCredentials: true // 添加此配置以解决CSRF错误
-    });
+    const response = await axios.get(`${API_BASE_URL}/invitation/`);
     return response.data;
   } catch (error) {
     console.error('获取邀请码列表失败:', error);
@@ -205,17 +176,7 @@ export async function getInvitationCodes(): Promise<InvitationCode[]> {
  */
 export async function generateInvitationCode(): Promise<InvitationCode> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('未登录');
-    }
-    
-    const response = await axios.post(`${API_BASE_URL}/invitation/`, {}, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      withCredentials: true // 添加此配置以解决CSRF错误
-    });
+    const response = await axios.post(`${API_BASE_URL}/invitation/`, {});
     return response.data;
   } catch (error) {
     console.error('生成邀请码失败:', error);

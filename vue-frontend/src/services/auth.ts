@@ -36,9 +36,6 @@ export async function login(username: string, password: string) {
     const response = await apiLogin({ username, password });
     console.log('登录响应:', response);
     
-    // 保存token和用户信息到localStorage
-    localStorage.setItem('token', response.token);
-    
     // 构建用户对象
     const user: User = {
       id: response.id,
@@ -124,7 +121,7 @@ export async function logout() {
 
 // 检查是否已认证
 export function isAuthenticated() {
-  return !!localStorage.getItem('token');
+  return false;
 }
 
 // 重置密码函数

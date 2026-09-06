@@ -17,13 +17,6 @@ const instance = axios.create({
 // 请求拦截器
 instance.interceptors.request.use(
   config => {
-    // 从localStorage获取token
-    const token = localStorage.getItem('token');
-    // 如果token存在，则添加到请求头
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    
     // 获取CSRF token并添加到请求头
     const csrfToken = document.cookie.match(new RegExp('(^| )csrftoken=([^;]+)'));
     if (csrfToken) {
@@ -83,12 +76,8 @@ instance.interceptors.response.use(
     
     // 处理特定错误码
     if (res && typeof res === 'object' && res.code === 401) {
-      // 未认证或认证失败，清除本地存储并重定向到登录页
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      showError(res.message || '认证失败，请重新登录');
-      window.location.href = '/login';
-      return Promise.reject(new Error(res.message || '认证失败'));
+      showError(res.message || '请求未授权');
+      return Promise.reject(new Error(res.message || '请求未授权'));
     }
     
     if (res && typeof res === 'object' && res.code === 403) {
@@ -111,10 +100,7 @@ instance.interceptors.response.use(
       let message = '请求失败';
       
       if (status === 401) {
-        message = '认证失败，请重新登录';
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+        message = '请求未授权';
       } else if (status === 403) {
         message = '权限不足';
       } else if (status === 404) {
