@@ -305,6 +305,7 @@ import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
+import { fetchDcDaily } from '@/services/dcDailyApi'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import type {
   IndustryTrendDaily,
@@ -815,6 +816,8 @@ const selectedIndustryName = ref('')
 
 /** 行业行情数据缓存：行业代码 -> (日期 -> 涨跌幅) */
 const industryPctChangeCache = ref(new Map<string, Map<string, number>>())
+let industryPctChangeRequestId = 0
+const PCT_CHANGE_FETCH_CONCURRENCY = 4
 
 /** 行业代码到行业名称的映射 */
 const industryCodeToName = computed(() => {
@@ -869,6 +872,110 @@ function getIndustryCode(industry: string): string | null {
   }
   return null
 }
+
+/** 当前矩阵涉及的行业代码，按代码去重，供批量补齐行业涨跌幅 */
+const matrixIndustryCodes = computed(() => {
+  const map = new Map<string, string>()
+  industries.value.forEach(industry => {
+    const code = getIndustryCode(industry)
+    if (code && !map.has(code)) {
+      map.set(code, industry)
+    }
+  })
+  return Array.from(map, ([code, industry]) => ({ code, industry }))
+})
+
+function normalizeTradeDate(value: unknown): string {
+  const text = String(value ?? '').replace(/[^0-9]/g, '')
+  return text.length === 8 ? text : ''
+}
+
+function hasCompletePctChangeCache(code: string): boolean {
+  const cached = industryPctChangeCache.value.get(code)
+  return !!cached && dates.value.every(date => cached.has(date))
+}
+
+async function fetchIndustryPctChange(code: string): Promise<Map<string, number>> {
+  const firstDate = dates.value[0]
+  const endDate = lastDate.value
+  if (!firstDate || !endDate) return new Map()
+
+  const response = await fetchDcDaily({
+    ts_code: code,
+    idx_type: props.idxType,
+    start_date: firstDate,
+    end_date: endDate,
+    fields: 'ts_code,trade_date,pct_change'
+  })
+
+  const dateMap = new Map<string, number>()
+  ;(response.records || []).forEach(record => {
+    const date = normalizeTradeDate(record.trade_date)
+    const pctChange = Number(record.pct_change)
+    if (date && Number.isFinite(pctChange)) {
+      dateMap.set(date, pctChange)
+    }
+  })
+  return dateMap
+}
+
+/** 按当前矩阵区间预加载板块日涨跌幅，补齐接口只返回部分日期的情况 */
+async function preloadIndustryPctChanges() {
+  const targets = matrixIndustryCodes.value
+    .map(item => item.code)
+    .filter(code => !hasCompletePctChangeCache(code))
+
+  if (!targets.length) return
+
+  const requestId = ++industryPctChangeRequestId
+  const fetched = new Map<string, Map<string, number>>()
+  const failed: string[] = []
+  const workerCount = Math.min(PCT_CHANGE_FETCH_CONCURRENCY, targets.length)
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async (_, workerIndex) => {
+      for (let index = workerIndex; index < targets.length; index += workerCount) {
+        if (requestId !== industryPctChangeRequestId) return
+        const code = targets[index]
+        try {
+          fetched.set(code, await fetchIndustryPctChange(code))
+        } catch (error) {
+          failed.push(code)
+          console.warn(`补齐行业涨跌幅失败: ${code}`, error)
+        }
+      }
+    })
+  )
+
+  if (requestId !== industryPctChangeRequestId) return
+
+  const nextCache = new Map(industryPctChangeCache.value)
+  fetched.forEach((dateMap, code) => {
+    const merged = new Map(nextCache.get(code))
+    dateMap.forEach((pctChange, date) => {
+      merged.set(date, pctChange)
+    })
+    nextCache.set(code, merged)
+  })
+  industryPctChangeCache.value = nextCache
+
+  if (failed.length) {
+    console.warn(`有 ${failed.length} 个行业涨跌幅未补齐`, failed)
+  }
+}
+
+watch(
+  () => [
+    props.idxType,
+    dates.value[0] || '',
+    lastDate.value,
+    matrixIndustryCodes.value.map(item => item.code).join(',')
+  ],
+  () => {
+    preloadIndustryPctChanges()
+  },
+  { immediate: true }
+)
 
 const detailStocks = computed<IndustryTrendStock[]>(() =>
   detailDate.value && detailIndustry.value ? cellStocks(detailDate.value, detailIndustry.value) : []
