@@ -809,7 +809,7 @@ const selectedStrengthFields = ref<RpsField[]>([])
 const minimumStrengthRank = ref<StrengthRankThreshold>('all')
 const changeRelationMode = ref<ChangeRelationMode>('all')
 const turnoverData = ref<IndustryTurnoverPercentileItem[]>([])
-const minAmount = ref<number>(30000000000)
+const minAmount = ref<number>(0)
 const maxAmount = ref<number>(0)
 
 const amountFilterOptions: Array<{ label: string; value: number }> = [
@@ -971,7 +971,7 @@ function resetSimpleFilters() {
   selectedStrengthFields.value = []
   minimumStrengthRank.value = 'all'
   changeRelationMode.value = 'all'
-  minAmount.value = 10000000000
+  minAmount.value = 0
   maxAmount.value = 0
 }
 
