@@ -271,6 +271,7 @@ const stockPickerMegaMenuSections = [
     title: '',
     items: [
       { title: '涨停分析选股', path: '/stock-picker/limit-board-analysis' },
+      { title: '潜力股票筛选', path: '/stock-picker/potential-stocks' },
       { title: '波段趋势选股', path: '/stock-picker/swing-practice' },
     ],
   },
