@@ -157,12 +157,16 @@ export interface PotentialStockFilters {
   max_breakout_pct: number
   max_base_depth_pct: number
   max_distance_ma20_pct: number
+  max_price: number
+  max_circ_mv: number
   limit: number
 }
 
 export interface PotentialStocksData {
   total: number
   matched_total: number
+  rps_total: number
+  prefiltered_total: number
   scanned_total: number
   data: PotentialStockItem[]
   filters: PotentialStockFilters
@@ -188,6 +192,8 @@ export interface PotentialStocksParams {
   max_breakout_pct?: number
   max_base_depth_pct?: number
   max_distance_ma20_pct?: number
+  max_price?: number
+  max_circ_mv?: number
   limit?: number
   token?: string
 }

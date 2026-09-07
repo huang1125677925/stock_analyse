@@ -92,6 +92,22 @@
             </el-form-item>
           </el-col>
 
+          <el-col :xs="24" :md="12" :lg="6">
+            <el-form-item label="最高股价">
+              <el-input-number v-model="filters.maxPrice" :min="1" :max="300" :step="1" class="full-width">
+                <template #suffix>元</template>
+              </el-input-number>
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :md="12" :lg="6">
+            <el-form-item label="最大流通市值">
+              <el-input-number v-model="filters.maxCircMvYi" :min="10" :max="5000" :step="50" class="full-width">
+                <template #suffix>亿</template>
+              </el-input-number>
+            </el-form-item>
+          </el-col>
+
           <el-col :xs="24">
             <el-form-item label="RPS周期">
               <el-checkbox-group v-model="filters.periods">
@@ -128,6 +144,14 @@
       <div class="summary-item">
         <span>入选股票</span>
         <strong>{{ data?.matched_total ?? 0 }}</strong>
+      </div>
+      <div class="summary-item">
+        <span>RPS股票池</span>
+        <strong>{{ data?.rps_total ?? 0 }}</strong>
+      </div>
+      <div class="summary-item">
+        <span>预过滤后</span>
+        <strong>{{ data?.prefiltered_total ?? 0 }}</strong>
       </div>
       <div class="summary-item">
         <span>扫描股票</span>
@@ -291,6 +315,8 @@ interface Filters {
   minRps60: number
   minVolumeRatio: number
   maxBreakoutPct: number
+  maxPrice: number
+  maxCircMvYi: number
   limit: number
   periods: number[]
 }
@@ -304,6 +330,8 @@ const defaultFilters: Filters = {
   minRps60: 70,
   minVolumeRatio: 1.3,
   maxBreakoutPct: 12,
+  maxPrice: 30,
+  maxCircMvYi: 500,
   limit: 100,
   periods: [5, 20, 60]
 }
@@ -363,6 +391,8 @@ async function loadCandidates() {
       min_rps_60: filters.minRps60,
       min_volume_ratio: filters.minVolumeRatio,
       max_breakout_pct: filters.maxBreakoutPct,
+      max_price: filters.maxPrice,
+      max_circ_mv: filters.maxCircMvYi * 1e8,
       limit: filters.limit
     }
     const response = await getPotentialStocks(params)
