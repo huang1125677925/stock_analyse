@@ -146,6 +146,7 @@ export interface PotentialStockItem extends StockRpsItem {
 
 export interface PotentialStockFilters {
   market: '主板'
+  exchange: 'SSE' | 'SZSE'
   periods: number[]
   industry_mapping: IndustryMapping
   lookback_days: number
@@ -167,6 +168,7 @@ export interface PotentialStocksData {
   filters: PotentialStockFilters
   periods: number[]
   trade_date: string
+  exchange: 'SSE' | 'SZSE'
   history_start_date: string
   history_end_date: string
   errors: string[]
@@ -176,6 +178,7 @@ export interface PotentialStocksData {
 export interface PotentialStocksParams {
   periods?: string
   trade_date?: string
+  exchange?: 'SSE' | 'SZSE'
   industry_mapping?: IndustryMapping
   lookback_days?: number
   min_rps_20?: number

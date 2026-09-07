@@ -5,7 +5,7 @@
         <div class="panel-header">
           <div>
             <h2>潜力股票筛选</h2>
-            <p>主板 · 突破前高 · 放量 · RPS强势</p>
+            <p>{{ selectedExchangeLabel }}主板 · 突破前高 · 放量 · RPS强势</p>
           </div>
           <el-button type="primary" :icon="Search" :loading="loading" @click="loadCandidates">查询</el-button>
         </div>
@@ -13,6 +13,17 @@
 
       <el-form :model="filters" label-width="110px">
         <el-row :gutter="16">
+          <el-col :xs="24" :md="12" :lg="6">
+            <el-form-item label="主板范围">
+              <el-segmented
+                v-model="filters.exchange"
+                :options="exchangeOptions"
+                class="full-width"
+                @change="loadCandidates"
+              />
+            </el-form-item>
+          </el-col>
+
           <el-col :xs="24" :md="12" :lg="6">
             <el-form-item label="交易日">
               <div class="trade-date-switcher">
@@ -96,7 +107,7 @@
       <div class="action-row">
         <el-button :icon="Refresh" @click="resetFilters">重置</el-button>
         <el-tag type="info" effect="plain">实际交易日 {{ formatCompactDate(data?.trade_date) }}</el-tag>
-        <el-tag type="success" effect="plain">主板股票</el-tag>
+        <el-tag type="success" effect="plain">{{ selectedExchangeLabel }}主板</el-tag>
       </div>
     </el-card>
 
@@ -232,6 +243,7 @@
             <el-tag v-if="selectedStock.signal" type="danger" effect="light">{{ selectedStock.signal }}</el-tag>
           </div>
           <el-radio-group v-model="trendShortcut" size="small" @change="handleTrendShortcutChange">
+            <el-radio-button label="3m">最近3月</el-radio-button>
             <el-radio-button label="6m">最近6月</el-radio-button>
             <el-radio-button label="1y">最近1年</el-radio-button>
             <el-radio-button label="3y">最近3年</el-radio-button>
@@ -267,10 +279,12 @@ import {
   type PotentialStocksParams
 } from '@/services/strategyApi'
 
-type TrendShortcut = '6m' | '1y' | '3y'
+type MainBoardExchange = 'SSE' | 'SZSE'
+type TrendShortcut = '3m' | '6m' | '1y' | '3y'
 
 interface Filters {
   tradeDate: string
+  exchange: MainBoardExchange
   industryMapping: IndustryMapping
   lookbackDays: number
   minRps20: number
@@ -283,6 +297,7 @@ interface Filters {
 
 const defaultFilters: Filters = {
   tradeDate: getRecentTradeDate(),
+  exchange: 'SSE',
   industryMapping: 'dc_l2',
   lookbackDays: 60,
   minRps20: 80,
@@ -295,6 +310,10 @@ const defaultFilters: Filters = {
 
 const latestSelectableTradeDate = getRecentTradeDate()
 const periodOptions = [5, 10, 20, 60, 120, 250]
+const exchangeOptions = [
+  { label: '上交所主板', value: 'SSE' },
+  { label: '深交所主板', value: 'SZSE' }
+] as const
 const industryMappingOptions = [
   { label: '默认行业', value: 'default' },
   { label: '东财概念板块', value: 'dc_concept' },
@@ -312,7 +331,7 @@ let requestId = 0
 const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendData = ref<StockHistoryDataItem[]>([])
-const trendShortcut = ref<TrendShortcut>('6m')
+const trendShortcut = ref<TrendShortcut>('3m')
 const trendDateRange = reactive({ start: '', end: '' })
 const selectedStock = reactive({
   tsCode: '',
@@ -324,6 +343,7 @@ let trendRequestId = 0
 
 const rows = computed(() => data.value?.data || [])
 const warningMessages = computed(() => data.value?.errors?.filter(Boolean) || [])
+const selectedExchangeLabel = computed(() => exchangeOptions.find(item => item.value === filters.exchange)?.label || '')
 const trendDialogTitle = computed(() => {
   const label = selectedStock.name || selectedStock.tsCode
   return label ? `${label} 趋势图` : '个股趋势图'
@@ -335,6 +355,7 @@ async function loadCandidates() {
   try {
     const params: PotentialStocksParams = {
       trade_date: filters.tradeDate,
+      exchange: filters.exchange,
       industry_mapping: filters.industryMapping,
       periods: buildPeriodsParam(),
       lookback_days: filters.lookbackDays,
@@ -380,8 +401,8 @@ function openTrendDialog(row: PotentialStockItem) {
   selectedStock.name = row.name || ''
   selectedStock.industry = row.industry || ''
   selectedStock.signal = row.signal || ''
-  trendShortcut.value = '6m'
-  applyTrendShortcut('6m')
+  trendShortcut.value = '3m'
+  applyTrendShortcut('3m')
   trendData.value = []
   trendDialogVisible.value = true
   loadTrendData()
@@ -418,7 +439,7 @@ function handleTrendShortcutChange(value: string | number | boolean | undefined)
 }
 
 function applyTrendShortcut(range: TrendShortcut) {
-  const monthMap: Record<TrendShortcut, number> = { '6m': 6, '1y': 12, '3y': 36 }
+  const monthMap: Record<TrendShortcut, number> = { '3m': 3, '6m': 6, '1y': 12, '3y': 36 }
   const end = new Date()
   const start = new Date()
   start.setMonth(end.getMonth() - monthMap[range])
