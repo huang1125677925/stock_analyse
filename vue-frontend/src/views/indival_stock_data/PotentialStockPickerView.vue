@@ -248,10 +248,31 @@
 
       <div class="trend-dialog-body">
         <div class="trend-toolbar">
-          <div class="trend-tags">
-            <el-tag v-if="selectedStock.tsCode" type="info" effect="plain">{{ selectedStock.tsCode }}</el-tag>
-            <el-tag v-if="selectedStock.industry" type="warning" effect="light">{{ selectedStock.industry }}</el-tag>
-            <el-tag v-if="selectedStock.signal" type="danger" effect="light">{{ selectedStock.signal }}</el-tag>
+          <div class="trend-toolbar-left">
+            <div class="trend-nav">
+              <el-button
+                size="small"
+                :icon="ArrowLeft"
+                :disabled="!hasPrevTrendStock"
+                @click="stepTrendStock(-1)"
+              >
+                上一个
+              </el-button>
+              <span v-if="trendNavPositionText" class="trend-nav-position">{{ trendNavPositionText }}</span>
+              <el-button
+                size="small"
+                :disabled="!hasNextTrendStock"
+                @click="stepTrendStock(1)"
+              >
+                下一个
+                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+            <div class="trend-tags">
+              <el-tag v-if="selectedStock.tsCode" type="info" effect="plain">{{ selectedStock.tsCode }}</el-tag>
+              <el-tag v-if="selectedStock.industry" type="warning" effect="light">{{ selectedStock.industry }}</el-tag>
+              <el-tag v-if="selectedStock.signal" type="danger" effect="light">{{ selectedStock.signal }}</el-tag>
+            </div>
           </div>
           <el-radio-group v-model="trendShortcut" size="small" @change="handleTrendShortcutChange">
             <el-radio-button label="3m">最近3月</el-radio-button>
@@ -343,11 +364,18 @@ const selectedStock = reactive({
   industry: '',
   signal: ''
 })
+const currentTrendIndex = ref(-1)
 let trendRequestId = 0
 
 const rows = computed(() => data.value?.data || [])
 const warningMessages = computed(() => data.value?.errors?.filter(Boolean) || [])
 const selectedExchangeLabel = computed(() => exchangeOptions.find(item => item.value === filters.exchange)?.label || '')
+const hasPrevTrendStock = computed(() => currentTrendIndex.value > 0)
+const hasNextTrendStock = computed(() => currentTrendIndex.value >= 0 && currentTrendIndex.value < rows.value.length - 1)
+const trendNavPositionText = computed(() => {
+  if (currentTrendIndex.value < 0 || rows.value.length <= 0) return ''
+  return `${currentTrendIndex.value + 1}/${rows.value.length}`
+})
 const trendDialogTitle = computed(() => {
   const label = selectedStock.name || selectedStock.tsCode
   return label ? `${label} 趋势图` : '个股趋势图'
@@ -402,15 +430,28 @@ function openTrendDialog(row: PotentialStockItem) {
     ElMessage.warning('该股票缺少代码，无法查看趋势图')
     return
   }
+  currentTrendIndex.value = rows.value.findIndex(item => item.ts_code === row.ts_code)
+  trendShortcut.value = '3m'
+  applyTrendShortcut('3m')
+  showTrendStock(row)
+  trendDialogVisible.value = true
+}
+
+function showTrendStock(row: PotentialStockItem) {
   selectedStock.tsCode = row.ts_code
   selectedStock.name = row.name || ''
   selectedStock.industry = row.industry || ''
   selectedStock.signal = row.signal || ''
-  trendShortcut.value = '3m'
-  applyTrendShortcut('3m')
   trendData.value = []
-  trendDialogVisible.value = true
   loadTrendData()
+}
+
+function stepTrendStock(step: -1 | 1) {
+  const nextIndex = currentTrendIndex.value + step
+  const targetRow = rows.value[nextIndex]
+  if (!targetRow) return
+  currentTrendIndex.value = nextIndex
+  showTrendStock(targetRow)
 }
 
 async function loadTrendData() {
@@ -672,6 +713,26 @@ onMounted(() => {
   gap: 6px;
 }
 
+.trend-toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.trend-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trend-nav-position {
+  min-width: 46px;
+  text-align: center;
+  font-size: 12px;
+  color: #606266;
+}
+
 .text-red {
   color: #d9001b;
   font-weight: 600;
@@ -715,6 +776,16 @@ onMounted(() => {
   .trend-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .trend-toolbar-left,
+  .trend-nav {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .trend-nav-position {
+    min-width: 0;
   }
 
   .summary-grid {
