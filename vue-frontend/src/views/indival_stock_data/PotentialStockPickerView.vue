@@ -42,19 +42,6 @@
           </el-col>
 
           <el-col :xs="24" :md="12" :lg="6">
-            <el-form-item label="行业映射">
-              <el-select v-model="filters.industryMapping" class="full-width">
-                <el-option
-                  v-for="item in industryMappingOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-
-          <el-col :xs="24" :md="12" :lg="6">
             <el-form-item label="前高窗口">
               <el-input-number v-model="filters.lookbackDays" :min="20" :max="120" :step="5" class="full-width" />
             </el-form-item>
@@ -146,8 +133,8 @@
         <strong>{{ data?.matched_total ?? 0 }}</strong>
       </div>
       <div class="summary-item">
-        <span>RPS股票池</span>
-        <strong>{{ data?.rps_total ?? 0 }}</strong>
+        <span>基础股票池</span>
+        <strong>{{ data?.universe_total ?? data?.rps_total ?? 0 }}</strong>
       </div>
       <div class="summary-item">
         <span>预过滤后</span>
@@ -297,7 +284,6 @@ import StockKLineChart from '@/components/StockKLineChart.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import {
   getPotentialStocks,
-  type IndustryMapping,
   type PotentialStockItem,
   type PotentialStocksData,
   type PotentialStocksParams
@@ -309,7 +295,6 @@ type TrendShortcut = '3m' | '6m' | '1y' | '3y'
 interface Filters {
   tradeDate: string
   exchange: MainBoardExchange
-  industryMapping: IndustryMapping
   lookbackDays: number
   minRps20: number
   minRps60: number
@@ -324,7 +309,6 @@ interface Filters {
 const defaultFilters: Filters = {
   tradeDate: getRecentTradeDate(),
   exchange: 'SSE',
-  industryMapping: 'dc_l2',
   lookbackDays: 60,
   minRps20: 80,
   minRps60: 70,
@@ -341,14 +325,6 @@ const periodOptions = [5, 10, 20, 60, 120, 250]
 const exchangeOptions = [
   { label: '上交所主板', value: 'SSE' },
   { label: '深交所主板', value: 'SZSE' }
-] as const
-const industryMappingOptions = [
-  { label: '默认行业', value: 'default' },
-  { label: '东财概念板块', value: 'dc_concept' },
-  { label: '东财地域板块', value: 'dc_region' },
-  { label: '东财一级行业', value: 'dc_l1' },
-  { label: '东财二级行业', value: 'dc_l2' },
-  { label: '东财三级行业', value: 'dc_l3' }
 ] as const
 
 const filters = reactive<Filters>({ ...defaultFilters, periods: [...defaultFilters.periods] })
@@ -384,7 +360,6 @@ async function loadCandidates() {
     const params: PotentialStocksParams = {
       trade_date: filters.tradeDate,
       exchange: filters.exchange,
-      industry_mapping: filters.industryMapping,
       periods: buildPeriodsParam(),
       lookback_days: filters.lookbackDays,
       min_rps_20: filters.minRps20,

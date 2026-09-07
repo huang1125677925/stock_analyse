@@ -166,6 +166,7 @@ export interface PotentialStocksData {
   total: number
   matched_total: number
   rps_total: number
+  universe_total?: number
   prefiltered_total: number
   scanned_total: number
   data: PotentialStockItem[]
