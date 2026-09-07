@@ -28,7 +28,7 @@
                   </div>
                 </template>
                 <div class="mega-menu-container">
-                  <div class="mega-menu-content">
+                  <div class="mega-menu-content" :class="{ 'is-flat': item.path === '/etf' }">
                     <div v-for="section in getMegaMenuSections(item.path)" :key="section.title || section.items.map(link => link.title).join('-')" class="mega-column">
                       <div v-if="section.title" class="mega-column-title">{{ section.title }}</div>
                       <ul class="mega-column-list">
@@ -128,12 +128,15 @@
                 </el-icon>
                 <span>{{ item.title }}</span>
               </template>
-              <template v-for="section in getMegaMenuSections(item.path)" :key="section.title">
-                <el-menu-item-group :title="section.title">
+              <template v-for="section in getMegaMenuSections(item.path)" :key="section.title || section.items.map(link => link.title).join('-')">
+                <el-menu-item-group v-if="section.title" :title="section.title">
                   <el-menu-item v-for="link in section.items" :key="link.title" :index="link.path">
                     {{ link.title }}
                   </el-menu-item>
                 </el-menu-item-group>
+                <el-menu-item v-else v-for="link in section.items" :key="link.title" :index="link.path">
+                  {{ link.title }}
+                </el-menu-item>
               </template>
             </el-sub-menu>
 
@@ -253,23 +256,11 @@ const marketOverviewMegaMenuSections = [
 
 const etfIndexMegaMenuSections = [
   {
-    title: '行业估值',
+    title: '',
     items: [
       { title: '申万行业估值分析', path: '/analysis/sw-industry-valuation' },
-    ],
-  },
-  {
-    title: '行业热点',
-    items: [
       { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
       { title: '行业宽度分析', path: '/analysis/congestion/breadth' },
-      { title: '行业成交额分析', path: '/analysis/congestion/turnover' },
-      { title: '行业流入资金分析', path: '/analysis/congestion/fundflow' },
-    ],
-  },
-  {
-    title: '行业洞察',
-    items: [
       { title: 'ETF全面分析', path: '/analysis/etf-tree' },
     ],
   },
@@ -433,6 +424,16 @@ watch(
   display: flex;
   gap: 24px;
   padding: 8px 4px;
+}
+
+.mega-menu-content.is-flat .mega-column-list {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.mega-menu-content.is-flat .mega-column-list li + li {
+  margin-top: 0;
 }
 
 .mega-column-title {

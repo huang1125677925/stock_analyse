@@ -67,18 +67,6 @@ const router = createRouter({
           redirect: '/major-index-rps',
         },
         {
-          path: '/analysis/congestion/turnover',
-          name: 'congestion-turnover',
-          component: () => import('@/views/industry-stock-data/CongestionTurnoverView.vue'),
-          meta: { title: '行业成交额分析' }
-        },
-        {
-          path: '/analysis/congestion/fundflow',
-          name: 'congestion-fundflow',
-          component: () => import('@/views/industry-stock-data/CongestionFundFlowView.vue'),
-          meta: { title: '行业流入资金分析' }
-        },
-        {
           path: '/analysis/congestion/breadth',
           name: 'congestion-breadth',
           component: () => import('@/views/industry-stock-data/CongestionBreadthView.vue'),
