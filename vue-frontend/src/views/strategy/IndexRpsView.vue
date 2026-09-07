@@ -173,37 +173,24 @@
           </el-table-column>
 
           <el-table-column
-            prop="RPS_today"
-            label="当日涨跌幅 / RPS_today"
-            :min-width="isMobile ? 118 : 150"
+            prop="pct_change"
+            label="当日涨跌幅"
+            :min-width="isMobile ? 88 : 110"
             sortable="custom"
             align="center"
           >
             <template #header>
               <div class="custom-header">
-                <span>当日涨跌幅 / RPS_today</span>
-                <el-tooltip content="上方为当日涨跌幅，下方为基于当天涨跌幅计算的 RPS 强度" placement="top">
+                <span>当日涨跌幅</span>
+                <el-tooltip content="最近交易日涨跌幅，仅作为当日表现参考，不参与RPS强度判断" placement="top">
                   <el-icon><InfoFilled /></el-icon>
                 </el-tooltip>
               </div>
             </template>
             <template #default="scope">
-              <div class="rps-cell rps-cell-with-change">
-                <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
-                  {{ formatPercent(scope.row.pct_change) }}
-                </span>
-                <el-progress
-                  :percentage="getNumericValue(scope.row.RPS_today)"
-                  :color="getRpsColor(getNumericValue(scope.row.RPS_today))"
-                  :format="() => formatRpsValue(scope.row.RPS_today)"
-                  :stroke-width="18"
-                  :text-inside="true"
-                  :show-text="true"
-                />
-                <div class="rps-rank" :class="getRpsRankClass(getNumericValue(scope.row.RPS_today))">
-                  {{ getRpsRankText(getNumericValue(scope.row.RPS_today)) }}
-                </div>
-              </div>
+              <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
+                {{ formatPercent(scope.row.pct_change) }}
+              </span>
             </template>
           </el-table-column>
           
@@ -616,24 +603,11 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" :min-width="isMobile ? 118 : 150" sortable="custom" align="center">
+              <el-table-column prop="pct_change" label="当日涨跌幅" :min-width="isMobile ? 88 : 110" sortable="custom" align="center">
                 <template #default="scope">
-                  <div class="rps-cell rps-cell-with-change">
-                    <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
-                      {{ formatPercent(scope.row.pct_change) }}
-                    </span>
-                    <el-progress
-                      :percentage="getNumericValue(scope.row.RPS_today)"
-                      :color="getRpsColor(getNumericValue(scope.row.RPS_today))"
-                      :format="() => formatRpsValue(scope.row.RPS_today)"
-                      :stroke-width="18"
-                      :text-inside="true"
-                      :show-text="true"
-                    />
-                    <div class="rps-rank" :class="getRpsRankClass(getNumericValue(scope.row.RPS_today))">
-                      {{ getRpsRankText(getNumericValue(scope.row.RPS_today)) }}
-                    </div>
-                  </div>
+                  <span class="rps-change-text" :class="{ up: getNumericValue(scope.row.pct_change) > 0, down: getNumericValue(scope.row.pct_change) < 0 }">
+                    {{ formatPercent(scope.row.pct_change) }}
+                  </span>
                 </template>
               </el-table-column>
 
@@ -762,7 +736,7 @@ interface Props {
 }
 
 type RpsPeriod = 5 | 20 | 60 | 120 | 250
-type RpsField = 'RPS_today' | `RPS_${RpsPeriod}`
+type RpsField = `RPS_${RpsPeriod}`
 type ReturnField = `return_${RpsPeriod}`
 type DynamicRpsField = 'RPS_today' | `RPS_${number}`
 type MemberTrendShortcut = '2m' | '1y' | '3y' | '5y' | '10y' | '20y'
@@ -848,7 +822,6 @@ const amountFilterOptions: Array<{ label: string; value: number }> = [
 ]
 
 const strengthFieldOptions: Array<{ label: string; value: RpsField }> = [
-  { label: 'RPS_today', value: 'RPS_today' },
   ...rpsPeriods.map((period) => ({
     label: `RPS_${period}`,
     value: `RPS_${period}` as RpsField
@@ -963,9 +936,6 @@ function getStrengthThresholdValue(rank: StrengthRankThreshold): number {
 }
 
 function getReturnValueByStrengthField(item: IndexRpsItem, field: RpsField): number {
-  if (field === 'RPS_today') {
-    return getNumericValue(item.pct_change)
-  }
   const period = Number(field.replace('RPS_', '')) as RpsPeriod
   return getNumericValue(item[getReturnProp(period)])
 }
