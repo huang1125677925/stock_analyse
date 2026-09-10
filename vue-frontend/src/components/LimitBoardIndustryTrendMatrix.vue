@@ -6,13 +6,21 @@
 
     <template v-else>
       <div class="matrix-legend">
-        <span class="legend-label">纵轴按最近交易日（{{ formatDisplayDate(lastDate) }}）行业涨停数量倒序排列</span>
+        <el-popover
+          placement="bottom-start"
+          trigger="click"
+          width="280"
+        >
+          <template #reference>
+            <button type="button" class="axis-info-dot" aria-label="查看纵轴排序说明">i</button>
+          </template>
+          <div class="axis-info">
+            <div class="axis-info-title">纵轴排序</div>
+            <div>按最近交易日（{{ formatDisplayDate(lastDate) }}）行业涨停数量倒序排列。</div>
+            <div>最近日无涨停数据的行业，按区间累计涨停数量排序。</div>
+          </div>
+        </el-popover>
         <span class="legend-tip">点击日期在表头查看当日情绪摘要；点击行业名查看该板块领涨数据详情；点击单元格顶部涨停数量查看当日行业涨停详情，点击个股标签查看该股趋势图</span>
-        <el-switch
-          v-model="showStockList"
-          class="legend-switch"
-          active-text="展示个股列表"
-        />
       </div>
 
       <div class="matrix-scroll">
@@ -25,29 +33,27 @@
               </th>
               <th v-for="date in displayDates" :key="date" class="date-head" :class="{ 'is-active': date === activeDate }">
                 <button type="button" class="date-head-btn" @click="setActiveDate(date)">
-                  <div class="date-text">{{ formatAxisDate(date) }}</div>
-                  <div class="overall-count" :title="`当日全市场涨停 ${overallCount(date)} 家`">
-                    {{ overallCount(date) }}
+                  <div class="date-head-main">
+                    <span class="date-text">{{ formatAxisDate(date) }}</span>
+                    <span class="overall-count" :title="`当日全市场涨停 ${overallCount(date)} 家`">
+                      {{ overallCount(date) }}
+                    </span>
+                    <span class="overall-unit">家</span>
                   </div>
-                </button>
-                <div class="date-head-summary">
-                  <div class="date-head-summary-title">
-                    当日情绪摘要
-                    <span v-if="dailyOverall(date)?.phase_label" class="date-head-summary-phase">
+                  <div class="date-head-compact">
+                    <span v-if="dailyOverall(date)?.phase_label" class="date-head-phase">
                       {{ dailyOverall(date).phase_label }}
                     </span>
-                  </div>
-                  <div class="date-head-summary-metrics">
-                    <div
+                    <span
                       v-for="item in dailySentimentCards(date)"
                       :key="item.key"
-                      class="date-head-summary-metric"
+                      class="date-head-metric"
                     >
                       <span class="dhs-label">{{ item.label }}</span>
                       <span class="dhs-value">{{ item.value }}</span>
-                    </div>
+                    </span>
                   </div>
-                </div>
+                </button>
               </th>
             </tr>
           </thead>
@@ -70,12 +76,22 @@
                 :class="{ 'is-empty': cellCount(date, industry) === 0 && !yesterdayPremium(date, industry) && industryPctChange(date, industry) === null }"
               >
                 <template v-if="cellCount(date, industry) > 0 || yesterdayPremium(date, industry) || industryPctChange(date, industry) !== null">
-                  <div v-if="yesterdayPremium(date, industry)" class="yesterday-premium">
-                    <span class="premium-label">昨日{{ yesterdayCount(date, industry) }}家</span>
+                  <div
+                    v-if="industryPctChange(date, industry) !== null || yesterdayPremium(date, industry)"
+                    class="cell-meta"
+                  >
                     <span
-                      class="premium-value"
-                      :class="premiumClass(yesterdayAvgPremium(date, industry))"
-                    >{{ formatPremium(yesterdayAvgPremium(date, industry)) }}</span>
+                      v-if="industryPctChange(date, industry) !== null"
+                      class="pct-change-value"
+                      :class="pctChangeClass(industryPctChange(date, industry))"
+                    >{{ formatPctChange(industryPctChange(date, industry)) }}</span>
+                    <span v-if="yesterdayPremium(date, industry)" class="premium-inline">
+                      <span class="premium-label">昨{{ yesterdayCount(date, industry) }}家</span>
+                      <span
+                        class="premium-value"
+                        :class="premiumClass(yesterdayAvgPremium(date, industry))"
+                      >溢价{{ formatPremium(yesterdayAvgPremium(date, industry)) }}</span>
+                    </span>
                   </div>
                   <button
                     v-if="cellCount(date, industry) > 0"
@@ -94,13 +110,7 @@
                       >{{ stat.symbol }}{{ stat.count }}</span>
                     </span>
                   </button>
-                  <div v-if="industryPctChange(date, industry) !== null" class="industry-pct-change">
-                    <span
-                      class="pct-change-value"
-                      :class="pctChangeClass(industryPctChange(date, industry))"
-                    >{{ formatPctChange(industryPctChange(date, industry)) }}</span>
-                  </div>
-                  <div v-if="showStockList && cellCount(date, industry) > 0" class="cell-stocks">
+                  <div v-if="showStockListEnabled && cellCount(date, industry) > 0" class="cell-stocks">
                     <button
                       v-for="stock in cellStocks(date, industry)"
                       :key="stock.ts_code || stock.name"
@@ -327,14 +337,16 @@ interface Props {
   daily: Record<string, IndustryTrendDaily>
   /** 东财板块类型（概念板块/地域板块/行业板块），供领涨数据详情弹窗按 idx_type 拉取板块K线 */
   idxType?: string
+  /** 是否在交叉块中展示个股涨停列表 */
+  showStockList?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  idxType: '行业板块'
+  idxType: '行业板块',
+  showStockList: true
 })
 
-/** 是否在交叉块中展示个股涨停列表，默认开启 */
-const showStockList = ref(true)
+const showStockListEnabled = computed(() => props.showStockList)
 const activeDate = ref('')
 
 /** 升序排列的交易日列表（左旧右新），供所有涨停/溢价计算逻辑使用 */
@@ -426,42 +438,6 @@ watch(
   { immediate: true }
 )
 
-const activeOverall = computed(() => {
-  if (!activeDate.value) return null
-  return props.daily[activeDate.value]?.overall || null
-})
-
-const sentimentSummaryCards = computed(() => {
-  const overall = activeOverall.value
-  return [
-    {
-      key: 'limit_up_count',
-      label: '涨停家数',
-      value: formatSummaryNumber(overall?.limit_up_count)
-    },
-    {
-      key: 'sealed_rate',
-      label: '封板率',
-      value: formatPercentValue(overall?.sealed_rate)
-    },
-    {
-      key: 'broken_rate',
-      label: '炸板率',
-      value: formatPercentValue(overall?.broken_rate)
-    },
-    {
-      key: 'max_board',
-      label: '最高连板',
-      value: formatBoardValue(overall?.max_board)
-    },
-    {
-      key: 'sentiment_score',
-      label: '情绪分',
-      value: formatSummaryNumber(overall?.sentiment_score, 1)
-    }
-  ]
-})
-
 function setActiveDate(date: string) {
   activeDate.value = date
 }
@@ -477,11 +453,6 @@ function dailyOverall(date: string) {
 function dailySentimentCards(date: string) {
   const overall = dailyOverall(date)
   return [
-    {
-      key: 'limit_up_count',
-      label: '涨停家数',
-      value: formatSummaryNumber(overall?.limit_up_count)
-    },
     {
       key: 'sealed_rate',
       label: '封板率',
@@ -1277,19 +1248,43 @@ function formatDisplayDate(value: string): string {
 .matrix-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px;
   align-items: center;
   font-size: 12px;
   color: #606266;
 }
 
-.legend-label {
-  font-weight: 600;
-  color: #303133;
+.axis-info-dot {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #c0c4cc;
+  border-radius: 50%;
+  background: #fff;
+  color: #606266;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  padding: 0;
+  text-align: center;
 }
 
-.legend-switch {
-  margin-left: auto;
+.axis-info-dot:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.axis-info {
+  display: grid;
+  gap: 6px;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.axis-info-title {
+  color: #303133;
+  font-weight: 600;
 }
 
 .matrix-scroll {
@@ -1334,7 +1329,7 @@ function formatDisplayDate(value: string): string {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 6px 4px;
+  padding: 6px 5px;
   cursor: pointer;
   font: inherit;
   color: inherit;
@@ -1344,51 +1339,52 @@ function formatDisplayDate(value: string): string {
   background: rgba(64, 158, 255, 0.08);
 }
 
+.date-head-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
 .date-text {
   font-size: 12px;
+  font-weight: 600;
   color: #606266;
 }
 
 .overall-count {
-  margin-top: 4px;
   font-size: 18px;
   font-weight: 700;
   color: #d9001b;
 }
 
-/* 表头内嵌的当日情绪摘要（仅激活日期列显示） */
-.date-head-summary {
-  margin-top: 6px;
-  padding: 6px 6px 4px;
-  border-top: 1px solid #dce4f0;
-  text-align: left;
-}
-
-.date-head-summary-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #303133;
-  text-align: center;
-}
-
-.date-head-summary-phase {
-  font-size: 11px;
-  font-weight: 500;
+.overall-unit {
   color: #909399;
+  font-size: 11px;
 }
 
-.date-head-summary-metrics {
-  margin-top: 4px;
+.date-head-compact {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-top: 3px;
+  line-height: 1.35;
 }
 
-.date-head-summary-metric {
-  display: flex;
+.date-head-phase {
+  font-size: 11px;
+  font-weight: 600;
+  color: #606266;
+}
+
+.date-head-metric {
+  display: inline-flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
+  gap: 2px;
+  white-space: nowrap;
 }
 
 .dhs-label {
@@ -1491,17 +1487,23 @@ function formatDisplayDate(value: string): string {
   background: #fbfbfb;
 }
 
-.yesterday-premium {
+.cell-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 2px 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 3px 6px;
   margin-bottom: 3px;
-  border-radius: 2px;
-  background: #f5f7fa;
-  font-size: 10px;
+  min-height: 16px;
+  font-size: 11px;
   line-height: 1.4;
+}
+
+.premium-inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
 }
 
 .premium-label {
@@ -1523,16 +1525,6 @@ function formatDisplayDate(value: string): string {
 
 .premium-neutral {
   color: #606266;
-}
-
-.industry-pct-change {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 4px;
-  margin-top: 3px;
-  font-size: 11px;
-  line-height: 1.4;
 }
 
 .pct-change-value {

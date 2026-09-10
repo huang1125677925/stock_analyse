@@ -1,46 +1,38 @@
 <template>
   <div class="limit-board-page">
-    <el-card class="query-card" shadow="never">
-      <el-form :inline="true" class="query-form">
-        <el-form-item label="时间范围">
-          <el-radio-group v-model="trendRange" @change="onTrendRangeChange">
-            <el-radio-button
-              v-for="option in trendRangeOptions"
-              :key="option.value"
-              :label="option.value"
-            >
-              {{ option.label }}
-            </el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="行业映射">
-          <el-select v-model="industryMapping" style="width: 160px" @change="onIndustryMappingChange">
-            <el-option
-              v-for="option in industryMappingOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" @click="loadIndustryTrend">查询</el-button>
-          <el-button :loading="loading" @click="loadIndustryTrend(true)">刷新</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
     <section v-loading="loading" class="tab-panel">
-      <el-card shadow="never" class="trend-card" v-if="hasIndustryTrendDaily">
-        <template #header>行业涨停趋势矩阵</template>
-        <LimitBoardIndustryTrendMatrix :daily="industryTrendDaily" :idx-type="industryIdxType" />
+      <el-card shadow="never" class="trend-card">
+        <template #header>
+          <div class="trend-card-header">
+            <div class="trend-card-title">行业涨停趋势矩阵</div>
+            <div class="trend-card-actions">
+              <div class="header-control">
+                <span class="header-control-label">行业映射</span>
+                <el-select v-model="industryMapping" class="industry-mapping-select" @change="onIndustryMappingChange">
+                  <el-option
+                    v-for="option in industryMappingOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </el-select>
+              </div>
+              <el-switch
+                v-model="showStockList"
+                active-text="展示个股列表"
+              />
+            </div>
+          </div>
+        </template>
+
+        <LimitBoardIndustryTrendMatrix
+          :daily="industryTrendDaily"
+          :idx-type="industryIdxType"
+          :show-stock-list="showStockList"
+        />
       </el-card>
 
       <SourceCounts :counts="industryTrendData?.source_counts" />
-      <el-empty
-        v-if="!loading && (!industryTrendData || !hasIndustryTrendDaily)"
-        description="请选择日期区间查询涨停趋势"
-      />
     </section>
   </div>
 </template>
@@ -50,15 +42,14 @@
  * 涨停分析选股页面
  * 功能：
  * - 展示打板策略中的涨停趋势分析结果
- * - 支持按时间范围和行业映射方式查询行业涨停趋势
+ * - 支持按行业映射方式查询行业涨停趋势
  * - 复用统一格式化方法展示统计指标与数据来源
  * 参数：无
  * 返回值：无
  * 事件：
- * - click: 点击查询或刷新按钮时重新拉取涨停趋势数据
+ * - change: 切换行业映射时自动重新拉取涨停趋势数据
  */
 import { computed, defineComponent, h, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import LimitBoardIndustryTrendMatrix from '@/components/LimitBoardIndustryTrendMatrix.vue'
 import {
   fetchIndustryTrendStrength,
@@ -99,14 +90,6 @@ const SourceCounts = defineComponent({
   }
 })
 
-type TrendRange = '2w' | '1m' | '3m'
-
-const trendRangeOptions: Array<{ label: string; value: TrendRange }> = [
-  { label: '最近2周', value: '2w' },
-  { label: '最近一个月', value: '1m' },
-  { label: '最近三个月', value: '3m' }
-]
-
 /** 行业趋势的行业映射方式选项，取值对应接口 industry_mapping 参数 */
 const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> = [
   { label: '东财概念', value: 'dc_concept' },
@@ -116,8 +99,8 @@ const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> =
   { label: '东财三级行业', value: 'dc_l3' }
 ]
 
-const trendRange = ref<TrendRange>('2w')
 const industryMapping = ref<IndustryMapping>('dc_l2')
+const showStockList = ref(true)
 
 /** 行业映射 -> 东财板块类型，供领涨数据详情按 idx_type 拉取板块K线 */
 const industryIdxType = computed(() => {
@@ -126,20 +109,16 @@ const industryIdxType = computed(() => {
   return '行业板块'
 })
 const trendEndDate = ref(getRecentTradeDate())
-const trendStartDate = ref(getRangeStartDate(trendEndDate.value, trendRange.value))
+const trendStartDate = ref(getRangeStartDate(trendEndDate.value))
 const loading = ref(false)
 const industryTrendData = ref<IndustryTrendStrengthData | null>(null)
 
 const industryTrendDaily = computed(() => industryTrendData.value?.data || {})
-const hasIndustryTrendDaily = computed(() => Object.keys(industryTrendDaily.value).length > 0)
 
 async function loadIndustryTrend(force = false) {
   if (loading.value && !force) return
-  if (!trendStartDate.value || !trendEndDate.value) return
-  if (trendStartDate.value > trendEndDate.value) {
-    ElMessage.warning('开始日期不能晚于结束日期')
-    return
-  }
+  trendEndDate.value = getRecentTradeDate()
+  trendStartDate.value = getRangeStartDate(trendEndDate.value)
 
   loading.value = true
   try {
@@ -179,43 +158,21 @@ function parseDateString(value: string): Date {
 }
 
 /**
- * 工具：按时间范围快捷键计算起始日期。
- * 参数：
- *  - endValue 为区间结束日期 YYYYMMDD；
- *  - range 为快捷范围，2周/1个月/3个月。
+ * 工具：计算固定近 2 周区间起始日期。
+ * 参数：endValue 为区间结束日期 YYYYMMDD。
  * 返回值：区间起始日期 YYYYMMDD。
  */
-function getRangeStartDate(endValue: string, range: TrendRange): string {
+function getRangeStartDate(endValue: string): string {
   const date = parseDateString(endValue)
-  if (range === '2w') {
-    date.setDate(date.getDate() - 14)
-  } else if (range === '1m') {
-    date.setMonth(date.getMonth() - 1)
-  } else {
-    date.setMonth(date.getMonth() - 3)
-  }
+  date.setDate(date.getDate() - 14)
   return formatDate(date)
 }
 
 /**
- * 事件：切换涨停趋势时间范围。
- * 参数：range 为选中的快捷范围。
- * 返回值：void，重算起始日期并刷新涨停趋势数据。
- */
-function onTrendRangeChange(range: string | number | boolean | undefined) {
-  const value = range as TrendRange
-  trendEndDate.value = getRecentTradeDate()
-  trendStartDate.value = getRangeStartDate(trendEndDate.value, value)
-  loadIndustryTrend(true)
-}
-
-/**
  * 事件：切换涨停趋势行业映射方式。
- * 参数：mapping 为选中的行业映射方式。
  * 返回值：void，按新映射方式刷新涨停趋势数据。
  */
-function onIndustryMappingChange(mapping: string | number | boolean | undefined) {
-  industryMapping.value = mapping as IndustryMapping
+function onIndustryMappingChange() {
   loadIndustryTrend(true)
 }
 
@@ -229,18 +186,50 @@ onMounted(() => {
   padding: 12px;
 }
 
-.query-card {
-  margin-bottom: 12px;
-}
-
-.query-form {
-  margin-bottom: -18px;
-}
-
 .tab-panel {
   min-height: 360px;
 }
 
+.trend-card {
+  margin-bottom: 12px;
+}
+
+.trend-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.trend-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.trend-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.header-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-control-label {
+  color: #606266;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.industry-mapping-select {
+  width: 160px;
+}
 
 .source-counts {
   display: flex;
@@ -258,19 +247,15 @@ onMounted(() => {
   background: #fafafa;
 }
 
-.trend-card {
-  margin-bottom: 12px;
-}
-
 @media (max-width: 768px) {
-  /* 内联表单在窄屏堆叠为多行，取消为单行调优的负外边距，避免遮挡下方内容 */
-  .query-form {
-    margin-bottom: 0;
+  .trend-card-header {
+    align-items: flex-start;
   }
 
-  /* 行业映射下拉占满整行 */
-  .query-form :deep(.el-select) {
-    width: 100% !important;
+  .trend-card-actions,
+  .header-control,
+  .industry-mapping-select {
+    width: 100%;
   }
 }
 </style>
