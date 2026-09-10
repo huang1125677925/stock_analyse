@@ -1,5 +1,5 @@
 <template>
-  <div class="index-dailybasic-view">
+  <div class="index-dailybasic-view" :class="{ 'is-embedded': props.embedded }">
     <el-card class="page-header" shadow="hover">
       <template #header>
         <div class="header-content">
@@ -9,7 +9,12 @@
       <div class="search-section">
         <el-form :inline="true" class="query-form">
           <el-form-item label="指标">
-            <el-select v-model="selectedMetric" placeholder="请选择展示指标" style="width: 200px" @change="updateChart">
+            <el-select
+              v-model="selectedMetric"
+              placeholder="请选择展示指标"
+              style="width: 200px"
+              @change="updateChart"
+            >
               <el-option
                 v-for="item in metricOptions"
                 :key="item.value"
@@ -43,8 +48,20 @@
           <el-tag type="info" effect="plain">共 {{ comparisonRows.length }} 个指数</el-tag>
         </div>
       </template>
-      <el-table :data="comparisonRows" border stripe style="width: 100%" empty-text="暂无指数估值对比数据">
-        <el-table-column prop="label" label="指数" :min-width="isMobile ? 96 : 160" :fixed="isMobile ? false : 'left'" align="center" />
+      <el-table
+        :data="comparisonRows"
+        border
+        stripe
+        style="width: 100%"
+        empty-text="暂无指数估值对比数据"
+      >
+        <el-table-column
+          prop="label"
+          label="指数"
+          :min-width="isMobile ? 96 : 160"
+          :fixed="isMobile ? false : 'left'"
+          align="center"
+        />
         <el-table-column prop="latestTradeDate" label="最新日期" min-width="120" align="center" />
         <el-table-column label="最新估值" min-width="140" align="center">
           <template #default="{ row }">
@@ -77,7 +94,12 @@
         </div>
         <div class="chart-carousel-actions">
           <el-button :disabled="activeChartIndex === 0" @click="showPrevChart">上一张</el-button>
-          <el-button type="primary" :disabled="activeChartIndex === datasets.length - 1" @click="showNextChart">下一张</el-button>
+          <el-button
+            type="primary"
+            :disabled="activeChartIndex === datasets.length - 1"
+            @click="showNextChart"
+            >下一张</el-button
+          >
         </div>
       </div>
 
@@ -88,13 +110,19 @@
               <div class="card-header">
                 <div class="header-title">
                   <span>{{ dataset.label }}（{{ dataset.totalCount }} 条数据）</span>
-                  <el-tag v-if="dataset.valuation" :type="dataset.valuation.type" effect="dark" class="valuation-tag">
-                    当前{{ metricLabel }}分位: {{ dataset.valuation.percentile.toFixed(2) }}% - {{ dataset.valuation.status }}
+                  <el-tag
+                    v-if="dataset.valuation"
+                    :type="dataset.valuation.type"
+                    effect="dark"
+                    class="valuation-tag"
+                  >
+                    当前{{ metricLabel }}分位: {{ dataset.valuation.percentile.toFixed(2) }}% -
+                    {{ dataset.valuation.status }}
                   </el-tag>
                 </div>
               </div>
             </template>
-            <div :ref="el => setChartRef(dataset.value, el)" class="chart-container"></div>
+            <div :ref="(el) => setChartRef(dataset.value, el)" class="chart-container"></div>
           </el-card>
         </div>
       </div>
@@ -112,7 +140,6 @@
         </button>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -135,6 +162,9 @@ import * as echarts from 'echarts'
 import { useIsMobile } from '@/composables/useIsMobile'
 
 const { isMobile } = useIsMobile()
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+})
 
 // emits：对外发出 loaded 事件
 const emit = defineEmits<{ (e: 'loaded', count: number): void }>()
@@ -169,12 +199,17 @@ const metricOptions = [
 
 // 当前选中的指标
 const selectedMetric = ref('pe')
-const metricLabel = computed(() => metricOptions.find(opt => opt.value === selectedMetric.value)?.label || selectedMetric.value)
+const metricLabel = computed(
+  () =>
+    metricOptions.find((opt) => opt.value === selectedMetric.value)?.label || selectedMetric.value,
+)
 
 // 查询时间范围：以截止日期为基准，向前回溯指定年数
 const endDate = ref<string>('')
 const lookbackYears = ref<number>(3)
-const dateRange = computed<[string, string]>(() => buildYearDateRange(lookbackYears.value, endDate.value))
+const dateRange = computed<[string, string]>(() =>
+  buildYearDateRange(lookbackYears.value, endDate.value),
+)
 const dateRangeText = computed(() => {
   const [startDate, finalDate] = dateRange.value
   return `${formatDisplayDate(startDate)} 至 ${formatDisplayDate(finalDate)}`
@@ -207,38 +242,44 @@ interface ComparisonRow {
   totalCount: number
 }
 
-const datasets = ref<IndexDataset[]>(indexOptions.map(item => ({
-  ...item,
-  records: [],
-  totalCount: 0,
-  valuation: null,
-})))
+const datasets = ref<IndexDataset[]>(
+  indexOptions.map((item) => ({
+    ...item,
+    records: [],
+    totalCount: 0,
+    valuation: null,
+  })),
+)
 const activeChartIndex = ref(0)
 const activeDataset = computed(() => datasets.value[activeChartIndex.value] ?? null)
 const carouselTrackStyle = computed(() => ({
-  transform: `translateX(-${activeChartIndex.value * 100}%)`
+  transform: `translateX(-${activeChartIndex.value * 100}%)`,
 }))
 
-const comparisonRows = computed<ComparisonRow[]>(() => datasets.value.map(dataset => {
-  const latestRecord = dataset.records[dataset.records.length - 1]
-  const rawMetricValue = latestRecord?.[selectedMetric.value]
-  const latestValue = rawMetricValue == null ? null : Number(rawMetricValue)
+const comparisonRows = computed<ComparisonRow[]>(() =>
+  datasets.value
+    .map((dataset) => {
+      const latestRecord = dataset.records[dataset.records.length - 1]
+      const rawMetricValue = latestRecord?.[selectedMetric.value]
+      const latestValue = rawMetricValue == null ? null : Number(rawMetricValue)
 
-  return {
-    label: dataset.label,
-    latestTradeDate: String(latestRecord?.trade_date || '--'),
-    latestValue: Number.isFinite(latestValue) ? latestValue : null,
-    percentile: dataset.valuation?.percentile ?? null,
-    status: dataset.valuation?.status ?? '',
-    type: dataset.valuation?.type ?? 'info',
-    totalCount: dataset.totalCount,
-  }
-}).sort((a, b) => {
-  // 按历史分位从低到高排列，无分位数据的排在最后
-  if (a.percentile === null) return 1
-  if (b.percentile === null) return -1
-  return a.percentile - b.percentile
-}))
+      return {
+        label: dataset.label,
+        latestTradeDate: String(latestRecord?.trade_date || '--'),
+        latestValue: Number.isFinite(latestValue) ? latestValue : null,
+        percentile: dataset.valuation?.percentile ?? null,
+        status: dataset.valuation?.status ?? '',
+        type: dataset.valuation?.type ?? 'info',
+        totalCount: dataset.totalCount,
+      }
+    })
+    .sort((a, b) => {
+      // 按历史分位从低到高排列，无分位数据的排在最后
+      if (a.percentile === null) return 1
+      if (b.percentile === null) return -1
+      return a.percentile - b.percentile
+    }),
+)
 
 // ECharts 相关
 const chartRefs = new Map<string, HTMLElement>()
@@ -248,7 +289,7 @@ const chartInstances = new Map<string, echarts.ECharts>()
 function calculatePercentileRank(values: number[], target: number): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
-  const rank = sorted.findIndex(v => v >= target)
+  const rank = sorted.findIndex((v) => v >= target)
   // 如果没找到（target比所有值都大），rank为-1，但逻辑上应该是100%
   if (rank === -1) return 100
   return (rank / sorted.length) * 100
@@ -261,10 +302,10 @@ function getValuationStatus(values: number[]): IndexValuationStatus | null {
 
   // 获取最新值（records已按日期排序，取最后一个）
   const latestValue = values[values.length - 1]
-  
+
   // 计算在历史数据中的分位
   const percentile = calculatePercentileRank(values, latestValue)
-  
+
   let status = '适中'
   let type: 'success' | 'warning' | 'danger' | 'info' | 'primary' = 'info'
 
@@ -286,7 +327,7 @@ function getValuationStatus(values: number[]): IndexValuationStatus | null {
     value: latestValue,
     percentile,
     status,
-    type
+    type,
   }
 }
 
@@ -361,25 +402,33 @@ function formatMetricValue(value: number | null): string {
 async function fetchData() {
   try {
     loading.value = true
-    chartInstances.forEach(chart => chart.showLoading())
-    
-    const [startDate, endDateValue] = dateRange.value
-    const loaded = await Promise.all(indexOptions.map(async option => {
-      const res = await fetchIndexDailybasic({ tsCode: option.value, startDate, endDate: endDateValue })
+    chartInstances.forEach((chart) => chart.showLoading())
 
-      const records = (res.records || []).sort((a, b) => {
-        const dateA = String(a.trade_date || '')
-        const dateB = String(b.trade_date || '')
-        return dateA.localeCompare(dateB)
-      })
-      const values = records.map(item => Number(item[selectedMetric.value])).filter(v => !isNaN(v))
-      return {
-        ...option,
-        records,
-        totalCount: res.count || records.length,
-        valuation: getValuationStatus(values)
-      }
-    }))
+    const [startDate, endDateValue] = dateRange.value
+    const loaded = await Promise.all(
+      indexOptions.map(async (option) => {
+        const res = await fetchIndexDailybasic({
+          tsCode: option.value,
+          startDate,
+          endDate: endDateValue,
+        })
+
+        const records = (res.records || []).sort((a, b) => {
+          const dateA = String(a.trade_date || '')
+          const dateB = String(b.trade_date || '')
+          return dateA.localeCompare(dateB)
+        })
+        const values = records
+          .map((item) => Number(item[selectedMetric.value]))
+          .filter((v) => !isNaN(v))
+        return {
+          ...option,
+          records,
+          totalCount: res.count || records.length,
+          valuation: getValuationStatus(values),
+        }
+      }),
+    )
 
     datasets.value = loaded
     if (activeChartIndex.value > loaded.length - 1) {
@@ -395,7 +444,7 @@ async function fetchData() {
     ElMessage.error(e?.message || '数据加载失败')
   } finally {
     loading.value = false
-    chartInstances.forEach(chart => chart.hideLoading())
+    chartInstances.forEach((chart) => chart.hideLoading())
   }
 }
 
@@ -406,7 +455,7 @@ function setChartRef(key: string, el: unknown) {
 }
 
 function initCharts() {
-  datasets.value.forEach(dataset => {
+  datasets.value.forEach((dataset) => {
     const el = chartRefs.get(dataset.value)
     if (el && !chartInstances.has(dataset.value)) {
       chartInstances.set(dataset.value, echarts.init(el))
@@ -424,23 +473,25 @@ function calculatePercentile(sortedValues: number[], p: number): number {
 }
 
 function updateChart() {
-  datasets.value = datasets.value.map(dataset => {
-    const values = dataset.records.map(item => Number(item[selectedMetric.value])).filter(v => !isNaN(v))
+  datasets.value = datasets.value.map((dataset) => {
+    const values = dataset.records
+      .map((item) => Number(item[selectedMetric.value]))
+      .filter((v) => !isNaN(v))
     return {
       ...dataset,
-      valuation: getValuationStatus(values)
+      valuation: getValuationStatus(values),
     }
   })
 
-  datasets.value.forEach(dataset => {
+  datasets.value.forEach((dataset) => {
     const chartInstance = chartInstances.get(dataset.value)
     if (!chartInstance) return
 
-    const dates = dataset.records.map(item => item.trade_date)
-    const values = dataset.records.map(item => Number(item[selectedMetric.value]))
+    const dates = dataset.records.map((item) => item.trade_date)
+    const values = dataset.records.map((item) => Number(item[selectedMetric.value]))
 
     // 计算分位数
-    const validValues = values.filter(v => !isNaN(v)).sort((a, b) => a - b)
+    const validValues = values.filter((v) => !isNaN(v)).sort((a, b) => a - b)
 
     const p10 = calculatePercentile(validValues, 10)
     const p30 = calculatePercentile(validValues, 30)
@@ -451,21 +502,21 @@ function updateChart() {
     const option = {
       title: {
         text: `${dataset.label} - ${metricLabel.value} 趋势`,
-        left: 'center'
+        left: 'center',
       },
       tooltip: {
-        trigger: 'axis'
+        trigger: 'axis',
       },
       grid: {
-        right: '15%' // 留出右侧空间显示 markLine 标签
+        right: '15%', // 留出右侧空间显示 markLine 标签
       },
       xAxis: {
         type: 'category',
-        data: dates
+        data: dates,
       },
       yAxis: {
         type: 'value',
-        scale: true // 让坐标轴自适应数据范围，而不是从0开始
+        scale: true, // 让坐标轴自适应数据范围，而不是从0开始
       },
       series: [
         {
@@ -477,15 +528,40 @@ function updateChart() {
           markLine: {
             symbol: 'none',
             data: [
-              { yAxis: p90, name: '90%分位', label: { formatter: '90%: {c}' }, lineStyle: { color: '#FF4500', type: 'dashed' } },
-              { yAxis: p70, name: '70%分位', label: { formatter: '70%: {c}' }, lineStyle: { color: '#FFA500', type: 'dashed' } },
-              { yAxis: p50, name: '50%分位', label: { formatter: '50%: {c}' }, lineStyle: { color: '#32CD32', width: 2 } }, // 中位数加粗
-              { yAxis: p30, name: '30%分位', label: { formatter: '30%: {c}' }, lineStyle: { color: '#1E90FF', type: 'dashed' } },
-              { yAxis: p10, name: '10%分位', label: { formatter: '10%: {c}' }, lineStyle: { color: '#0000FF', type: 'dashed' } },
-            ]
-          }
-        }
-      ]
+              {
+                yAxis: p90,
+                name: '90%分位',
+                label: { formatter: '90%: {c}' },
+                lineStyle: { color: '#FF4500', type: 'dashed' },
+              },
+              {
+                yAxis: p70,
+                name: '70%分位',
+                label: { formatter: '70%: {c}' },
+                lineStyle: { color: '#FFA500', type: 'dashed' },
+              },
+              {
+                yAxis: p50,
+                name: '50%分位',
+                label: { formatter: '50%: {c}' },
+                lineStyle: { color: '#32CD32', width: 2 },
+              }, // 中位数加粗
+              {
+                yAxis: p30,
+                name: '30%分位',
+                label: { formatter: '30%: {c}' },
+                lineStyle: { color: '#1E90FF', type: 'dashed' },
+              },
+              {
+                yAxis: p10,
+                name: '10%分位',
+                label: { formatter: '10%: {c}' },
+                lineStyle: { color: '#0000FF', type: 'dashed' },
+              },
+            ],
+          },
+        },
+      ],
     }
 
     chartInstance.setOption(option)
@@ -493,7 +569,7 @@ function updateChart() {
 }
 
 function handleResize() {
-  chartInstances.forEach(chart => chart.resize())
+  chartInstances.forEach((chart) => chart.resize())
 }
 
 // 监听截止日期与回溯年限变化，自动刷新数据
@@ -515,30 +591,96 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
-  chartInstances.forEach(chart => chart.dispose())
+  chartInstances.forEach((chart) => chart.dispose())
   chartInstances.clear()
 })
 </script>
 
 <style scoped>
-.index-dailybasic-view { padding: 20px; }
-.page-header, .search-section, .table-section { margin-bottom: 20px; }
-.header-content { display: flex; justify-content: space-between; align-items: center; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.header-title { display: flex; align-items: center; gap: 10px; }
-.valuation-tag { margin-left: 10px; font-weight: bold; }
-.chart-section { display: flex; flex-direction: column; gap: 16px; }
-.chart-carousel-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.chart-carousel-summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.chart-carousel-title { font-size: 18px; font-weight: 600; }
-.chart-carousel-counter { color: var(--el-text-color-secondary); }
-.chart-carousel-actions { display: flex; gap: 12px; }
-.chart-carousel-viewport { overflow: hidden; }
-.chart-carousel-track { display: flex; transition: transform 0.3s ease; will-change: transform; }
-.index-card { width: 100%; min-width: 100%; flex: 0 0 100%; box-sizing: border-box; }
-.chart-slide { scroll-snap-align: start; }
-.chart-container { width: 100%; height: 420px; }
-.chart-carousel-dots { display: flex; gap: 10px; flex-wrap: wrap; }
+.index-dailybasic-view {
+  padding: 20px;
+}
+.index-dailybasic-view.is-embedded {
+  padding: 0;
+}
+.page-header,
+.search-section,
+.table-section {
+  margin-bottom: 20px;
+}
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.valuation-tag {
+  margin-left: 10px;
+  font-weight: bold;
+}
+.chart-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.chart-carousel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.chart-carousel-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.chart-carousel-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+.chart-carousel-counter {
+  color: var(--el-text-color-secondary);
+}
+.chart-carousel-actions {
+  display: flex;
+  gap: 12px;
+}
+.chart-carousel-viewport {
+  overflow: hidden;
+}
+.chart-carousel-track {
+  display: flex;
+  transition: transform 0.3s ease;
+  will-change: transform;
+}
+.index-card {
+  width: 100%;
+  min-width: 100%;
+  flex: 0 0 100%;
+  box-sizing: border-box;
+}
+.chart-slide {
+  scroll-snap-align: start;
+}
+.chart-container {
+  width: 100%;
+  height: 420px;
+}
+.chart-carousel-dots {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .chart-dot {
   border: 1px solid var(--el-border-color);
   background: var(--el-fill-color-blank);
@@ -553,20 +695,58 @@ onUnmounted(() => {
   background: var(--el-color-primary-light-9);
   color: var(--el-color-primary);
 }
-.range-buttons { margin-left: 8px; }
-.range-text { margin-left: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
+.range-buttons {
+  margin-left: 8px;
+}
+.range-text {
+  margin-left: 12px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
 @media (max-width: 768px) {
-  .index-dailybasic-view { padding: 0; }
-  .page-header, .search-section, .table-section { margin-bottom: 12px; }
-  .chart-carousel-toolbar { flex-direction: column; align-items: flex-start; }
-  .chart-carousel-actions { width: 100%; }
-  .chart-carousel-actions :deep(.el-button) { flex: 1; }
-  .chart-container { height: 300px; }
+  .index-dailybasic-view {
+    padding: 0;
+  }
+  .page-header,
+  .search-section,
+  .table-section {
+    margin-bottom: 12px;
+  }
+  .chart-carousel-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .chart-carousel-actions {
+    width: 100%;
+  }
+  .chart-carousel-actions :deep(.el-button) {
+    flex: 1;
+  }
+  .chart-container {
+    height: 300px;
+  }
   /* 指标下拉、日期、快捷范围按钮在窄屏占满整宽、整齐换行 */
-  .query-form :deep(.el-select) { width: 100% !important; }
-  .query-form :deep(.el-date-editor) { width: 100% !important; }
-  .range-buttons { margin-left: 0; margin-top: 8px; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
-  .range-buttons :deep(.el-button) { width: 100%; }
-  .range-text { margin-left: 0; margin-top: 8px; display: block; white-space: normal; }
+  .query-form :deep(.el-select) {
+    width: 100% !important;
+  }
+  .query-form :deep(.el-date-editor) {
+    width: 100% !important;
+  }
+  .range-buttons {
+    margin-left: 0;
+    margin-top: 8px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .range-buttons :deep(.el-button) {
+    width: 100%;
+  }
+  .range-text {
+    margin-left: 0;
+    margin-top: 8px;
+    display: block;
+    white-space: normal;
+  }
 }
 </style>

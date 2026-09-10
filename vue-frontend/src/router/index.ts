@@ -6,31 +6,23 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      component: DefaultLayout,
-      children: [
-        {
-          path: '',
-          name: 'home',
-          component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
-          meta: { title: '大盘指数估值' }
-        }
-      ]
+      redirect: '/market-overview',
     },
     {
       path: '/login',
-      redirect: '/'
+      redirect: '/',
     },
     {
       path: '/register',
-      redirect: '/'
+      redirect: '/',
     },
     {
       path: '/reset-password',
-      redirect: '/'
+      redirect: '/',
     },
     {
       path: '/change-password',
-      redirect: '/reset-password'
+      redirect: '/reset-password',
     },
     {
       path: '/market-overview',
@@ -38,24 +30,23 @@ const router = createRouter({
       meta: { title: '大盘概览' },
       children: [
         {
-          path: '/market-overview/index-valuation',
-          name: 'market-index-valuation',
-          component: () => import('@/views/markt_data/IndexDailybasicView.vue'),
-          meta: { title: '大盘指数估值' }
+          path: '',
+          name: 'market-overview',
+          component: () => import('@/views/markt_data/MarketOverviewView.vue'),
         },
-        {
-          path: '/major-index-rps',
-          name: 'major-index-rps',
-          component: () => import('@/views/markt_data/MajorIndexRpsView.vue'),
-          meta: { title: '大盘指数RPS' }
-        },
-        {
-          path: '/market-overview/index-breadth',
-          name: 'market-index-breadth',
-          component: () => import('@/views/markt_data/MarketIndexBreadthView.vue'),
-          meta: { title: '大盘指数宽度分析' }
-        }
-      ]
+      ],
+    },
+    {
+      path: '/major-index-rps',
+      redirect: '/market-overview',
+    },
+    {
+      path: '/market-overview/index-valuation',
+      redirect: '/market-overview',
+    },
+    {
+      path: '/market-overview/index-breadth',
+      redirect: '/market-overview',
     },
     {
       path: '/analysis',
@@ -64,33 +55,33 @@ const router = createRouter({
       children: [
         {
           path: '/analysis/major-index-rps',
-          redirect: '/major-index-rps',
+          redirect: '/market-overview',
         },
         {
           path: '/analysis/congestion/breadth',
           name: 'congestion-breadth',
           component: () => import('@/views/industry-stock-data/CongestionBreadthView.vue'),
-          meta: { title: '市场宽度分析' }
+          meta: { title: '市场宽度分析' },
         },
         {
           path: '/analysis/congestion/index-rps',
           name: 'congestion-index-rps',
           component: () => import('@/views/industry-stock-data/CongestionIndexRpsView.vue'),
-          meta: { title: '指数RPS强度排名' }
+          meta: { title: '指数RPS强度排名' },
+        },
+        {
+          path: '/analysis/industry-fund-flow',
+          name: 'industry-fund-flow',
+          component: () => import('@/views/industry-stock-data/IndustryFundFlowView.vue'),
+          meta: { title: '行业资金流量' },
         },
         {
           path: '/analysis/sw-industry-valuation',
           name: 'sw-industry-valuation',
           component: () => import('@/views/industry-stock-data/SwIndustryValuationView.vue'),
-          meta: { title: '申万行业估值分析' }
+          meta: { title: '申万行业估值分析' },
         },
-        {
-          path: '/analysis/etf-tree',
-          name: 'etf-tree',
-          component: () => import('@/views/markt_data/EtfTreeView.vue'),
-          meta: { title: 'ETF全面分析' }
-        },
-      ]
+      ],
     },
     {
       path: '/stock-picker',
@@ -101,23 +92,23 @@ const router = createRouter({
           path: '/stock-picker/limit-board-analysis',
           name: 'stock-limit-board-analysis',
           component: () => import('@/views/indival_stock_data/LimitBoardAnalysisView.vue'),
-          meta: { title: '涨停分析选股' }
+          meta: { title: '涨停分析选股' },
         },
         {
           path: '/stock-picker/swing-practice',
           name: 'stock-swing-practice',
           component: () => import('@/views/indival_stock_data/StockSwingPracticeView.vue'),
-          meta: { title: '波段趋势选股' }
-        }
-      ]
+          meta: { title: '波段趋势选股' },
+        },
+      ],
     },
     {
       path: '/stock-limit-board-analysis',
-      redirect: '/stock-picker/limit-board-analysis'
+      redirect: '/stock-picker/limit-board-analysis',
     },
     {
       path: '/stock-swing-practice',
-      redirect: '/stock-picker/swing-practice'
+      redirect: '/stock-picker/swing-practice',
     },
     {
       path: '/admin/invite-codes',
@@ -127,11 +118,11 @@ const router = createRouter({
           path: '',
           name: 'admin-invite-codes',
           component: () => import('@/views/SettingsView.vue'),
-          meta: { title: '邀请码生成' }
-        }
-      ]
-    }
-  ]
+          meta: { title: '邀请码生成' },
+        },
+      ],
+    },
+  ],
 })
 
 export default router

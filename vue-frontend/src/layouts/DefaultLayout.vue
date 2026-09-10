@@ -273,25 +273,14 @@ const menuItems = computed(() => {
   return baseMenuItems
 })
 
-const marketOverviewMegaMenuSections = [
-  {
-    title: '',
-    items: [
-      { title: '大盘指数RPS', path: '/major-index-rps' },
-      { title: '大盘指数估值', path: '/market-overview/index-valuation' },
-      { title: '大盘指数宽度分析', path: '/market-overview/index-breadth' },
-    ],
-  },
-]
-
 const etfIndexMegaMenuSections = [
   {
     title: '',
     items: [
       { title: '申万行业估值分析', path: '/analysis/sw-industry-valuation' },
+      { title: '行业资金流量', path: '/analysis/industry-fund-flow' },
       { title: '指数RPS强度排名', path: '/analysis/congestion/index-rps' },
       { title: '行业宽度分析', path: '/analysis/congestion/breadth' },
-      { title: 'ETF全面分析', path: '/analysis/etf-tree' },
     ],
   },
 ]
@@ -312,17 +301,13 @@ function goPath(path?: string) {
 }
 
 function hasMegaMenu(path: string) {
-  return ['/market-overview', '/analysis', '/stock-picker', '/etf'].includes(path)
+  return ['/analysis', '/stock-picker', '/etf'].includes(path)
 }
 
 function isMegaMenuActive(path: string) {
   switch (path) {
     case '/market-overview':
-      return (
-        route.path === '/market-overview/index-valuation' ||
-        route.path === '/major-index-rps' ||
-        route.path === '/market-overview/index-breadth'
-      )
+      return route.path === '/market-overview'
     case '/etf':
       return route.matched.some((record) => record.path === '/analysis')
     case '/stock-picker':
@@ -337,8 +322,6 @@ function isMegaMenuActive(path: string) {
 
 function getMegaMenuSections(path: string) {
   switch (path) {
-    case '/market-overview':
-      return marketOverviewMegaMenuSections
     case '/stock-picker':
       return stockPickerMegaMenuSections
     case '/etf':

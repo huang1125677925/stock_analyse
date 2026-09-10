@@ -1,6 +1,7 @@
 <template>
   <div
     class="major-index-rps-view"
+    :class="{ 'is-embedded': props.embedded }"
     v-loading="loading"
     element-loading-text="正在加载大盘指数RPS数据..."
   >
@@ -65,7 +66,7 @@
         :data="filteredRows"
         stripe
         style="width: 100%"
-        :height="isMobile ? undefined : 'calc(100dvh - 240px)'"
+        :height="tableHeight"
         :default-sort="{ prop: sortState.prop, order: sortState.order || undefined }"
         empty-text="暂无大盘指数RPS数据"
         @sort-change="handleSortChange"
@@ -215,6 +216,9 @@ interface SortState {
 }
 
 const DEFAULT_PERIODS = [5, 20, 60, 120, 250]
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+})
 
 const loading = ref(false)
 const rows = ref<MajorIndexRpsItem[]>([])
@@ -233,6 +237,10 @@ const trendIndex = ref({
   market: '',
 })
 const isMobile = ref(window.innerWidth < 768)
+const tableHeight = computed(() => {
+  if (isMobile.value) return undefined
+  return props.embedded ? 520 : 'calc(100dvh - 240px)'
+})
 
 const filteredRows = computed(() => {
   const filtered = rows.value.filter(
@@ -410,6 +418,12 @@ function handleResize() {
   background: #f4f6f8;
 }
 
+.major-index-rps-view.is-embedded {
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+}
+
 .filter-panel,
 .ranking-panel {
   border-radius: 6px;
@@ -458,6 +472,10 @@ function handleResize() {
   overflow: hidden;
   background: #ffffff;
   border: 1px solid #e1e6ee;
+}
+
+.major-index-rps-view.is-embedded .ranking-panel {
+  min-height: 580px;
 }
 
 .ranking-panel-header {
