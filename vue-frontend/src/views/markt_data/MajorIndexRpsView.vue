@@ -1,6 +1,10 @@
 <template>
-  <div class="major-index-rps-view" v-loading="loading" element-loading-text="正在加载大盘指数RPS数据...">
-    <el-card class="page-header" shadow="never">
+  <div
+    class="major-index-rps-view"
+    v-loading="loading"
+    element-loading-text="正在加载大盘指数RPS数据..."
+  >
+    <section class="filter-panel" aria-label="指数RPS筛选条件">
       <el-form :inline="!isMobile" class="query-form">
         <el-form-item label="截止日期">
           <el-date-picker
@@ -9,45 +13,77 @@
             placeholder="默认最近交易日"
             value-format="YYYYMMDD"
             clearable
+            class="full-width"
           />
         </el-form-item>
         <el-form-item label="市场">
-          <el-select v-model="selectedMarket" style="width: 140px">
+          <el-select v-model="selectedMarket" class="market-select">
             <el-option label="全部市场" value="全部" />
             <el-option label="国内" value="国内" />
             <el-option label="国际" value="国际" />
           </el-select>
         </el-form-item>
       </el-form>
-    </el-card>
+    </section>
 
-    <el-card class="table-card" shadow="never">
-      <template #header>
+    <section class="ranking-panel" aria-label="指数RPS强度排名">
+      <div class="ranking-panel-header">
         <div class="table-header">
-          <div class="table-title">多周期 RPS 排名</div>
+          <div class="table-title-row">
+            <div class="table-title">多周期 RPS 排名</div>
+            <el-popover placement="bottom-start" trigger="click" width="420">
+              <template #reference>
+                <el-button
+                  class="info-button"
+                  circle
+                  size="small"
+                  :icon="InfoFilled"
+                  aria-label="查看RPS说明"
+                />
+              </template>
+              <div class="info-popover">
+                <p>
+                  RPS（Relative Price
+                  Strength）用于衡量指数相对同组指数的强弱排序，数值越高代表相对更强。
+                </p>
+                <p>
+                  页面按接口返回的目标交易日截面进行横向对比，同时展示当日涨跌幅与 5/20/60/120/250
+                  日区间收益。
+                </p>
+              </div>
+            </el-popover>
+          </div>
           <div class="table-meta">
             <el-tag type="info" effect="plain">周期 {{ availablePeriods.join(' / ') }} 日</el-tag>
             <el-tag type="success" effect="light">更新时间 {{ queryTime || '--' }}</el-tag>
           </div>
         </div>
-      </template>
-
-      <div class="methodology">
-        <p>RPS（Relative Price Strength）用于衡量指数相对同组指数的强弱排序，数值越高代表相对更强。</p>
-        <p>页面按接口返回的目标交易日截面进行横向对比，同时展示当日涨跌幅与 5/20/60/120/250 日区间收益。</p>
       </div>
 
       <el-table
+        class="ranking-table"
         :data="filteredRows"
         stripe
         style="width: 100%"
-        :height="isMobile ? undefined : 640"
+        :height="isMobile ? undefined : 'calc(100dvh - 240px)'"
         :default-sort="{ prop: sortState.prop, order: sortState.order || undefined }"
         empty-text="暂无大盘指数RPS数据"
         @sort-change="handleSortChange"
       >
-        <el-table-column type="index" label="#" :width="isMobile ? 34 : 60" align="center" :fixed="isMobile ? false : 'left'" />
-        <el-table-column prop="name" label="指数名称" :min-width="isMobile ? 92 : 180" sortable="custom" :fixed="isMobile ? false : 'left'">
+        <el-table-column
+          type="index"
+          label="#"
+          :width="isMobile ? 34 : 60"
+          align="center"
+          :fixed="isMobile ? false : 'left'"
+        />
+        <el-table-column
+          prop="name"
+          label="指数名称"
+          :min-width="isMobile ? 92 : 180"
+          sortable="custom"
+          :fixed="isMobile ? false : 'left'"
+        >
           <template #header>
             <div class="custom-header">
               <span>指数名称</span>
@@ -77,12 +113,24 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="trade_date" label="交易日" min-width="110" align="center" sortable="custom">
+        <el-table-column
+          prop="trade_date"
+          label="交易日"
+          min-width="110"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">
             {{ formatTradeDate(row.trade_date) }}
           </template>
         </el-table-column>
-        <el-table-column prop="RPS_today" label="当日涨跌幅 / RPS_today" :min-width="isMobile ? 118 : 180" align="center" sortable="custom">
+        <el-table-column
+          prop="RPS_today"
+          label="当日涨跌幅 / RPS_today"
+          :min-width="isMobile ? 118 : 180"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">
             <div class="rps-cell rps-cell-with-change">
               <span :class="getChangeClass(row.pct_change)" class="rps-change-text">
@@ -126,7 +174,7 @@
           </el-table-column>
         </template>
       </el-table>
-    </el-card>
+    </section>
 
     <MajorIndexTrendDialog
       v-model="trendDialogVisible"
@@ -187,8 +235,8 @@ const trendIndex = ref({
 const isMobile = ref(window.innerWidth < 768)
 
 const filteredRows = computed(() => {
-  const filtered = rows.value.filter(item =>
-    selectedMarket.value === '全部' || item.market === selectedMarket.value
+  const filtered = rows.value.filter(
+    (item) => selectedMarket.value === '全部' || item.market === selectedMarket.value,
   )
 
   return [...filtered].sort((a, b) => compareRows(a, b, sortState.value))
@@ -277,7 +325,13 @@ function compareRows(a: MajorIndexRpsItem, b: MajorIndexRpsItem, sort: SortState
   const aValue = a[sort.prop as keyof MajorIndexRpsItem]
   const bValue = b[sort.prop as keyof MajorIndexRpsItem]
 
-  if (sort.prop === 'name' || sort.prop === 'ts_code' || sort.prop === 'market' || sort.prop === 'source' || sort.prop === 'trade_date') {
+  if (
+    sort.prop === 'name' ||
+    sort.prop === 'ts_code' ||
+    sort.prop === 'market' ||
+    sort.prop === 'source' ||
+    sort.prop === 'trade_date'
+  ) {
     const compareResult = String(aValue || '').localeCompare(String(bValue || ''), 'zh-CN')
     return sort.order === 'ascending' ? compareResult : -compareResult
   }
@@ -289,7 +343,10 @@ function compareRows(a: MajorIndexRpsItem, b: MajorIndexRpsItem, sort: SortState
 async function fetchData() {
   loading.value = true
   try {
-    const result: MajorIndexRpsData = await getMajorIndexRps(DEFAULT_PERIODS.join(','), tradeDate.value || undefined)
+    const result: MajorIndexRpsData = await getMajorIndexRps(
+      DEFAULT_PERIODS.join(','),
+      tradeDate.value || undefined,
+    )
     rows.value = result.data || []
     availablePeriods.value = result.periods?.length ? result.periods : [...DEFAULT_PERIODS]
     queryTime.value = result.query_time || ''
@@ -345,61 +402,111 @@ function handleResize() {
 
 <style scoped>
 .major-index-rps-view {
-  padding: 0;
+  min-height: calc(100dvh - 104px);
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f4f6f8;
 }
 
-.page-header,
-.table-card {
-  margin-bottom: 12px;
+.filter-panel,
+.ranking-panel {
+  border-radius: 6px;
 }
 
-/* 去掉 el-card 的边框、阴影和圆角 */
-.page-header.el-card,
-.table-card.el-card {
-  border-radius: 0;
-}
-
-:deep(.page-header.el-card),
-:deep(.table-card.el-card) {
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-/* 去掉 el-card header 和 body 的左右 padding */
-:deep(.page-header .el-card__header),
-:deep(.table-card .el-card__header) {
-  padding: 18px 0 16px;
-}
-
-:deep(.table-card .el-card__body) {
-  padding: 0 0 20px;
-}
-
-/* 筛选卡片仅保留表单，上下留白收紧 */
-:deep(.page-header .el-card__body) {
-  padding: 16px 0;
+.filter-panel {
+  flex-shrink: 0;
+  padding: 12px 14px 0;
+  background: #ffffff;
+  border: 1px solid #e5e9f0;
 }
 
 .query-form {
   margin-bottom: 0;
 }
 
-/* 表单只有一行，去掉表单项底部默认外边距，消除卡片内多余空白 */
 .query-form :deep(.el-form-item) {
-  margin-bottom: 0;
+  margin-right: 12px;
+  margin-bottom: 12px;
+}
+
+.query-form :deep(.el-form-item__label) {
+  color: #5f6876;
+  font-weight: 500;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.market-select {
+  width: 140px;
+}
+
+.query-form :deep(.el-input__wrapper),
+.query-form :deep(.el-select__wrapper) {
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px #d8dee8 inset;
+}
+
+.ranking-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e1e6ee;
+}
+
+.ranking-panel-header {
+  flex-shrink: 0;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid #e8edf3;
+  background: #ffffff;
 }
 
 .table-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+.table-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .table-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
+  color: #172033;
+  letter-spacing: 0;
+}
+
+.info-button {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  color: #6f7a89;
+  border-color: #d8dee8;
+}
+
+.info-popover {
+  display: grid;
+  gap: 6px;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.info-popover p {
+  margin: 0;
 }
 
 .table-meta {
@@ -407,6 +514,15 @@ function handleResize() {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.table-meta :deep(.el-tag) {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #f8fafc;
+  border-color: #dce3ec;
 }
 
 .custom-header {
@@ -429,23 +545,6 @@ function handleResize() {
 .index-code {
   color: var(--el-text-color-secondary);
   font-size: 12px;
-}
-
-.methodology {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: var(--el-fill-color-light);
-  color: var(--el-text-color-regular);
-  line-height: 1.7;
-}
-
-.methodology p {
-  margin: 0;
-}
-
-.methodology p + p {
-  margin-top: 6px;
 }
 
 .rps-cell {
@@ -477,6 +576,50 @@ function handleResize() {
   color: var(--el-text-color-secondary);
 }
 
+.ranking-table {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+:deep(.ranking-table.el-table) {
+  --el-table-border-color: #edf1f6;
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-row-hover-bg-color: #f1f6ff;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+:deep(.ranking-table.el-table::before),
+:deep(.ranking-table .el-table__inner-wrapper::before) {
+  display: none;
+}
+
+:deep(.ranking-table th.el-table__cell) {
+  padding: 7px 0;
+  color: #475467;
+  font-weight: 600;
+  background: #f8fafc;
+}
+
+:deep(.ranking-table td.el-table__cell) {
+  padding: 7px 0;
+}
+
+:deep(.ranking-table .cell) {
+  padding: 0 8px;
+  line-height: 1.35;
+}
+
+:deep(.ranking-table .el-progress-bar__outer) {
+  background-color: #edf1f6;
+  border-radius: 3px;
+}
+
+:deep(.ranking-table .el-progress-bar__inner) {
+  border-radius: 3px;
+}
+
 @media (max-width: 992px) {
   .table-header {
     flex-direction: column;
@@ -486,22 +629,9 @@ function handleResize() {
 
 @media (max-width: 768px) {
   .major-index-rps-view {
-    padding: 0;
-  }
-
-  .page-header,
-  .table-card {
-    margin-bottom: 12px;
-  }
-
-  :deep(.page-header .el-card__header),
-  :deep(.table-card .el-card__header) {
-    padding: 10px 8px;
-  }
-
-  :deep(.page-header .el-card__body),
-  :deep(.table-card .el-card__body) {
-    padding: 0 0 10px;
+    min-height: auto;
+    padding: 8px;
+    gap: 8px;
   }
 
   .query-form {
@@ -515,9 +645,21 @@ function handleResize() {
     width: 100%;
   }
 
+  .filter-panel,
+  .ranking-panel {
+    border-radius: 0;
+  }
+
+  .filter-panel,
+  .ranking-panel-header {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
   .query-form :deep(.el-select),
   .query-form :deep(.el-input),
-  .query-form :deep(.el-date-picker) {
+  .query-form :deep(.el-date-picker),
+  .market-select {
     width: 100% !important;
   }
 
@@ -527,11 +669,6 @@ function handleResize() {
 
   .query-form :deep(.el-button) {
     width: 100%;
-  }
-
-  .methodology {
-    padding: 10px 12px;
-    font-size: 13px;
   }
 }
 </style>

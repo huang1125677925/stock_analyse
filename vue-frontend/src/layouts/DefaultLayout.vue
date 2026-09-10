@@ -1,12 +1,18 @@
 <template>
   <el-container class="layout-container">
     <el-header class="topbar">
-      <div class="topbar-left" @click="$router.push('/')" style="cursor: pointer;">
+      <div class="topbar-left" @click="$router.push('/')" style="cursor: pointer">
         <h3 class="app-title">股票分析系统</h3>
       </div>
 
       <div class="topbar-right" v-if="!isMobile">
-        <el-menu :default-active="$route.path" class="top-menu" mode="horizontal" router :ellipsis="false">
+        <el-menu
+          :default-active="$route.path"
+          class="top-menu"
+          mode="horizontal"
+          router
+          :ellipsis="false"
+        >
           <template v-for="item in menuItems" :key="item.path">
             <template v-if="hasMegaMenu(item.path)">
               <el-popover
@@ -19,7 +25,10 @@
                 :offset="0"
               >
                 <template #reference>
-                  <div class="mega-menu-trigger" :class="{ 'is-active': isMegaMenuActive(item.path) }">
+                  <div
+                    class="mega-menu-trigger"
+                    :class="{ 'is-active': isMegaMenuActive(item.path) }"
+                  >
                     <el-icon>
                       <component :is="item.icon" />
                     </el-icon>
@@ -29,14 +38,18 @@
                 </template>
                 <div class="mega-menu-container">
                   <div class="mega-menu-content" :class="{ 'is-flat': item.path === '/etf' }">
-                    <div v-for="section in getMegaMenuSections(item.path)" :key="section.title || section.items.map(link => link.title).join('-')" class="mega-column">
+                    <div
+                      v-for="section in getMegaMenuSections(item.path)"
+                      :key="section.title || section.items.map((link) => link.title).join('-')"
+                      class="mega-column"
+                    >
                       <div v-if="section.title" class="mega-column-title">{{ section.title }}</div>
                       <ul class="mega-column-list">
                         <li v-for="link in section.items" :key="link.title">
-                          <el-link 
-                            :underline="false" 
-                            :disabled="!link.path" 
-                            @click="goPath(link.path)" 
+                          <el-link
+                            :underline="false"
+                            :disabled="!link.path"
+                            @click="goPath(link.path)"
                             class="mega-link"
                             :class="{ 'is-active': $route.path === link.path }"
                           >
@@ -50,7 +63,11 @@
               </el-popover>
             </template>
 
-            <el-sub-menu v-else-if="item.children && item.children.length" :index="item.path" :key="item.path + ':sub'">
+            <el-sub-menu
+              v-else-if="item.children && item.children.length"
+              :index="item.path"
+              :key="item.path + ':sub'"
+            >
               <template #title>
                 <el-icon>
                   <component :is="item.icon" />
@@ -75,6 +92,13 @@
         </el-menu>
 
         <div class="header-right">
+          <div class="risk-warning topbar-risk-warning">
+            <strong>注意：所有数据仅作参考，不作为任何投资建议，风险自担</strong>
+          </div>
+          <div class="feedback-note">
+            如有建议可发送邮箱
+            <a href="mailto:1125677925@qq.com">1125677925@qq.com</a>
+          </div>
           <div class="visit-counter">
             <el-icon><View /></el-icon>
             <span>访问数</span>
@@ -103,9 +127,6 @@
             </el-breadcrumb-item>
           </el-breadcrumb>
         </div>
-        <div class="risk-warning">
-          <strong>注意：所有数据仅作参考，不作为任何投资建议，风险自担</strong>
-        </div>
       </div>
     </div>
 
@@ -117,9 +138,16 @@
       <div class="mobile-drawer">
         <div class="mobile-drawer-header">
           <h3>导航</h3>
-          <el-button type="text" @click="mobileMenuVisible = false"><el-icon><Fold /></el-icon></el-button>
+          <el-button type="text" @click="mobileMenuVisible = false"
+            ><el-icon><Fold /></el-icon
+          ></el-button>
         </div>
-        <el-menu :default-active="$route.path" router class="mobile-menu" @select="onMobileMenuSelect">
+        <el-menu
+          :default-active="$route.path"
+          router
+          class="mobile-menu"
+          @select="onMobileMenuSelect"
+        >
           <template v-for="item in menuItems" :key="item.path">
             <el-sub-menu v-if="hasMegaMenu(item.path)" :index="item.path">
               <template #title>
@@ -128,13 +156,21 @@
                 </el-icon>
                 <span>{{ item.title }}</span>
               </template>
-              <template v-for="section in getMegaMenuSections(item.path)" :key="section.title || section.items.map(link => link.title).join('-')">
+              <template
+                v-for="section in getMegaMenuSections(item.path)"
+                :key="section.title || section.items.map((link) => link.title).join('-')"
+              >
                 <el-menu-item-group v-if="section.title" :title="section.title">
                   <el-menu-item v-for="link in section.items" :key="link.title" :index="link.path">
                     {{ link.title }}
                   </el-menu-item>
                 </el-menu-item-group>
-                <el-menu-item v-else v-for="link in section.items" :key="link.title" :index="link.path">
+                <el-menu-item
+                  v-else
+                  v-for="link in section.items"
+                  :key="link.title"
+                  :index="link.path"
+                >
                   {{ link.title }}
                 </el-menu-item>
               </template>
@@ -163,7 +199,6 @@
             </el-menu-item>
           </template>
         </el-menu>
-
       </div>
     </el-drawer>
   </el-container>
@@ -173,12 +208,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { recordSiteVisit } from '../services/siteStatsApi'
-import {
-  Fold,
-  Menu,
-  ArrowDown,
-  View,
-} from '@element-plus/icons-vue'
+import { Fold, Menu, ArrowDown, View } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -197,9 +227,9 @@ const isMobile = ref(false)
 const mobileMenuVisible = ref(false)
 const visitCount = ref<number | null>(null)
 
-const formattedVisitCount = computed(() => (
-  visitCount.value === null ? '--' : visitCount.value.toLocaleString('zh-CN')
-))
+const formattedVisitCount = computed(() =>
+  visitCount.value === null ? '--' : visitCount.value.toLocaleString('zh-CN'),
+)
 
 function updateIsMobile() {
   isMobile.value = window.innerWidth <= 768
@@ -288,11 +318,18 @@ function hasMegaMenu(path: string) {
 function isMegaMenuActive(path: string) {
   switch (path) {
     case '/market-overview':
-      return route.path === '/market-overview/index-valuation' || route.path === '/major-index-rps' || route.path === '/market-overview/index-breadth'
+      return (
+        route.path === '/market-overview/index-valuation' ||
+        route.path === '/major-index-rps' ||
+        route.path === '/market-overview/index-breadth'
+      )
     case '/etf':
       return route.matched.some((record) => record.path === '/analysis')
     case '/stock-picker':
-      return route.matched.some((record) => record.path === '/stock-picker') || route.path.startsWith('/stock-picker/')
+      return (
+        route.matched.some((record) => record.path === '/stock-picker') ||
+        route.path.startsWith('/stock-picker/')
+      )
     default:
       return route.path.startsWith(path)
   }
@@ -331,7 +368,7 @@ watch(
     if (isMobile.value && mobileMenuVisible.value) {
       mobileMenuVisible.value = false
     }
-  }
+  },
 )
 </script>
 
@@ -383,6 +420,10 @@ watch(
   white-space: nowrap;
 }
 
+.topbar-risk-warning {
+  font-size: 13px;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -426,14 +467,8 @@ watch(
   padding: 8px 4px;
 }
 
-.mega-menu-content.is-flat .mega-column-list {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-}
-
-.mega-menu-content.is-flat .mega-column-list li + li {
-  margin-top: 0;
+.mega-menu-content.is-flat {
+  min-width: 180px;
 }
 
 .mega-column-title {
@@ -452,6 +487,11 @@ watch(
   margin-top: 8px;
 }
 
+.mega-link {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 .mega-link.is-active {
   color: var(--el-color-primary);
   font-weight: 600;
@@ -460,7 +500,24 @@ watch(
 .header-right {
   display: flex;
   align-items: center;
+  gap: 14px;
   flex-shrink: 0;
+}
+
+.feedback-note {
+  color: #606266;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.feedback-note a {
+  color: var(--el-color-primary);
+  font-weight: 500;
+}
+
+.feedback-note a:hover {
+  color: var(--el-color-primary-light-3);
 }
 
 .visit-counter {
