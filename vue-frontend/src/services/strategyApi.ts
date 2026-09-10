@@ -117,88 +117,6 @@ export interface StockRpsParams {
   token?: string
 }
 
-export interface PotentialStockItem extends StockRpsItem {
-  latest_trade_date: string
-  latest_close: number | null
-  previous_close: number | null
-  prev_high: number | null
-  base_low: number | null
-  breakout_pct: number | null
-  base_depth_pct: number | null
-  volume_ratio_5: number | null
-  volume_ratio_10: number | null
-  ma5: number | null
-  ma10: number | null
-  ma20: number | null
-  ma60: number | null
-  ma20_slope_pct: number | null
-  distance_ma20_pct: number | null
-  is_breakout: boolean
-  volume_confirmed: boolean
-  ma_aligned: boolean
-  base_depth_ok: boolean
-  not_overextended: boolean
-  is_limit_up_like: boolean
-  setup_score: number
-  setup_tags: string[]
-  signal: string
-}
-
-export interface PotentialStockFilters {
-  market: '主板'
-  exchange: 'SSE' | 'SZSE'
-  periods: number[]
-  industry_mapping: IndustryMapping
-  lookback_days: number
-  min_rps_20: number
-  min_rps_60: number
-  min_volume_ratio: number
-  min_breakout_pct: number
-  max_breakout_pct: number
-  max_base_depth_pct: number
-  max_distance_ma20_pct: number
-  max_price: number
-  max_circ_mv: number
-  limit: number
-}
-
-export interface PotentialStocksData {
-  total: number
-  matched_total: number
-  rps_total: number
-  universe_total?: number
-  prefiltered_total: number
-  scanned_total: number
-  data: PotentialStockItem[]
-  filters: PotentialStockFilters
-  periods: number[]
-  trade_date: string
-  exchange: 'SSE' | 'SZSE'
-  history_start_date: string
-  history_end_date: string
-  errors: string[]
-  query_time: string
-}
-
-export interface PotentialStocksParams {
-  periods?: string
-  trade_date?: string
-  exchange?: 'SSE' | 'SZSE'
-  industry_mapping?: IndustryMapping
-  lookback_days?: number
-  min_rps_20?: number
-  min_rps_60?: number
-  min_volume_ratio?: number
-  min_breakout_pct?: number
-  max_breakout_pct?: number
-  max_base_depth_pct?: number
-  max_distance_ma20_pct?: number
-  max_price?: number
-  max_circ_mv?: number
-  limit?: number
-  token?: string
-}
-
 export interface IndexRpsResponse {
   code: number
   message: string
@@ -365,21 +283,6 @@ export async function getStockRps(
     return response.data
   } catch (error) {
     console.error('获取股票RPS排名失败:', error)
-    throw error
-  }
-}
-
-export async function getPotentialStocks(
-  params: PotentialStocksParams = {}
-): Promise<PotentialStocksData> {
-  try {
-    const response = await axios.get<PotentialStocksData>(
-      '/django/api/strategy/potential-stocks/',
-      { params }
-    )
-    return response.data
-  } catch (error) {
-    console.error('获取潜力股票筛选列表失败:', error)
     throw error
   }
 }

@@ -25,18 +25,16 @@
 
           <el-col :xs="24" :md="8" :lg="6">
             <el-form-item label="交易日">
-              <div class="trade-date-switcher">
-                <el-button circle :icon="ArrowLeft" @click="changeTradeDate(-1)" />
-                <el-button class="trade-date-display" @click="resetTradeDateToLatest">
-                  {{ formatCompactDate(filters.tradeDate) }}
-                </el-button>
-                <el-button
-                  circle
-                  :icon="ArrowRight"
-                  :disabled="filters.tradeDate >= latestSelectableTradeDate"
-                  @click="changeTradeDate(1)"
-                />
-              </div>
+              <el-date-picker
+                v-model="filters.tradeDate"
+                type="date"
+                value-format="YYYYMMDD"
+                format="YYYY-MM-DD"
+                placeholder="选择交易日"
+                :clearable="false"
+                :disabled-date="isTradeDateDisabled"
+                class="full-width"
+              />
             </el-form-item>
           </el-col>
 
@@ -97,7 +95,7 @@
 
       <div class="hint-row">
         <el-tag type="danger" effect="plain">默认按首个周期的 RPS 倒序展示</el-tag>
-        <el-tag type="success" effect="plain">交易日支持左右切换，条件变更后自动刷新</el-tag>
+        <el-tag type="success" effect="plain">交易日支持点选，条件变更后自动刷新</el-tag>
         <el-tag type="info" effect="plain">点击股票名称可查看前复权趋势图</el-tag>
         <span class="hint-text">RPS 越高，表示该股票在当前股票池中相对更强。</span>
       </div>
@@ -472,7 +470,7 @@ interface StockRpsFilters {
  */
 
 const defaultPeriods = [5, 20, 60]
-const latestSelectableTradeDate = getRecentTradeDate()
+const latestSelectableTradeDate = getDefaultTradeDate()
 const periodOptions = [5, 10, 20, 60, 120, 250]
 const exchangeOptions = [
   { label: '上交所', value: 'SSE' },
@@ -620,20 +618,52 @@ function formatDateToCompact(date: Date): string {
 }
 
 /**
- * 工具：获取最近一个可选交易日。
- * 参数：无。
+ * 工具：判断日期是否为周末。
+ * 参数：date 为待判断日期。
+ * 返回值：周六或周日返回 true。
+ * 事件：无。
+ */
+function isWeekend(date: Date): boolean {
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
+
+/**
+ * 工具：获取指定日期之前最近一个工作日。
+ * 参数：date 为基准日期。
  * 返回值：按工作日规则回退后的 `YYYYMMDD` 日期字符串。
  * 事件：无。
  */
-function getRecentTradeDate(): string {
+function getPreviousWeekday(date: Date): string {
+  const previousDate = new Date(date)
+  do {
+    previousDate.setDate(previousDate.getDate() - 1)
+  } while (isWeekend(previousDate))
+  return formatDateToCompact(previousDate)
+}
+
+/**
+ * 工具：获取默认交易日。
+ * 参数：无。
+ * 返回值：工作日 16:00 后为当天，否则为前一个工作日。
+ * 事件：无。
+ */
+function getDefaultTradeDate(): string {
   const date = new Date()
-  const day = date.getDay()
-  if (day === 0) {
-    date.setDate(date.getDate() - 2)
-  } else if (day === 6) {
-    date.setDate(date.getDate() - 1)
+  if (!isWeekend(date) && date.getHours() >= 16) {
+    return formatDateToCompact(date)
   }
-  return formatDateToCompact(date)
+  return getPreviousWeekday(date)
+}
+
+/**
+ * 事件：限制交易日选择范围。
+ * 参数：date 为日期选择器候选日期。
+ * 返回值：周末或超过当前可用交易日时返回 true。
+ * 事件：阻止选择不可用日期。
+ */
+function isTradeDateDisabled(date: Date): boolean {
+  return isWeekend(date) || formatDateToCompact(date) > latestSelectableTradeDate
 }
 
 /**
@@ -1065,48 +1095,6 @@ const buildPeriodsParam = (periods: number[]): string => {
 }
 
 /**
- * 工具：按工作日规则移动交易日。
- * 参数：
- *  - currentDate 为当前 `YYYYMMDD` 交易日；
- *  - step 为移动方向，`-1` 表示上一交易日，`1` 表示下一交易日。
- * 返回值：移动后的 `YYYYMMDD` 交易日字符串。
- * 事件：无。
- */
-const shiftTradeDateByStep = (currentDate: string, step: -1 | 1): string => {
-  const year = Number(currentDate.slice(0, 4))
-  const month = Number(currentDate.slice(4, 6)) - 1
-  const day = Number(currentDate.slice(6, 8))
-  const date = new Date(year, month, day)
-
-  do {
-    date.setDate(date.getDate() + step)
-  } while (date.getDay() === 0 || date.getDay() === 6)
-
-  const nextDate = formatDateToCompact(date)
-  return step > 0 && nextDate > latestSelectableTradeDate ? latestSelectableTradeDate : nextDate
-}
-
-/**
- * 事件：按方向切换交易日。
- * 参数：step 为切换方向，`-1` 表示上一交易日，`1` 表示下一交易日。
- * 返回值：void。
- * 事件：更新 `filters.tradeDate`，触发榜单自动刷新。
- */
-const changeTradeDate = (step: -1 | 1): void => {
-  filters.tradeDate = shiftTradeDateByStep(filters.tradeDate, step)
-}
-
-/**
- * 事件：恢复到最近可选交易日。
- * 参数：无。
- * 返回值：void。
- * 事件：更新 `filters.tradeDate`，触发榜单自动刷新。
- */
-const resetTradeDateToLatest = (): void => {
-  filters.tradeDate = latestSelectableTradeDate
-}
-
-/**
  * 工具：格式化趋势弹窗的日期范围。
  * 参数：range 为快捷区间值。
  * 返回值：无。
@@ -1413,18 +1401,6 @@ watch(
 
 .full-width {
   width: 100%;
-}
-
-.trade-date-switcher {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.trade-date-display {
-  flex: 1;
-  min-width: 0;
 }
 
 .hint-row {

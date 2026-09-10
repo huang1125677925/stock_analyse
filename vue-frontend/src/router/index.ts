@@ -104,12 +104,6 @@ const router = createRouter({
           meta: { title: '涨停分析选股' }
         },
         {
-          path: '/stock-picker/potential-stocks',
-          name: 'stock-potential-stocks',
-          component: () => import('@/views/indival_stock_data/PotentialStockPickerView.vue'),
-          meta: { title: '潜力股票筛选' }
-        },
-        {
           path: '/stock-picker/swing-practice',
           name: 'stock-swing-practice',
           component: () => import('@/views/indival_stock_data/StockSwingPracticeView.vue'),
@@ -120,10 +114,6 @@ const router = createRouter({
     {
       path: '/stock-limit-board-analysis',
       redirect: '/stock-picker/limit-board-analysis'
-    },
-    {
-      path: '/stock-potential-stocks',
-      redirect: '/stock-picker/potential-stocks'
     },
     {
       path: '/stock-swing-practice',
