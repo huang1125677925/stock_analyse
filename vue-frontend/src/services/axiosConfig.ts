@@ -9,7 +9,7 @@ const instance = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true, // 允许跨域请求携带cookie，解决CSRF问题
+  withCredentials: false, // 后端接口已无鉴权，本地调试不携带 cookie
   xsrfCookieName: 'csrftoken', // Django默认的CSRF cookie名称
   xsrfHeaderName: 'X-CSRFToken' // Django默认的CSRF header名称
 });
@@ -17,15 +17,6 @@ const instance = axios.create({
 // 请求拦截器
 instance.interceptors.request.use(
   config => {
-    // 获取CSRF token并添加到请求头
-    const csrfToken = document.cookie.match(new RegExp('(^| )csrftoken=([^;]+)'));
-    if (csrfToken) {
-      config.headers['X-CSRFToken'] = csrfToken[2];
-      console.log('CSRF Token added:', csrfToken[2]);
-    } else {
-      console.warn('CSRF Token not found in cookies');
-    }
-    
     return config;
   },
   error => {

@@ -4,12 +4,14 @@
       <template #header>
         <div class="card-header">
           <div class="header-copy">
-            <span class="header-title">申万行业估值分析</span>
-            <span class="header-subtitle">一屏查看估值分层、行业差异和当前更适合的跟踪方向</span>
+            <span class="header-title">申万行业估值柱状图</span>
           </div>
           <div class="toolbar">
-            <IndustryFilter v-model="selectedIndustries" />
-            <el-select v-model="query.level" placeholder="选择分级" class="level-select">
+            <el-button-group class="metric-buttons">
+              <el-button :type="selectedValuationMetric === 'pe' ? 'primary' : 'default'" @click="setValuationMetric('pe')">PE</el-button>
+              <el-button :type="selectedValuationMetric === 'pb' ? 'primary' : 'default'" @click="setValuationMetric('pb')">PB</el-button>
+            </el-button-group>
+            <el-select v-model="query.level" placeholder="行业级别" class="level-select" @change="fetchData">
               <el-option label="一级行业" value="L1" />
               <el-option label="二级行业" value="L2" />
             </el-select>
@@ -19,147 +21,27 @@
               <el-button :type="selectedRangeYears === 5 ? 'primary' : 'default'" @click="setYearRange(5)">最近五年</el-button>
               <el-button :type="selectedRangeYears === 10 ? 'primary' : 'default'" @click="setYearRange(10)">最近10年</el-button>
             </el-button-group>
-            <el-button type="primary" :loading="loading" @click="fetchData">查询</el-button>
           </div>
         </div>
       </template>
 
       <div class="content-area" v-loading="loading">
-        <div class="summary-grid">
-          <section class="summary-card emphasis">
-            <div class="summary-label">当前样本</div>
-            <div class="summary-value">{{ filteredBoardItems.length }}</div>
-            <div class="summary-meta">
-              {{ levelLabel }} · {{ rangeLabel }}
-              <span v-if="latestTradeDate"> · {{ latestTradeDate }}</span>
-            </div>
-          </section>
-
-          <section class="summary-card positive">
-            <div class="summary-label">偏低估</div>
-            <div class="summary-value">{{ valuationSummary.low }}</div>
-            <div class="summary-meta">优先看分位数低于 20 的行业</div>
-          </section>
-
-          <section class="summary-card neutral">
-            <div class="summary-label">中性区间</div>
-            <div class="summary-value">{{ valuationSummary.neutral }}</div>
-            <div class="summary-meta">等待景气催化或估值进一步拉开</div>
-          </section>
-
-          <section class="summary-card negative">
-            <div class="summary-label">偏高估</div>
-            <div class="summary-value">{{ valuationSummary.high }}</div>
-            <div class="summary-meta">优先控制节奏，避免追高</div>
-          </section>
-        </div>
-
-        <div v-if="filteredBoardItems.length" class="board-layout">
-          <aside class="insight-panel">
-            <section class="insight-card">
-              <div class="insight-title">方向指引</div>
-              <div class="signal-list">
-                <div class="signal-row">
-                  <span class="signal-label">低估优先</span>
-                  <span class="signal-text">分位数越低，越适合纳入观察和分批布局清单。</span>
-                </div>
-                <div class="signal-row">
-                  <span class="signal-label">中性等待</span>
-                  <span class="signal-text">估值不贵也不便宜，重点看景气、盈利和资金催化。</span>
-                </div>
-                <div class="signal-row">
-                  <span class="signal-label">高估谨慎</span>
-                  <span class="signal-text">分位数靠上时先看兑现风险，避免只凭情绪加仓。</span>
-                </div>
-              </div>
-            </section>
-
-            <section class="insight-card">
-              <div class="insight-title">优先观察</div>
-              <div class="rank-list">
-                <div v-for="item in lowestItems" :key="item.ts_code" class="rank-row">
-                  <div>
-                    <div class="rank-name">{{ item.name }}</div>
-                    <div class="rank-code">{{ item.ts_code }}</div>
-                  </div>
-                  <div class="rank-value positive-text">{{ item.avgPercentileText }}</div>
-                </div>
-              </div>
-            </section>
-
-            <section class="insight-card">
-              <div class="insight-title">风险较高</div>
-              <div class="rank-list">
-                <div v-for="item in highestItems" :key="item.ts_code" class="rank-row">
-                  <div>
-                    <div class="rank-name">{{ item.name }}</div>
-                    <div class="rank-code">{{ item.ts_code }}</div>
-                  </div>
-                  <div class="rank-value negative-text">{{ item.avgPercentileText }}</div>
-                </div>
-              </div>
-            </section>
-          </aside>
-
-          <section class="board-panel">
-            <div class="board-header">
-              <div class="board-title">行业估值看板</div>
-              <div class="board-legend">
-                <span class="legend-item"><i class="legend-dot low"></i>偏低估</span>
-                <span class="legend-item"><i class="legend-dot neutral"></i>中性</span>
-                <span class="legend-item"><i class="legend-dot high"></i>偏高估</span>
+        <div v-if="filteredBoardItems.length" class="chart-grid">
+          <section class="chart-panel">
+            <div class="chart-heading">
+              <div class="chart-title">{{ selectedMetricLabel }}</div>
+              <div class="color-note">
+                颜色按{{ selectedMetricLabel }}历史分位判断，不按绝对值：
+                <span class="note-item"><i class="note-dot low"></i>低估 <= 20%</span>
+                <span class="note-item"><i class="note-dot neutral"></i>中性 20%-70%</span>
+                <span class="note-item"><i class="note-dot high"></i>高估 >= 70%</span>
               </div>
             </div>
-
-            <div class="board-list">
-              <article
-                v-for="item in filteredBoardItems"
-                :key="item.ts_code"
-                class="board-row"
-                :class="item.toneClass"
-                @click="openIndustryDialog(item)"
-              >
-                <div class="industry-main">
-                  <div class="industry-title-row">
-                    <div class="industry-name">{{ item.name }}</div>
-                    <el-tag size="small" :type="item.tagType" effect="dark">{{ item.direction }}</el-tag>
-                  </div>
-                  <div class="industry-subline">
-                    <span>{{ item.ts_code }}</span>
-                    <span>均值分位 {{ item.avgPercentileText }}</span>
-                    <span>{{ item.actionText }}</span>
-                  </div>
-                </div>
-
-                <div class="metric-block">
-                  <div class="metric-top">
-                    <span class="metric-label">PE</span>
-                    <span class="metric-value">{{ formatNumber(item.pe) }}</span>
-                    <span class="metric-percent">{{ item.pePercentileText }}</span>
-                  </div>
-                  <el-progress
-                    :percentage="item.pePercentileBar"
-                    :show-text="false"
-                    :stroke-width="8"
-                    :color="item.peBarColor"
-                  />
-                </div>
-
-                <div class="metric-block">
-                  <div class="metric-top">
-                    <span class="metric-label">PB</span>
-                    <span class="metric-value">{{ formatNumber(item.pb) }}</span>
-                    <span class="metric-percent">{{ item.pbPercentileText }}</span>
-                  </div>
-                  <el-progress
-                    :percentage="item.pbPercentileBar"
-                    :show-text="false"
-                    :stroke-width="8"
-                    :color="item.pbBarColor"
-                  />
-                </div>
-              </article>
-            </div>
+            <div ref="valueChartRef" class="bar-chart"></div>
+          </section>
+          <section class="chart-panel">
+            <div class="chart-title">{{ selectedMetricPercentileLabel }}</div>
+            <div ref="percentileChartRef" class="bar-chart"></div>
           </section>
         </div>
 
@@ -277,13 +159,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import * as echarts from 'echarts'
 import { getSwValuationAnalysis, type SwValuationAnalysisItem } from '@/services/industryApi'
 import { fetchSwIndexClassify, type SwIndexClassifyItem } from '@/services/swIndexClassifyApi'
 import SwIndustryTrendChart from './components/SwIndustryTrendChart.vue'
 import SwIndustryMembersTab from './components/SwIndustryMembersTab.vue'
-import IndustryFilter from '@/components/IndustryFilter.vue'
 
 type DirectionType = 'success' | 'warning' | 'danger'
 
@@ -310,10 +192,26 @@ interface DialogChildRow extends SwIndexClassifyItem {
   trade_date?: string
 }
 
+type ChartMetricKey = 'pe' | 'pb' | 'pe_percentile' | 'pb_percentile'
+type ChartSlotKey = 'value' | 'percentile'
+type ValuationMetric = 'pe' | 'pb'
+
+interface ValuationChartConfig {
+  id: ChartSlotKey
+  key: ChartMetricKey
+  label: string
+  ref: Ref<HTMLElement | null>
+  isPercentile?: boolean
+}
+
 const loading = ref(false)
 const tableData = ref<SwValuationAnalysisItem[]>([])
-const selectedRangeYears = ref(10)
-const selectedIndustries = ref<string[]>([])
+const selectedRangeYears = ref(3)
+const selectedValuationMetric = ref<ValuationMetric>('pe')
+
+const valueChartRef = ref<HTMLElement | null>(null)
+const percentileChartRef = ref<HTMLElement | null>(null)
+const chartInstances = new Map<ChartSlotKey, echarts.ECharts>()
 
 const industryDialogVisible = ref(false)
 const industryDialogLoading = ref(false)
@@ -326,9 +224,25 @@ const query = reactive({
   level: 'L1'
 })
 
+const selectedMetricLabel = computed(() => selectedValuationMetric.value.toUpperCase())
+const selectedMetricPercentileLabel = computed(() => `${selectedMetricLabel.value}分位数`)
+const selectedMetricKey = computed<ChartMetricKey>(() => selectedValuationMetric.value)
+const selectedPercentileKey = computed<ChartMetricKey>(() => `${selectedValuationMetric.value}_percentile` as ChartMetricKey)
+
+const chartConfigs = computed<ValuationChartConfig[]>(() => [
+  { id: 'value', key: selectedMetricKey.value, label: selectedMetricLabel.value, ref: valueChartRef },
+  {
+    id: 'percentile',
+    key: selectedPercentileKey.value,
+    label: selectedMetricPercentileLabel.value,
+    ref: percentileChartRef,
+    isPercentile: true
+  }
+])
+
 const endDate = new Date()
 const startDate = new Date()
-startDate.setFullYear(startDate.getFullYear() - 10)
+startDate.setFullYear(startDate.getFullYear() - 3)
 
 const formatDate = (date: Date) => {
   const year = date.getFullYear()
@@ -341,19 +255,6 @@ const dateRange = ref<[string, string]>([
   formatDate(startDate),
   formatDate(endDate)
 ])
-
-const levelLabel = computed(() => {
-  if (query.level === 'L1') return '一级行业'
-  if (query.level === 'L2') return '二级行业'
-  return '三级行业'
-})
-
-const rangeLabel = computed(() => `最近${selectedRangeYears.value}年`)
-
-const latestTradeDate = computed(() => {
-  const dates = tableData.value.map(item => item.trade_date).filter(Boolean).sort()
-  return dates.length ? dates[dates.length - 1] : ''
-})
 
 const formatNumber = (num?: number | null) => {
   if (num === undefined || num === null || Number.isNaN(Number(num))) return '--'
@@ -438,27 +339,9 @@ const boardItems = computed<BoardItem[]>(() => {
     .sort((a, b) => a.avgPercentile - b.avgPercentile)
 })
 
-/**
- * 过滤后的行业看板：当selectedIndustries为空时显示全部，否则只显示选中的行业
- */
 const filteredBoardItems = computed<BoardItem[]>(() => {
-  if (!selectedIndustries.value.length) return boardItems.value
-  const selectedSet = new Set(selectedIndustries.value)
-  return boardItems.value.filter(item => selectedSet.has(item.name))
+  return boardItems.value
 })
-
-const valuationSummary = computed(() => {
-  const summary = { low: 0, neutral: 0, high: 0 }
-  for (const item of filteredBoardItems.value) {
-    if (item.avgPercentile <= 20) summary.low += 1
-    else if (item.avgPercentile < 70) summary.neutral += 1
-    else summary.high += 1
-  }
-  return summary
-})
-
-const lowestItems = computed(() => filteredBoardItems.value.slice(0, 3))
-const highestItems = computed(() => [...filteredBoardItems.value].reverse().slice(0, 3))
 
 const dialogChildTableData = computed<DialogChildRow[]>(() => {
   return dialogChildren.value.map(item => {
@@ -480,6 +363,173 @@ const setYearRange = (years: number) => {
   start.setFullYear(start.getFullYear() - years)
   dateRange.value = [formatDate(start), formatDate(end)]
   selectedRangeYears.value = years
+  void fetchData()
+}
+
+const setValuationMetric = (metric: ValuationMetric) => {
+  selectedValuationMetric.value = metric
+}
+
+const getChartValue = (item: BoardItem, key: ChartMetricKey) => {
+  const value = Number(item[key])
+  return Number.isFinite(value) ? value : null
+}
+
+const getChartBarColor = (item: BoardItem, key: ChartMetricKey) => {
+  const percentile = key === 'pb' || key === 'pb_percentile' ? item.pb_percentile : item.pe_percentile
+  return getToneMeta(normalizePercentile(percentile)).color
+}
+
+const formatChartValue = (value: number, isPercentile?: boolean) => {
+  return isPercentile ? Number(value).toFixed(1) : formatNumber(value)
+}
+
+const getSortedChartItems = (key: ChartMetricKey) => {
+  return filteredBoardItems.value
+    .map(item => ({ item, value: getChartValue(item, key) }))
+    .filter((entry): entry is { item: BoardItem; value: number } => entry.value !== null)
+    .sort((a, b) => a.value - b.value)
+}
+
+const buildChartOption = (config: ValuationChartConfig): echarts.EChartsOption => {
+  const sortedItems = getSortedChartItems(config.key)
+  const names = sortedItems.map(({ item }) => item.name)
+  const data = sortedItems.map(({ item, value }) => ({
+    value,
+    item,
+    itemStyle: {
+      color: getChartBarColor(item, config.key),
+      borderRadius: [4, 4, 0, 0]
+    }
+  }))
+
+  return {
+    animationDuration: 240,
+    grid: {
+      top: 18,
+      right: 24,
+      bottom: 76,
+      left: 54,
+      containLabel: true
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      confine: true,
+      formatter(params) {
+        const row = Array.isArray(params) ? params[0] : params
+        const chartData = row?.data as { value: number; item: BoardItem } | undefined
+        if (!chartData?.item) return ''
+        const suffix = config.isPercentile ? '%' : ''
+        return [
+          `${chartData.item.name} ${chartData.item.ts_code}`,
+          `${config.label}: ${formatChartValue(chartData.value, config.isPercentile)}${suffix}`,
+          `估值状态: ${chartData.item.direction}`
+        ].join('<br/>')
+      }
+    },
+    xAxis: {
+      type: 'category',
+      data: names,
+      axisTick: { alignWithLabel: true },
+      axisLine: { lineStyle: { color: '#d8dee8' } },
+      axisLabel: {
+        color: '#334155',
+        fontSize: 12,
+        interval: 0,
+        rotate: 45,
+        width: 68,
+        overflow: 'truncate'
+      }
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: config.isPercentile ? 100 : undefined,
+      axisLabel: {
+        color: '#6b7280',
+        formatter: config.isPercentile ? '{value}%' : '{value}'
+      },
+      splitLine: {
+        lineStyle: { color: '#eef2f7' }
+      }
+    },
+    dataZoom: [
+      {
+        type: 'inside',
+        xAxisIndex: 0,
+        filterMode: 'none',
+        zoomLock: false
+      },
+      {
+        type: 'slider',
+        xAxisIndex: 0,
+        height: 18,
+        bottom: 8,
+        brushSelect: false,
+        filterMode: 'none'
+      }
+    ],
+    series: [
+      {
+        name: config.label,
+        type: 'bar',
+        barMaxWidth: 28,
+        data,
+        cursor: 'pointer',
+        emphasis: {
+          focus: 'self',
+          itemStyle: {
+            shadowBlur: 12,
+            shadowColor: 'rgba(15, 23, 42, 0.22)'
+          }
+        },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#475569',
+          fontSize: 11,
+          formatter: ({ value }) => `${formatChartValue(Number(value), config.isPercentile)}${config.isPercentile ? '%' : ''}`
+        }
+      }
+    ]
+  }
+}
+
+const renderCharts = async () => {
+  await nextTick()
+  for (const config of chartConfigs.value) {
+    const el = config.ref.value
+    if (!el) continue
+
+    let instance = chartInstances.get(config.id)
+    if (instance && instance.getDom() !== el) {
+      instance.dispose()
+      chartInstances.delete(config.id)
+      instance = undefined
+    }
+    if (!instance) {
+      instance = echarts.init(el)
+      instance.on('click', (params) => {
+        const chartData = params.data as { item?: BoardItem } | undefined
+        if (chartData?.item) {
+          void openIndustryDialog(chartData.item)
+        }
+      })
+      chartInstances.set(config.id, instance)
+    }
+    instance.setOption(buildChartOption(config), true)
+    instance.resize()
+  }
+}
+
+const resizeCharts = () => {
+  chartInstances.forEach(chart => chart.resize())
+}
+
+const disposeCharts = () => {
+  chartInstances.forEach(chart => chart.dispose())
+  chartInstances.clear()
 }
 
 const fetchData = async () => {
@@ -620,6 +670,17 @@ const handleParentClick = async () => {
 
 onMounted(() => {
   fetchData()
+  window.addEventListener('resize', resizeCharts)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeCharts)
+  disposeCharts()
+})
+
+watch([filteredBoardItems, selectedValuationMetric], () => {
+  if (filteredBoardItems.value.length) void renderCharts()
+  else disposeCharts()
 })
 </script>
 
@@ -675,306 +736,87 @@ onMounted(() => {
   width: 140px;
 }
 
+.metric-buttons,
 .range-buttons {
   flex-wrap: nowrap;
 }
 
 .content-area {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.summary-card {
-  min-height: 96px;
-  padding: 14px 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.summary-card.emphasis {
-  background: linear-gradient(135deg, #f8fafc, #eef4ff);
-}
-
-.summary-card.positive {
-  background: linear-gradient(135deg, #f6fcf8, #ebf8ef);
-}
-
-.summary-card.neutral {
-  background: linear-gradient(135deg, #fffaf1, #fff4db);
-}
-
-.summary-card.negative {
-  background: linear-gradient(135deg, #fff7f6, #fdeceb);
-}
-
-.summary-label {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 8px;
-}
-
-.summary-value {
-  font-size: 28px;
-  line-height: 1;
-  font-weight: 700;
-  color: #111827;
-}
-
-.summary-meta {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #6b7280;
-  line-height: 1.5;
-}
-
-.board-layout {
-  min-height: 0;
-  flex: 1;
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 14px;
-}
-
-.insight-panel,
-.board-panel {
-  min-height: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.insight-panel {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   overflow: auto;
 }
 
-.insight-card {
-  border: 1px solid #eef0f4;
-  border-radius: 8px;
-  padding: 12px;
-  background: #fafbfd;
+.chart-grid {
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 14px;
 }
 
-.insight-title,
-.board-title {
+.chart-panel {
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.chart-title {
   font-size: 14px;
   font-weight: 700;
   color: #1f2937;
 }
 
-.signal-list,
-.rank-list {
-  margin-top: 10px;
+.chart-heading {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.color-note {
+  display: flex;
+  align-items: center;
   gap: 10px;
-}
-
-.rank-list {
-  max-height: 180px;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.signal-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.signal-label {
+  flex-wrap: wrap;
   font-size: 12px;
-  font-weight: 700;
-  color: #374151;
-}
-
-.signal-text,
-.rank-code {
-  font-size: 12px;
-  color: #6b7280;
+  color: #64748b;
   line-height: 1.5;
 }
 
-.rank-row {
-  display: flex;
+.note-item {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.rank-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.rank-value {
-  font-size: 13px;
-  font-weight: 700;
+  gap: 4px;
   white-space: nowrap;
 }
 
-.positive-text {
-  color: #26734d;
-}
-
-.negative-text {
-  color: #b9382f;
-}
-
-.board-panel {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-}
-
-.board-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.board-legend {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.legend-dot {
+.note-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   display: inline-block;
 }
 
-.legend-dot.low {
+.note-dot.low {
   background: #3f9b63;
 }
 
-.legend-dot.neutral {
+.note-dot.neutral {
   background: #b88228;
 }
 
-.legend-dot.high {
+.note-dot.high {
   background: #c84f44;
 }
 
-.board-list {
-  min-height: 0;
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-right: 4px;
-}
-
-.board-row {
-  display: grid;
-  grid-template-columns: minmax(240px, 1.4fr) minmax(180px, 1fr) minmax(180px, 1fr);
-  gap: 14px;
-  align-items: center;
-  border: 1px solid #edf0f5;
-  border-radius: 8px;
-  padding: 12px 14px;
-  background: #fff;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.board-row:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  border-color: #d6dde8;
-}
-
-.board-row.tone-low {
-  background: linear-gradient(90deg, rgba(63, 155, 99, 0.08), rgba(255, 255, 255, 0));
-}
-
-.board-row.tone-neutral {
-  background: linear-gradient(90deg, rgba(184, 130, 40, 0.08), rgba(255, 255, 255, 0));
-}
-
-.board-row.tone-high {
-  background: linear-gradient(90deg, rgba(200, 79, 68, 0.08), rgba(255, 255, 255, 0));
-}
-
-.industry-main {
-  min-width: 0;
-}
-
-.industry-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.industry-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.industry-subline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.metric-block {
-  min-width: 0;
-}
-
-.metric-top {
-  display: grid;
-  grid-template-columns: 26px 1fr auto;
-  gap: 8px;
-  align-items: baseline;
-  margin-bottom: 6px;
-}
-
-.metric-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #374151;
-}
-
-.metric-value {
-  font-size: 13px;
-  color: #111827;
-}
-
-.metric-percent {
-  font-size: 12px;
-  font-weight: 700;
-  color: #4b5563;
+.bar-chart {
+  width: 100%;
+  height: 360px;
 }
 
 .empty-state {
@@ -1045,15 +887,7 @@ onMounted(() => {
     height: auto;
   }
 
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .board-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .board-row {
+  .chart-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1070,18 +904,22 @@ onMounted(() => {
     flex-direction: column;
   }
 
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-
   .range-buttons {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .board-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .metric-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bar-chart {
+    height: 360px;
   }
 
   :deep(.industry-drill-dialog) {
