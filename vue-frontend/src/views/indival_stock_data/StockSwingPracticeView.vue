@@ -1,105 +1,74 @@
 <template>
-  <div class="stock-swing-practice-view" v-loading="loading" element-loading-text="正在加载股票RPS数据...">
-    <el-card shadow="hover" class="filter-card">
-      <template #header>
-        <div class="card-header">
-          <div>
-            <h2>波段趋势选股</h2>
-            <p>基于全市场股票 RPS 接口展示强势股榜单，支持按交易所、市场板块与周期筛选。</p>
-          </div>
+  <div
+    class="stock-swing-practice-view"
+    v-loading="loading"
+    element-loading-text="正在加载股票RPS数据..."
+  >
+    <section class="filter-panel" aria-label="股票RPS筛选条件">
+      <el-form :model="filters" class="compact-filter-form">
+        <div class="compact-filter-row">
+          <el-form-item label="搜索">
+            <el-input
+              v-model="filters.searchKeyword"
+              clearable
+              :prefix-icon="Search"
+              placeholder="搜索股票名称、代码或行业"
+            />
+          </el-form-item>
+          <el-form-item label="交易日">
+            <el-date-picker
+              v-model="filters.tradeDate"
+              type="date"
+              value-format="YYYYMMDD"
+              format="YYYY-MM-DD"
+              placeholder="选择交易日"
+              :clearable="false"
+              :disabled-date="isTradeDateDisabled"
+              class="full-width"
+            />
+          </el-form-item>
+          <el-form-item label="交易所">
+            <el-select
+              v-model="filters.exchange"
+              clearable
+              placeholder="全部交易所"
+              class="full-width"
+            >
+              <el-option
+                v-for="item in exchangeOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="市场板块">
+            <el-select v-model="filters.market" placeholder="请选择市场板块" class="full-width">
+              <el-option
+                v-for="item in marketOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="行业映射">
+            <el-select
+              v-model="filters.industryMapping"
+              placeholder="请选择行业映射"
+              class="full-width"
+            >
+              <el-option
+                v-for="item in industryMappingOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
         </div>
-      </template>
-
-      <el-form :model="filters" label-width="96px">
-        <el-row :gutter="16">
-          <el-col :xs="24" :md="8" :lg="6">
-            <el-form-item label="搜索">
-              <el-input
-                v-model="filters.searchKeyword"
-                clearable
-                :prefix-icon="Search"
-                placeholder="搜索股票名称、代码或行业"
-              />
-            </el-form-item>
-          </el-col>
-
-          <el-col :xs="24" :md="8" :lg="6">
-            <el-form-item label="交易日">
-              <el-date-picker
-                v-model="filters.tradeDate"
-                type="date"
-                value-format="YYYYMMDD"
-                format="YYYY-MM-DD"
-                placeholder="选择交易日"
-                :clearable="false"
-                :disabled-date="isTradeDateDisabled"
-                class="full-width"
-              />
-            </el-form-item>
-          </el-col>
-
-          <el-col :xs="24" :md="8" :lg="6">
-            <el-form-item label="交易所">
-              <el-select v-model="filters.exchange" clearable placeholder="全部交易所" class="full-width">
-                <el-option
-                  v-for="item in exchangeOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-
-          <el-col :xs="24" :md="8" :lg="6">
-            <el-form-item label="市场板块">
-              <el-select v-model="filters.market" placeholder="请选择市场板块" class="full-width">
-                <el-option
-                  v-for="item in marketOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-
-          <el-col :xs="24" :md="8" :lg="6">
-            <el-form-item label="行业映射">
-              <el-select v-model="filters.industryMapping" placeholder="请选择行业映射" class="full-width">
-                <el-option
-                  v-for="item in industryMappingOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-
-          <el-col :xs="24">
-            <el-form-item label="RPS 周期">
-              <el-checkbox-group v-model="filters.periods">
-                <el-checkbox
-                  v-for="period in periodOptions"
-                  :key="period"
-                  :label="period"
-                >
-                  {{ period }}日
-                </el-checkbox>
-              </el-checkbox-group>
-            </el-form-item>
-          </el-col>
-        </el-row>
       </el-form>
-
-      <div class="hint-row">
-        <el-tag type="danger" effect="plain">默认按首个周期的 RPS 倒序展示</el-tag>
-        <el-tag type="success" effect="plain">交易日支持点选，条件变更后自动刷新</el-tag>
-        <el-tag type="info" effect="plain">点击股票名称可查看前复权趋势图</el-tag>
-        <span class="hint-text">RPS 越高，表示该股票在当前股票池中相对更强。</span>
-      </div>
-    </el-card>
+    </section>
 
     <el-alert
       v-if="warningMessages.length"
@@ -114,141 +83,125 @@
       </div>
     </el-alert>
 
-    <div class="summary-grid">
-      <div class="summary-item">
-        <span class="summary-label">返回记录数</span>
-        <strong class="summary-value">{{ stockRpsData?.total ?? 0 }}</strong>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">筛选后记录数</span>
-        <strong class="summary-value">{{ filteredRows.length }}</strong>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">实际交易日</span>
-        <strong class="summary-value">{{ formatCompactDate(stockRpsData?.trade_date) }}</strong>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">实际周期</span>
-        <strong class="summary-value">{{ currentPeriodsText }}</strong>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">交易所</span>
-        <strong class="summary-value">{{ stockRpsData?.exchange || '全市场' }}</strong>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">更新时间</span>
-        <strong class="summary-value summary-time">{{ formatDateTime(stockRpsData?.query_time) }}</strong>
-      </div>
-    </div>
-
-    <el-card shadow="hover" class="table-card">
-      <template #header>
+    <section class="ranking-panel" aria-label="全市场股票RPS榜单">
+      <div class="ranking-panel-header">
         <div class="table-header">
-          <div>
+          <div class="table-title-row">
             <div class="table-title">全市场股票 RPS 榜单</div>
-            <p class="table-desc">支持查看当日强弱、各周期区间涨跌幅以及对应 RPS 强度。</p>
+            <el-popover placement="bottom-start" trigger="click" width="420">
+              <template #reference>
+                <el-button
+                  class="info-button"
+                  circle
+                  size="small"
+                  :icon="InfoFilled"
+                  aria-label="查看RPS说明"
+                />
+              </template>
+              <div class="info-popover">
+                <p>RPS（Relative Price Strength）用于衡量股票在同一股票池中的相对强弱。</p>
+                <p>系统基于目标交易日横向计算当日涨跌幅和 5 / 20 / 60 日收益率，并生成对应排名。</p>
+                <p>
+                  计算公式：RPS = (1 - rank / total) *
+                  100。数值越高，说明该股票在当前筛选范围内越强。
+                </p>
+                <p>条件变更后自动刷新；点击股票名称可查看前复权趋势图。</p>
+              </div>
+            </el-popover>
           </div>
           <div class="table-summary">
-            <el-tag type="info" effect="plain">共 {{ filteredRows.length }} 条</el-tag>
-            <el-tag v-if="stockRpsData?.market" type="success" effect="light">{{ stockRpsData.market }}</el-tag>
+            <el-tag type="info" effect="plain">返回 {{ stockRpsData?.total ?? 0 }}</el-tag>
+            <el-tag type="primary" effect="light">筛选 {{ filteredRows.length }}</el-tag>
+            <el-tag effect="plain">{{ formatCompactDate(stockRpsData?.trade_date) }}</el-tag>
+            <el-tag effect="plain">{{ currentPeriodsText }}</el-tag>
+            <el-tag effect="plain">{{ stockRpsData?.exchange || '全市场' }}</el-tag>
+            <el-tag v-if="stockRpsData?.market" type="success" effect="light">{{
+              stockRpsData.market
+            }}</el-tag>
+            <el-tag effect="plain">{{ formatDateTime(stockRpsData?.query_time) }}</el-tag>
           </div>
         </div>
-        <div class="rps-filter-panel">
+        <div class="table-filter-toolbar">
           <div
             v-for="filterGroup in rpsFilterGroups"
             :key="filterGroup.field"
-            class="rps-filter-group"
+            class="toolbar-filter"
           >
-            <span class="rps-filter-label">{{ filterGroup.label }}</span>
-            <div class="rps-filter-tags">
-              <el-check-tag
+            <el-select
+              v-model="selectedRpsRanks[filterGroup.field]"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              clearable
+              :placeholder="filterGroup.label"
+            >
+              <el-option
                 v-for="tag in rpsRankOptions"
                 :key="`${filterGroup.field}-${tag}`"
-                :checked="(selectedRpsRanks[filterGroup.field] || []).includes(tag)"
-                @change="toggleRpsRank(filterGroup.field, tag)"
-              >
-                {{ tag }}
-              </el-check-tag>
-            </div>
+                :label="tag"
+                :value="tag"
+              />
+            </el-select>
           </div>
-          <el-button
-            v-if="hasActiveRpsFilter"
-            link
-            type="primary"
-            class="rps-filter-reset"
-            @click="resetRpsFilters"
-          >
-            清空强度筛选
-          </el-button>
-        </div>
-        <div class="rps-filter-panel">
           <div
             v-for="filterGroup in changeFilterGroups"
             :key="filterGroup.field"
-            class="rps-filter-group"
+            class="toolbar-filter"
           >
-            <span class="rps-filter-label">{{ filterGroup.label }}</span>
-            <div class="rps-filter-tags">
-              <el-check-tag
+            <el-select
+              v-model="selectedChangeDirections[filterGroup.field]"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              clearable
+              :placeholder="filterGroup.label"
+            >
+              <el-option
                 v-for="tag in changeDirectionOptions"
                 :key="`${filterGroup.field}-${tag}`"
-                :checked="(selectedChangeDirections[filterGroup.field] || []).includes(tag)"
-                @change="toggleChangeDirection(filterGroup.field, tag)"
-              >
-                {{ tag }}
-              </el-check-tag>
-            </div>
+                :label="tag"
+                :value="tag"
+              />
+            </el-select>
           </div>
-          <el-button
-            v-if="hasActiveChangeFilter"
-            link
-            type="primary"
-            class="rps-filter-reset"
-            @click="resetChangeFilters"
-          >
-            清空涨跌幅筛选
-          </el-button>
-        </div>
-        <div class="rps-filter-panel">
           <div
             v-for="filterGroup in valueFilterGroups"
             :key="filterGroup.field"
-            class="rps-filter-group"
+            class="toolbar-filter"
           >
-            <span class="rps-filter-label">{{ filterGroup.label }}</span>
-            <div class="rps-filter-tags">
-              <el-check-tag
+            <el-select
+              v-model="selectedValueRanges[filterGroup.field]"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              clearable
+              :placeholder="filterGroup.label"
+            >
+              <el-option
                 v-for="option in filterGroup.options"
                 :key="`${filterGroup.field}-${option.label}`"
-                :checked="(selectedValueRanges[filterGroup.field] || []).includes(option.label)"
-                @change="toggleValueRange(filterGroup.field, option.label)"
-              >
-                {{ option.label }}
-              </el-check-tag>
-            </div>
+                :label="option.label"
+                :value="option.label"
+              />
+            </el-select>
           </div>
           <el-button
-            v-if="hasActiveValueFilter"
+            v-if="hasAnyTableFilter"
             link
             type="primary"
-            class="rps-filter-reset"
-            @click="resetValueFilters"
+            class="toolbar-filter-reset"
+            @click="resetAllTableFilters"
           >
-            清空股价市值筛选
+            清空筛选
           </el-button>
         </div>
-      </template>
-
-      <div class="methodology">
-        <p>RPS（Relative Price Strength）用于衡量股票在同一股票池中的相对强弱。系统会基于目标交易日横向计算当日涨跌幅和多个回看周期收益率，并生成对应排名。</p>
-        <p>计算公式：`RPS = (1 - rank / total) * 100`。数值越高，说明该股票在当前筛选范围内越强。</p>
       </div>
 
       <el-table
+        class="ranking-table"
         :data="filteredRows"
         stripe
-        border
-        :height="isMobile ? undefined : 640"
+        :height="isMobile ? undefined : 'calc(100dvh - 300px)'"
         :max-height="isMobile ? 560 : undefined"
         style="width: 100%"
         empty-text="暂无股票RPS数据"
@@ -257,18 +210,41 @@
         :row-class-name="tableRowClassName"
         @sort-change="handleSortChange"
       >
-        <el-table-column type="index" label="#" :width="isMobile ? 34 : 56" :fixed="isMobile ? false : 'left'" align="center" />
+        <el-table-column
+          type="index"
+          label="#"
+          :width="isMobile ? 34 : 56"
+          :fixed="isMobile ? false : 'left'"
+          align="center"
+        />
 
-        <el-table-column label="股票名称/代码" :min-width="isMobile ? 92 : 150" align="center" sortable="custom" prop="name" :fixed="isMobile ? false : 'left'" show-overflow-tooltip>
+        <el-table-column
+          label="股票名称/代码"
+          :min-width="isMobile ? 92 : 150"
+          align="center"
+          sortable="custom"
+          prop="name"
+          :fixed="isMobile ? false : 'left'"
+          show-overflow-tooltip
+        >
           <template #default="{ row }">
             <div class="stock-name-cell">
-              <el-button type="primary" link @click="openTrendDialog(row)">{{ row.name }}</el-button>
+              <el-button type="primary" link @click="openTrendDialog(row)">{{
+                row.name
+              }}</el-button>
               <span>{{ row.symbol }}</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column prop="industry" label="行业" :min-width="isMobile ? 78 : 140" align="center" show-overflow-tooltip sortable="custom">
+        <el-table-column
+          prop="industry"
+          label="行业"
+          :min-width="isMobile ? 78 : 140"
+          align="center"
+          show-overflow-tooltip
+          sortable="custom"
+        >
           <template #default="{ row }">
             <div class="industry-cell">
               <el-button
@@ -285,18 +261,38 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="latest_price" label="最新股价" :min-width="isMobile ? 68 : 110" align="center" sortable="custom">
+        <el-table-column
+          prop="latest_price"
+          label="最新股价"
+          :min-width="isMobile ? 68 : 110"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">{{ formatPrice(row.latest_price) }}</template>
         </el-table-column>
 
-        <el-table-column prop="circ_mv" label="流通市值" :min-width="isMobile ? 76 : 120" align="center" sortable="custom">
+        <el-table-column
+          prop="circ_mv"
+          label="流通市值"
+          :min-width="isMobile ? 76 : 120"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">{{ formatMarketCap(row.circ_mv) }}</template>
         </el-table-column>
 
-        <el-table-column prop="RPS_today" label="当日涨跌幅/RPS" :min-width="isMobile ? 116 : 160" align="center" sortable="custom">
+        <el-table-column
+          prop="RPS_today"
+          label="当日涨跌幅/RPS"
+          :min-width="isMobile ? 116 : 160"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">
             <div class="rps-cell">
-              <span :class="getChangeClass(row.pct_change)">{{ formatPercent(row.pct_change) }}</span>
+              <span :class="getChangeClass(row.pct_change)">{{
+                formatPercent(row.pct_change)
+              }}</span>
               <el-progress
                 :percentage="getNumericValue(row.RPS_today)"
                 :color="getRpsColor(getNumericValue(row.RPS_today))"
@@ -331,7 +327,10 @@
                   :stroke-width="16"
                   :text-inside="true"
                 />
-                <div class="rps-rank" :class="getRpsRankClass(getNumericValue(row[getRpsProp(period)]))">
+                <div
+                  class="rps-rank"
+                  :class="getRpsRankClass(getNumericValue(row[getRpsProp(period)]))"
+                >
                   {{ getRpsRankText(getNumericValue(row[getRpsProp(period)])) }}
                 </div>
               </div>
@@ -339,7 +338,7 @@
           </el-table-column>
         </template>
       </el-table>
-    </el-card>
+    </section>
 
     <el-dialog
       v-model="trendDialogVisible"
@@ -351,18 +350,30 @@
     >
       <template #header>
         <div class="trend-dialog-header">
-          <div class="trend-dialog-title">{{ selectedTrendStock.name || selectedTrendStock.tsCode }} 趋势图</div>
-          <div class="trend-dialog-subtitle">{{ trendDateRange.start || '-' }} 至 {{ trendDateRange.end || '-' }}</div>
+          <div class="trend-dialog-title">
+            {{ selectedTrendStock.name || selectedTrendStock.tsCode }} 趋势图
+          </div>
+          <div class="trend-dialog-subtitle">
+            {{ trendDateRange.start || '-' }} 至 {{ trendDateRange.end || '-' }}
+          </div>
         </div>
       </template>
 
       <div class="trend-dialog-body">
         <div class="toolbar-row">
           <div class="table-summary">
-            <el-tag v-if="selectedTrendStock.symbol" type="info" effect="plain">代码 {{ selectedTrendStock.symbol }}</el-tag>
-            <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">{{ selectedTrendStock.industry }}</el-tag>
-            <el-tag v-if="selectedTrendStock.market" type="success" effect="light">{{ selectedTrendStock.market }}</el-tag>
-            <el-tag v-if="latestTrendPoint" type="info" effect="light">最新收盘 {{ latestTrendPoint.close_price.toFixed(2) }}</el-tag>
+            <el-tag v-if="selectedTrendStock.symbol" type="info" effect="plain"
+              >代码 {{ selectedTrendStock.symbol }}</el-tag
+            >
+            <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">{{
+              selectedTrendStock.industry
+            }}</el-tag>
+            <el-tag v-if="selectedTrendStock.market" type="success" effect="light">{{
+              selectedTrendStock.market
+            }}</el-tag>
+            <el-tag v-if="latestTrendPoint" type="info" effect="light"
+              >最新收盘 {{ latestTrendPoint.close_price.toFixed(2) }}</el-tag
+            >
             <el-tag
               v-if="latestTrendPoint"
               :type="getNumericValue(latestTrendPoint.change_percent) >= 0 ? 'danger' : 'success'"
@@ -381,11 +392,10 @@
               >
                 上一只
               </el-button>
-              <span v-if="trendNavPositionText" class="trend-nav-position">{{ trendNavPositionText }}</span>
-              <el-button
-                :disabled="!hasNextTrendStock"
-                @click="stepTrendStock(1)"
-              >
+              <span v-if="trendNavPositionText" class="trend-nav-position">{{
+                trendNavPositionText
+              }}</span>
+              <el-button :disabled="!hasNextTrendStock" @click="stepTrendStock(1)">
                 下一只
                 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
               </el-button>
@@ -427,12 +437,17 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, Search } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, InfoFilled, Search } from '@element-plus/icons-vue'
 import { useIsMobile } from '@/composables/useIsMobile'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
-import { getStockRps, type StockRpsData, type StockRpsItem, type IndustryMapping } from '@/services/strategyApi'
+import {
+  getStockRps,
+  type StockRpsData,
+  type StockRpsItem,
+  type IndustryMapping,
+} from '@/services/strategyApi'
 
 const { isMobile } = useIsMobile()
 
@@ -465,28 +480,27 @@ interface StockRpsFilters {
  * 参数：无。
  * 返回值：无，组件返回股票 RPS 筛选面板、汇总卡片、数据表格和趋势弹窗。
  * 事件：
- *  - 切换交易日、交易所、市场板块或 RPS 周期时自动请求最新榜单；
+ *  - 切换交易日、交易所或市场板块时自动请求最新榜单；
  *  - 点击股票名称时打开趋势弹窗并请求对应股票历史 K 线数据。
  */
 
 const defaultPeriods = [5, 20, 60]
 const latestSelectableTradeDate = getDefaultTradeDate()
-const periodOptions = [5, 10, 20, 60, 120, 250]
 const exchangeOptions = [
   { label: '上交所', value: 'SSE' },
   { label: '深交所', value: 'SZSE' },
-  { label: '北交所', value: 'BSE' }
+  { label: '北交所', value: 'BSE' },
 ]
 const exchangeMarketMap: Record<string, string[]> = {
   SSE: ['主板', '科创板'],
   SZSE: ['主板', '创业板'],
-  BSE: ['北交所']
+  BSE: ['北交所'],
 }
 const allMarketOptions = [
   { label: '主板', value: '主板' },
   { label: '创业板', value: '创业板' },
   { label: '科创板', value: '科创板' },
-  { label: '北交所', value: '北交所' }
+  { label: '北交所', value: '北交所' },
 ]
 const industryMappingOptions = [
   { label: '默认行业', value: 'default' },
@@ -494,7 +508,7 @@ const industryMappingOptions = [
   { label: '东财地域板块', value: 'dc_region' },
   { label: '东财一级行业', value: 'dc_l1' },
   { label: '东财二级行业', value: 'dc_l2' },
-  { label: '东财三级行业', value: 'dc_l3' }
+  { label: '东财三级行业', value: 'dc_l3' },
 ]
 
 /**
@@ -519,19 +533,10 @@ const priceRangeOptions: RangeOption[] = [
   { label: '10-30', min: 10, max: 30 },
   { label: '30-50', min: 30, max: 50 },
   { label: '50-100', min: 50, max: 100 },
-  { label: '100+', min: 100, max: null }
+  { label: '100+', min: 100, max: null },
 ]
-const marketCapRangeOptions: RangeOption[] = [
-  { label: '<50亿', min: 0, max: 50 * YI },
-  { label: '50-100亿', min: 50 * YI, max: 100 * YI },
-  { label: '100-500亿', min: 100 * YI, max: 500 * YI },
-  { label: '500-1000亿', min: 500 * YI, max: 1000 * YI },
-  { label: '1000亿+', min: 1000 * YI, max: null }
-]
-const valueFilterGroups: Array<{ field: ValueRangeField; label: string; options: RangeOption[] }> = [
-  { field: 'latest_price', label: '最新股价', options: priceRangeOptions },
-  { field: 'circ_mv', label: '流通市值', options: marketCapRangeOptions }
-]
+const valueFilterGroups: Array<{ field: ValueRangeField; label: string; options: RangeOption[] }> =
+  [{ field: 'latest_price', label: '最新股价', options: priceRangeOptions }]
 
 const filters = reactive<StockRpsFilters>({
   searchKeyword: '',
@@ -539,7 +544,7 @@ const filters = reactive<StockRpsFilters>({
   tradeDate: latestSelectableTradeDate,
   exchange: 'SSE',
   market: '主板',
-  industryMapping: 'dc_l2'
+  industryMapping: 'dc_l2',
 })
 
 const loading = ref(false)
@@ -554,14 +559,14 @@ const trendData = ref<StockHistoryDataItem[]>([])
 const trendShortcut = ref<TrendShortcut>('2m')
 const trendDateRange = reactive({
   start: '',
-  end: ''
+  end: '',
 })
 const selectedTrendStock = reactive({
   tsCode: '',
   symbol: '',
   name: '',
   industry: '',
-  market: ''
+  market: '',
 })
 // 趋势弹窗当前展示的股票在筛选结果 `filteredRows` 中的索引，用于左右翻阅
 const currentTrendIndex = ref(-1)
@@ -579,7 +584,7 @@ const dcIdxTypeByMapping: Partial<Record<IndustryMapping, string>> = {
   dc_region: '地域板块',
   dc_l1: '行业板块',
   dc_l2: '行业板块',
-  dc_l3: '行业板块'
+  dc_l3: '行业板块',
 }
 
 // 当前行业映射是否为东财板块（default 为个股默认行业，无对应板块领涨数据）
@@ -779,7 +784,8 @@ const getRowFieldValue = (item: StockRpsItem, field: string): StockRpsValue => {
   return Reflect.get(item, field) as StockRpsValue
 }
 
-const getReturnProp = (period: number): DynamicReturnField => `return_${period}` as DynamicReturnField
+const getReturnProp = (period: number): DynamicReturnField =>
+  `return_${period}` as DynamicReturnField
 const getRpsProp = (period: number): DynamicRpsField => `RPS_${period}` as DynamicRpsField
 
 const getRpsColor = (rpsValue: number): string => {
@@ -817,17 +823,19 @@ const currentPeriodsText = computed(() => {
 const rpsFilterGroups = computed<Array<{ field: DynamicRpsField; label: string }>>(() => {
   return currentPeriods.value.map((period) => ({
     field: getRpsProp(period),
-    label: `RPS_${period}强度`
+    label: `RPS_${period}强度`,
   }))
 })
 
-const changeFilterGroups = computed<Array<{ field: 'pct_change' | DynamicReturnField; label: string }>>(() => {
+const changeFilterGroups = computed<
+  Array<{ field: 'pct_change' | DynamicReturnField; label: string }>
+>(() => {
   return [
     { field: 'pct_change', label: '当日涨跌幅' },
     ...currentPeriods.value.map((period) => ({
       field: getReturnProp(period),
-      label: `${period}日涨跌幅`
-    }))
+      label: `${period}日涨跌幅`,
+    })),
   ]
 })
 
@@ -835,7 +843,7 @@ const selectedRpsRanks = reactive<Record<string, RpsRankLabel[]>>({})
 const selectedChangeDirections = reactive<Record<string, ChangeDirectionLabel[]>>({})
 const selectedValueRanges = reactive<Record<ValueRangeField, string[]>>({
   latest_price: ['10-30', '30-50'],
-  circ_mv: ['50-100亿', '100-500亿']
+  circ_mv: [],
 })
 
 const defaultSortProp = computed(() => {
@@ -888,46 +896,6 @@ const syncFilterFields = (): void => {
 }
 
 /**
- * 事件：切换 RPS 强度标签。
- * 参数：
- *  - field 为 RPS 字段名；
- *  - rank 为强度标签。
- * 返回值：void。
- * 事件：更新 `selectedRpsRanks`。
- */
-const toggleRpsRank = (field: DynamicRpsField, rank: RpsRankLabel): void => {
-  const ranks = selectedRpsRanks[field] || []
-  const index = ranks.indexOf(rank)
-  if (index >= 0) {
-    ranks.splice(index, 1)
-    selectedRpsRanks[field] = ranks
-    return
-  }
-  ranks.push(rank)
-  selectedRpsRanks[field] = ranks
-}
-
-/**
- * 事件：切换涨跌方向标签。
- * 参数：
- *  - field 为涨跌幅字段名；
- *  - direction 为方向标签。
- * 返回值：void。
- * 事件：更新 `selectedChangeDirections`。
- */
-const toggleChangeDirection = (field: 'pct_change' | DynamicReturnField, direction: ChangeDirectionLabel): void => {
-  const directions = selectedChangeDirections[field] || []
-  const index = directions.indexOf(direction)
-  if (index >= 0) {
-    directions.splice(index, 1)
-    selectedChangeDirections[field] = directions
-    return
-  }
-  directions.push(direction)
-  selectedChangeDirections[field] = directions
-}
-
-/**
  * 工具：清空 RPS 强度筛选。
  * 参数：无。
  * 返回值：void。
@@ -949,26 +917,6 @@ const resetChangeFilters = (): void => {
   Object.keys(selectedChangeDirections).forEach((field) => {
     selectedChangeDirections[field] = []
   })
-}
-
-/**
- * 事件：切换市值/股价区间标签。
- * 参数：
- *  - field 为区间字段名（latest_price、circ_mv）；
- *  - rangeLabel 为区间标签。
- * 返回值：void。
- * 事件：更新 `selectedValueRanges`。
- */
-const toggleValueRange = (field: ValueRangeField, rangeLabel: string): void => {
-  const ranges = selectedValueRanges[field] || []
-  const index = ranges.indexOf(rangeLabel)
-  if (index >= 0) {
-    ranges.splice(index, 1)
-    selectedValueRanges[field] = ranges
-    return
-  }
-  ranges.push(rangeLabel)
-  selectedValueRanges[field] = ranges
 }
 
 /**
@@ -995,6 +943,16 @@ const hasActiveValueFilter = computed(() => {
   return Object.values(selectedValueRanges).some((items) => items.length > 0)
 })
 
+const hasAnyTableFilter = computed(() => {
+  return hasActiveRpsFilter.value || hasActiveChangeFilter.value || hasActiveValueFilter.value
+})
+
+const resetAllTableFilters = (): void => {
+  resetRpsFilters()
+  resetChangeFilters()
+  resetValueFilters()
+}
+
 /**
  * 工具：判断单条记录是否满足 RPS 强度筛选。
  * 参数：item 为股票 RPS 记录。
@@ -1005,7 +963,9 @@ const matchesRpsFilters = (item: StockRpsItem): boolean => {
   return rpsFilterGroups.value.every(({ field }) => {
     const selectedRanks = selectedRpsRanks[field] || []
     if (!selectedRanks.length) return true
-    return selectedRanks.includes(getRpsRankText(getNumericValue(getRowFieldValue(item, field))) as RpsRankLabel)
+    return selectedRanks.includes(
+      getRpsRankText(getNumericValue(getRowFieldValue(item, field))) as RpsRankLabel,
+    )
   })
 }
 
@@ -1052,13 +1012,9 @@ const filteredRows = computed<StockRpsItem[]>(() => {
 
   if (keyword) {
     result = result.filter((item) => {
-      return [
-        item.name,
-        item.symbol,
-        item.ts_code,
-        item.industry || '',
-        item.market || ''
-      ].some((field) => field.toLowerCase().includes(keyword))
+      return [item.name, item.symbol, item.ts_code, item.industry || '', item.market || ''].some(
+        (field) => field.toLowerCase().includes(keyword),
+      )
     })
   }
 
@@ -1075,7 +1031,7 @@ const latestTrendPoint = computed(() => {
 // 是否存在上一只/下一只可翻阅的股票（基于当前筛选结果 `filteredRows`）
 const hasPrevTrendStock = computed(() => currentTrendIndex.value > 0)
 const hasNextTrendStock = computed(
-  () => currentTrendIndex.value >= 0 && currentTrendIndex.value < filteredRows.value.length - 1
+  () => currentTrendIndex.value >= 0 && currentTrendIndex.value < filteredRows.value.length - 1,
 )
 
 // 翻阅进度文本，如 “3 / 128”
@@ -1140,7 +1096,7 @@ const loadStockRpsData = async () => {
       trade_date: filters.tradeDate || undefined,
       exchange: filters.exchange || undefined,
       market: filters.market,
-      industry_mapping: filters.industryMapping
+      industry_mapping: filters.industryMapping,
     })
     if (requestId !== stockRpsRequestId) return
     stockRpsData.value = response
@@ -1183,7 +1139,7 @@ const scheduleStockRpsReload = (): void => {
  */
 const requestTrendHistoryData = async (): Promise<StockHistoryDataItem[]> => {
   const candidateCodes = [selectedTrendStock.tsCode, selectedTrendStock.symbol].filter(
-    (value, index, array): value is string => Boolean(value) && array.indexOf(value) === index
+    (value, index, array): value is string => Boolean(value) && array.indexOf(value) === index,
   )
   let lastError: unknown = null
 
@@ -1193,7 +1149,7 @@ const requestTrendHistoryData = async (): Promise<StockHistoryDataItem[]> => {
         code,
         formatDateForHistoryApi(trendDateRange.start),
         formatDateForHistoryApi(trendDateRange.end),
-        'qfq'
+        'qfq',
       )
     } catch (error) {
       lastError = error
@@ -1323,11 +1279,17 @@ const tableRowClassName = ({ row }: { row: StockRpsItem }): string => {
 }
 
 watch(
-  () => [filters.tradeDate, filters.exchange, filters.market, filters.industryMapping, [...filters.periods].sort((a, b) => a - b).join(',')],
+  () => [
+    filters.tradeDate,
+    filters.exchange,
+    filters.market,
+    filters.industryMapping,
+    [...filters.periods].sort((a, b) => a - b).join(','),
+  ],
   () => {
     scheduleStockRpsReload()
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 watch(
@@ -1341,7 +1303,7 @@ watch(
         filters.market = availableMarkets[0] || ''
       }
     }
-  }
+  },
 )
 
 watch(
@@ -1349,26 +1311,26 @@ watch(
   () => {
     syncFilterFields()
   },
-  { immediate: true }
+  { immediate: true },
 )
-
 </script>
 
 <style scoped>
 .stock-swing-practice-view {
-  padding: 20px;
+  min-height: calc(100dvh - 104px);
+  padding: 12px 16px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+  background: #f4f6f8;
 }
 
-.filter-card,
-.table-card,
+.filter-panel,
+.ranking-panel,
 .trend-preview-card {
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
-.card-header,
 .table-header,
 .toolbar-row {
   display: flex;
@@ -1378,18 +1340,27 @@ watch(
   flex-wrap: wrap;
 }
 
-.card-header h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  color: #111827;
+.filter-panel {
+  flex-shrink: 0;
+  padding: 12px 14px 0;
+  background: #ffffff;
+  border: 1px solid #e5e9f0;
 }
 
-.card-header p,
-.table-desc,
-.hint-text {
-  margin: 0;
-  color: #6b7280;
-  font-size: 13px;
+.compact-filter-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+.compact-filter-form :deep(.el-form-item__label) {
+  color: #5f6876;
+  font-weight: 500;
+}
+
+.compact-filter-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.6fr) repeat(4, minmax(148px, 1fr));
+  gap: 10px 12px;
+  align-items: start;
 }
 
 .table-summary {
@@ -1403,13 +1374,6 @@ watch(
   width: 100%;
 }
 
-.hint-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .warning-alert {
   margin-top: -4px;
 }
@@ -1421,92 +1385,94 @@ watch(
   line-height: 1.6;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
-}
-
-.summary-item {
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-}
-
-.summary-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.summary-value {
-  display: block;
-  color: #111827;
-  font-size: 20px;
-  line-height: 1.2;
-}
-
-.summary-time {
-  font-size: 15px;
+.ranking-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e1e6ee;
 }
 
 .table-title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
-  color: #111827;
-  margin-bottom: 6px;
+  color: #172033;
+  letter-spacing: 0;
 }
 
-.methodology {
-  margin-bottom: 16px;
-  padding: 12px 14px;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
+.table-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ranking-panel-header {
+  flex-shrink: 0;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid #e8edf3;
+  background: #ffffff;
+}
+
+.info-button {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  color: #6f7a89;
+  border-color: #d8dee8;
+}
+
+.table-summary :deep(.el-tag) {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
   background: #f8fafc;
+  border-color: #dce3ec;
+}
+
+.info-popover {
+  display: grid;
+  gap: 6px;
   color: #4b5563;
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
-.methodology p {
+.info-popover p {
   margin: 0;
 }
 
-.methodology p + p {
-  margin-top: 6px;
-}
-
-.rps-filter-panel {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.rps-filter-group {
+.table-filter-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  margin-top: 10px;
 }
 
-.rps-filter-label {
-  color: #6b7280;
-  font-size: 13px;
-  white-space: nowrap;
+.toolbar-filter {
+  width: 136px;
 }
 
-.rps-filter-tags {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.toolbar-filter :deep(.el-select) {
+  width: 100%;
 }
 
-.rps-filter-reset {
+.toolbar-filter :deep(.el-select__wrapper),
+.compact-filter-form :deep(.el-input__wrapper),
+.compact-filter-form :deep(.el-select__wrapper) {
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px #d8dee8 inset;
+}
+
+.toolbar-filter :deep(.el-select__wrapper) {
+  min-height: 30px;
+}
+
+.toolbar-filter-reset {
   padding: 0;
 }
 
@@ -1535,12 +1501,12 @@ watch(
 }
 
 .text-up {
-  color: #dc2626;
+  color: #d92d20;
   font-weight: 600;
 }
 
 .text-down {
-  color: #2563eb;
+  color: #175cd3;
   font-weight: 600;
 }
 
@@ -1552,40 +1518,41 @@ watch(
 
 .rps-rank {
   align-self: center;
-  padding: 2px 8px;
-  border-radius: 999px;
+  min-width: 42px;
+  padding: 2px 7px;
+  border-radius: 4px;
   font-size: 12px;
   line-height: 1.4;
 }
 
 .rank-excellent {
-  color: #dc2626;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  color: #b42318;
+  background: #fff1f3;
+  border: 1px solid #ffd6dd;
 }
 
 .rank-strong {
-  color: #d97706;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  color: #b54708;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
 }
 
 .rank-good {
-  color: #2563eb;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  color: #175cd3;
+  background: #eff8ff;
+  border: 1px solid #b9e6fe;
 }
 
 .rank-normal {
-  color: #059669;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  color: #067647;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
 }
 
 .rank-weak {
-  color: #6b7280;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
+  color: #667085;
+  background: #f7f8fa;
+  border: 1px solid #e4e7ec;
 }
 
 .trend-dialog-header {
@@ -1641,27 +1608,91 @@ watch(
   min-height: 220px;
 }
 
-:deep(.el-table) {
-  border-radius: 10px;
+.ranking-table {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+:deep(.ranking-table.el-table) {
+  --el-table-border-color: #edf1f6;
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-row-hover-bg-color: #f1f6ff;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
+}
+
+:deep(.ranking-table.el-table::before),
+:deep(.ranking-table .el-table__inner-wrapper::before) {
+  display: none;
+}
+
+:deep(.ranking-table th.el-table__cell) {
+  padding: 7px 0;
+  color: #475467;
+  font-weight: 600;
+  background: #f8fafc;
+}
+
+:deep(.ranking-table td.el-table__cell) {
+  padding: 7px 0;
+}
+
+:deep(.ranking-table .cell) {
+  padding: 0 8px;
+  line-height: 1.35;
+}
+
+:deep(.ranking-table .el-progress-bar__outer) {
+  background-color: #edf1f6;
+  border-radius: 3px;
+}
+
+:deep(.ranking-table .el-progress-bar__inner) {
+  border-radius: 3px;
 }
 
 :deep(.row-excellent) {
-  background: rgba(239, 68, 68, 0.05);
+  background: rgba(217, 45, 32, 0.04);
 }
 
 :deep(.row-strong) {
-  background: rgba(245, 158, 11, 0.06);
+  background: rgba(247, 144, 9, 0.05);
 }
 
 :deep(.row-good) {
-  background: rgba(59, 130, 246, 0.06);
+  background: rgba(46, 144, 250, 0.05);
 }
 
 @media (max-width: 768px) {
   .stock-swing-practice-view {
-    padding: 14px;
+    min-height: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .compact-filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-panel,
+  .ranking-panel {
+    border-radius: 0;
+  }
+
+  .filter-panel,
+  .ranking-panel-header {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .table-header {
+    align-items: flex-start;
+  }
+
+  .table-filter-toolbar,
+  .toolbar-filter {
+    width: 100%;
   }
 
   .trend-toolbar-right,
