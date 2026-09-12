@@ -232,7 +232,7 @@
  * 功能：
  * - 使用板块 MA 市场宽度接口渲染热力图（日期 × 板块，值为宽度比例）
  * - 支持行业板块与概念板块切换，并在点击热力图单元格后打开该板块的领涨数据详情弹窗
- * - 支持选择东方财富行业层级、固定最近20天结束日期与 MA 窗口
+ * - 支持选择东方财富行业层级、默认最近30天结束日期与 MA 窗口
  * 参数：无
  * 返回值：无
  * 事件（Emits）：
@@ -275,8 +275,8 @@ const rangeDayOptions = [
   { label: '最近20天', value: 20 },
   { label: '最近30天', value: 30 }
 ]
-/** 回溯天数（可调，默认与原写死的 10 天一致） */
-const rangeDays = ref<number>(10)
+/** 回溯天数（可调，默认最近 30 天） */
+const rangeDays = ref<number>(30)
 const loading = ref(false)
 const endDate = ref<string>(formatDate(new Date()))
 const maWindow = ref<number>(5)
@@ -317,7 +317,7 @@ const amountFilterOptions = [
 const consecutiveIncreaseDays = ref<number>(0)
 const firstDayBreadthRange = ref<string>('')
 const lastDayBreadthRange = ref<string>('')
-const minAmount = ref<number>(30000000000)
+const minAmount = ref<number>(0)
 const maxAmount = ref<number>(0)
 const selectedIdxType = ref<IndustryMaBreadthIdxType>('行业板块')
 const levelOptions: Array<{ label: EastMoneyIndustryLevel; value: EastMoneyIndustryLevel }> = [
