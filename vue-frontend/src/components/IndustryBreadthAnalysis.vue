@@ -5,6 +5,15 @@
       放不下时横向滚动而不是换行，把纵向空间尽量留给热力图
     -->
     <div class="control-bar">
+      <el-segmented
+        v-model="analysisMode"
+        :options="analysisModeOptions"
+        size="small"
+        class="ctl ctl-mode"
+        :disabled="loading"
+        @change="handleModeChange"
+      />
+
       <div class="ctl ctl-industry">
         <IndustryFilter
           :model-value="props.selectedIndustries"
@@ -43,6 +52,7 @@
       </el-select>
 
       <el-select
+        v-if="analysisMode === 'display'"
         v-model="rangeDays"
         size="small"
         class="ctl ctl-sm"
@@ -73,6 +83,7 @@
       />
 
       <el-select
+        v-if="analysisMode === 'display'"
         v-model="maWindow"
         size="small"
         class="ctl ctl-xs"
@@ -89,6 +100,7 @@
       </el-select>
 
       <el-select
+        v-if="analysisMode === 'display'"
         v-model="consecutiveIncreaseDays"
         size="small"
         class="ctl ctl-md"
@@ -103,7 +115,7 @@
         />
       </el-select>
 
-      <template v-if="consecutiveIncreaseDays > 0">
+      <template v-if="analysisMode === 'display' && consecutiveIncreaseDays > 0">
         <span class="ctl-label">首日</span>
         <el-select
           v-model="firstDayBreadthRange"
@@ -173,7 +185,7 @@
       <el-button
         type="default"
         size="small"
-        :disabled="loading || !amountFilteredData.length"
+        :disabled="loading || (analysisMode === 'display' ? !amountFilteredData.length : !practiceSignals.length)"
         @click="toggleLastColumnSort"
         :icon="sortByLastColumn ? 'SortDown' : 'Sort'"
       >
@@ -182,7 +194,11 @@
 
       <div class="bar-spacer"></div>
 
-      <span class="count-info">行业 {{ totalIndustryCount }} · 显示 {{ displayedIndustryCount }}</span>
+      <span class="count-info">
+        {{ analysisMode === 'display'
+          ? `行业 ${totalIndustryCount} · 显示 ${displayedIndustryCount}`
+          : `实战 ${practiceSignals.length} · 匹配 ${practiceMatchedSignalCount}` }}
+      </span>
       <el-popover placement="bottom-end" trigger="click" :width="380">
         <template #reference>
           <el-icon class="info-icon" :size="16" aria-label="查看统计口径与使用说明">
@@ -191,29 +207,87 @@
         </template>
         <div class="methodology">
           <p class="methodology-title">统计口径与说明</p>
-          <p>
+          <template v-if="analysisMode === 'display'">
+            <p>
             基于东方财富{{ selectedIdxType === '概念板块' ? '概念板块' : '行业板块' }}成分，汇总各板块中收盘价高于
-            MA{{ maWindow }} 的股票占比。
-          </p>
-          <p>
-            市场宽度 = count_above_ma / eligible_count。数值越高，代表该板块内站上均线的股票占比越高，走势越强。
-          </p>
-          <p>时间范围为最近 {{ rangeDays }} 天（最多 30 天），可配合结束日期一起调整。</p>
-          <p>成交额区间按最近一个交易日的板块成交额过滤。</p>
-          <p>
-            行业总数 {{ totalIndustryCount }} / 当前显示 {{ displayedIndustryCount }}，显示数量受行业筛选、宽度递增、成交额区间影响。
-          </p>
-          <p>数据来源：板块 MA 宽度接口。点击热力图任意格子可查看该板块领涨数据详情。</p>
+              MA{{ maWindow }} 的股票占比。
+            </p>
+            <p>
+              市场宽度 = count_above_ma / eligible_count。数值越高，代表该板块内站上均线的股票占比越高，走势越强。
+            </p>
+            <p>时间范围为最近 {{ rangeDays }} 天（最多 30 天），可配合结束日期一起调整。</p>
+            <p>成交额区间按最近一个交易日的板块成交额过滤。</p>
+            <p>
+              行业总数 {{ totalIndustryCount }} / 当前显示 {{ displayedIndustryCount }}，显示数量受行业筛选、宽度递增、成交额区间影响。
+            </p>
+            <p>数据来源：板块 MA 宽度接口。点击热力图任意格子可查看该板块领涨数据详情。</p>
+          </template>
+          <template v-else>
+            <p>实战模式固定使用最近 3 个有效交易日，分别统计 MA5、MA10、MA20 三线宽度变化。</p>
+            <p>扩张/收窄按最新日相对 3 日前变化判断，信号按三线组合规则归类。</p>
+            <p>成交额区间按最近一个交易日的板块成交额过滤。</p>
+          </template>
         </div>
       </el-popover>
     </div>
 
     <HeatmapChart
-      v-if="heatmapOption"
+      v-if="analysisMode === 'display' && heatmapOption"
       :option="heatmapOption"
       @chart-ready="onChartReady"
       @chart-click="onChartClick"
     />
+
+    <section v-else-if="analysisMode === 'practice' && practiceSignals.length" class="practice-panel">
+      <div class="practice-summary-grid">
+        <div
+          v-for="stat in practiceSignalStats"
+          :key="stat.key"
+          class="practice-summary-item"
+          :class="`tone-${stat.tone}`"
+        >
+          <div class="practice-summary-label">{{ stat.label }}</div>
+          <div class="practice-summary-main">
+            <strong>{{ stat.count }}</strong>
+            <span>{{ stat.ratioText }}</span>
+          </div>
+          <div class="practice-summary-desc">{{ stat.description }}</div>
+        </div>
+      </div>
+
+      <el-table
+        :data="practiceSortedSignals"
+        border
+        stripe
+        size="small"
+        class="practice-table"
+        :height="isMobile ? undefined : 'calc(100dvh - 390px)'"
+      >
+        <el-table-column prop="sector_name" label="板块" min-width="150" fixed />
+        <el-table-column prop="signalLabel" label="实战信号" min-width="180">
+          <template #default="{ row }">
+            <el-tag :type="row.tagType" effect="light">{{ row.signalLabel }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="action" label="动作" min-width="180" />
+        <el-table-column label="MA5" min-width="120" align="right">
+          <template #default="{ row }">
+            <span :class="directionClass(row.ma5Direction)">{{ formatPracticeCell(row.ma5, row.ma5Change) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="MA10" min-width="120" align="right">
+          <template #default="{ row }">
+            <span :class="directionClass(row.ma10Direction)">{{ formatPracticeCell(row.ma10, row.ma10Change) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="MA20" min-width="120" align="right">
+          <template #default="{ row }">
+            <span :class="directionClass(row.ma20Direction)">{{ formatPracticeCell(row.ma20, row.ma20Change) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reason" label="三日变化" min-width="260" />
+      </el-table>
+    </section>
 
     <div v-else class="empty-tip">暂无数据</div>
 
@@ -232,7 +306,7 @@
  * 功能：
  * - 使用板块 MA 市场宽度接口渲染热力图（日期 × 板块，值为宽度比例）
  * - 支持行业板块与概念板块切换，并在点击热力图单元格后打开该板块的领涨数据详情弹窗
- * - 支持选择东方财富行业层级、默认最近30天结束日期与 MA 窗口
+ * - 展示模式保留热力图，实战模式固定最近3个交易日并按 MA5/MA10/MA20 三线宽度规则统计
  * 参数：无
  * 返回值：无
  * 事件（Emits）：
@@ -258,6 +332,32 @@ import {
   type IndustryTurnoverPercentileItem
 } from '@/services/industry-turnover-percentile'
 
+type AnalysisMode = 'display' | 'practice'
+type PracticeMaWindow = 5 | 10 | 20
+type WidthDirection = 'expand' | 'shrink' | 'flat'
+type PracticeSignalKey = 'bullish' | 'dip' | 'mediumRisk' | 'retreat' | 'neutral' | 'insufficient'
+
+interface PracticeSignal {
+  sector_code: string
+  sector_name: string
+  dates: string[]
+  ma5: number | null
+  ma10: number | null
+  ma20: number | null
+  ma5Change: number | null
+  ma10Change: number | null
+  ma20Change: number | null
+  ma5Direction: WidthDirection
+  ma10Direction: WidthDirection
+  ma20Direction: WidthDirection
+  signalKey: PracticeSignalKey
+  signalLabel: string
+  action: string
+  reason: string
+  tagType: 'success' | 'warning' | 'danger' | 'info' | 'primary'
+  tone: 'bullish' | 'dip' | 'risk' | 'retreat' | 'neutral'
+}
+
 const emit = defineEmits<{
   chartReady: [chart: echarts.ECharts]
   chartClick: [payload: { industry: string; sectorCode: string; date: string; value: number; idxType: IndustryMaBreadthIdxType }]
@@ -265,8 +365,17 @@ const emit = defineEmits<{
   'update:selectedIndustries': [industries: string[]]
 }>()
 
+const analysisModeOptions = [
+  { label: '展示模式', value: 'display' },
+  { label: '实战模式', value: 'practice' }
+]
+const analysisMode = ref<AnalysisMode>('display')
+
 /** 时间范围上限：最多回溯 30 天 */
 const MAX_RANGE_DAYS = 30
+const PRACTICE_DAYS = 3
+const PRACTICE_LOOKBACK_DAYS = 10
+const PRACTICE_MA_WINDOWS: PracticeMaWindow[] = [5, 10, 20]
 const rangeDayOptions = [
   { label: '最近3天', value: 3 },
   { label: '最近5天', value: 5 },
@@ -383,13 +492,21 @@ const openLeadRiseDetail = (sectorCode: string, sectorName: string, idxType: Ind
 
 const rawData = ref<IndustryMaBreadthItem[]>([])
 const turnoverData = ref<IndustryTurnoverPercentileItem[]>([])
+const practiceDataByMa = ref<Record<PracticeMaWindow, IndustryMaBreadthItem[]>>({
+  5: [],
+  10: [],
+  20: []
+})
 
 /**
  * 从获取到的原始数据中提取唯一的行业名称列表（已排序），
  * 用于驱动筛选组件的下拉选项，确保与实际数据一致。
  */
 const rawIndustryNames = computed<string[]>(() => {
-  const names = Array.from(new Set(rawData.value.map(d => d.sector_name)))
+  const source = analysisMode.value === 'practice'
+    ? PRACTICE_MA_WINDOWS.flatMap(window => practiceDataByMa.value[window])
+    : rawData.value
+  const names = Array.from(new Set(source.map(d => d.sector_name)))
   names.sort()
   return names
 })
@@ -556,11 +673,259 @@ const amountFilteredData = computed(() => {
   )
 })
 
+function passesAmountFilter(sectorCode: string): boolean {
+  const hasMinFilter = minAmount.value > 0
+  const hasMaxFilter = maxAmount.value > 0
+  if (!hasMinFilter && !hasMaxFilter) return true
+  if (turnoverData.value.length === 0) return true
+
+  const allDates = Array.from(new Set(turnoverData.value.map(d => d.date))).sort()
+  const latestDate = allDates[allDates.length - 1]
+  const matched = turnoverData.value.find(item => item.date === latestDate && item.sector_code === sectorCode)
+  const amount = matched?.amount ?? 0
+  if (hasMinFilter && amount < minAmount.value) return false
+  if (hasMaxFilter && amount > maxAmount.value) return false
+  return true
+}
+
 const selectedBoardLabel = computed(() => {
   return selectedIdxType.value === '行业板块'
     ? selectedLevel.value
     : '东财概念板块'
 })
+
+function getNumericBreadth(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function getDirection(change: number | null): WidthDirection {
+  if (change === null) return 'flat'
+  if (change > 0) return 'expand'
+  if (change < 0) return 'shrink'
+  return 'flat'
+}
+
+function formatPracticePercent(value: number | null): string {
+  return value === null ? '--' : `${(value * 100).toFixed(1)}%`
+}
+
+function formatPracticeChange(value: number | null): string {
+  if (value === null) return '无变化'
+  const absText = `${Math.abs(value * 100).toFixed(1)}pct`
+  if (value > 0) return `+${absText}`
+  if (value < 0) return `-${absText}`
+  return '0.0pct'
+}
+
+function formatPracticeCell(value: number | null, change: number | null): string {
+  return `${formatPracticePercent(value)} (${formatPracticeChange(change)})`
+}
+
+function resolvePracticeSignal(
+  ma5Direction: WidthDirection,
+  ma10Direction: WidthDirection,
+  ma20Direction: WidthDirection
+): Pick<PracticeSignal, 'signalKey' | 'signalLabel' | 'action' | 'tagType' | 'tone'> {
+  if (ma5Direction === 'shrink' && ma10Direction === 'shrink' && ma20Direction === 'shrink') {
+    return {
+      signalKey: 'retreat',
+      signalLabel: '全面退潮',
+      action: '空仓等待',
+      tagType: 'danger',
+      tone: 'retreat'
+    }
+  }
+
+  if (ma20Direction === 'shrink') {
+    return {
+      signalKey: 'mediumRisk',
+      signalLabel: '中期风险信号',
+      action: '大幅减仓防守',
+      tagType: 'danger',
+      tone: 'risk'
+    }
+  }
+
+  if (ma5Direction === 'expand' && ma10Direction === 'expand' && ma20Direction === 'expand') {
+    return {
+      signalKey: 'bullish',
+      signalLabel: '全面做多环境',
+      action: '顺势参与强势方向',
+      tagType: 'success',
+      tone: 'bullish'
+    }
+  }
+
+  if (ma5Direction === 'shrink' && ma10Direction === 'expand' && ma20Direction === 'expand') {
+    return {
+      signalKey: 'dip',
+      signalLabel: '正常分化调整',
+      action: '可低吸',
+      tagType: 'warning',
+      tone: 'dip'
+    }
+  }
+
+  return {
+    signalKey: 'neutral',
+    signalLabel: '观察区',
+    action: '等待三线共振',
+    tagType: 'info',
+    tone: 'neutral'
+  }
+}
+
+function buildPracticeSignals(): PracticeSignal[] {
+  const rowsBySector = new Map<string, { code: string; name: string; byMa: Record<PracticeMaWindow, IndustryMaBreadthItem[]> }>()
+
+  for (const ma of PRACTICE_MA_WINDOWS) {
+    for (const item of practiceDataByMa.value[ma]) {
+      const key = item.sector_code || item.sector_name
+      if (!key) continue
+      const existing = rowsBySector.get(key) ?? {
+        code: item.sector_code,
+        name: item.sector_name,
+        byMa: { 5: [], 10: [], 20: [] }
+      }
+      existing.byMa[ma].push(item)
+      rowsBySector.set(key, existing)
+    }
+  }
+
+  const selectedSet = new Set(props.selectedIndustries || [])
+  const signals: PracticeSignal[] = []
+
+  rowsBySector.forEach(({ code, name, byMa }) => {
+    if (selectedSet.size && !selectedSet.has(name)) return
+    if (!passesAmountFilter(code)) return
+
+    const sortedByMa = Object.fromEntries(
+      PRACTICE_MA_WINDOWS.map(ma => [
+        ma,
+        [...byMa[ma]]
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(-PRACTICE_DAYS)
+      ])
+    ) as Record<PracticeMaWindow, IndustryMaBreadthItem[]>
+
+    const dates = Array.from(new Set(PRACTICE_MA_WINDOWS.flatMap(ma => sortedByMa[ma].map(item => item.date)))).sort()
+    const hasEnoughData = PRACTICE_MA_WINDOWS.every(ma => sortedByMa[ma].length >= PRACTICE_DAYS)
+    if (!hasEnoughData) {
+      signals.push({
+        sector_code: code,
+        sector_name: name,
+        dates,
+        ma5: null,
+        ma10: null,
+        ma20: null,
+        ma5Change: null,
+        ma10Change: null,
+        ma20Change: null,
+        ma5Direction: 'flat',
+        ma10Direction: 'flat',
+        ma20Direction: 'flat',
+        signalKey: 'insufficient',
+        signalLabel: '数据不足',
+        action: '等待数据补齐',
+        reason: `有效交易日不足 ${PRACTICE_DAYS} 天`,
+        tagType: 'info',
+        tone: 'neutral'
+      })
+      return
+    }
+
+    const maValues = Object.fromEntries(
+      PRACTICE_MA_WINDOWS.map(ma => {
+        const rows = sortedByMa[ma]
+        const first = getNumericBreadth(rows[0]?.breadth_ratio)
+        const latest = getNumericBreadth(rows[rows.length - 1]?.breadth_ratio)
+        return [ma, { latest, change: latest - first }]
+      })
+    ) as Record<PracticeMaWindow, { latest: number; change: number }>
+
+    const ma5Direction = getDirection(maValues[5].change)
+    const ma10Direction = getDirection(maValues[10].change)
+    const ma20Direction = getDirection(maValues[20].change)
+    const signal = resolvePracticeSignal(ma5Direction, ma10Direction, ma20Direction)
+
+    signals.push({
+      sector_code: code,
+      sector_name: name,
+      dates,
+      ma5: maValues[5].latest,
+      ma10: maValues[10].latest,
+      ma20: maValues[20].latest,
+      ma5Change: maValues[5].change,
+      ma10Change: maValues[10].change,
+      ma20Change: maValues[20].change,
+      ma5Direction,
+      ma10Direction,
+      ma20Direction,
+      ...signal,
+      reason: `MA5 ${formatPracticeChange(maValues[5].change)}，MA10 ${formatPracticeChange(maValues[10].change)}，MA20 ${formatPracticeChange(maValues[20].change)}`
+    })
+  })
+
+  return signals
+}
+
+const practiceSignals = computed<PracticeSignal[]>(() => buildPracticeSignals())
+
+const practiceSignalRank: Record<PracticeSignalKey, number> = {
+  bullish: 1,
+  dip: 2,
+  mediumRisk: 3,
+  retreat: 4,
+  neutral: 5,
+  insufficient: 6
+}
+
+const practiceSortedSignals = computed<PracticeSignal[]>(() => {
+  const rows = [...practiceSignals.value]
+  if (sortByLastColumn.value) {
+    return rows.sort((a, b) =>
+      practiceSignalRank[a.signalKey] - practiceSignalRank[b.signalKey] ||
+      (b.ma20 ?? -1) - (a.ma20 ?? -1) ||
+      a.sector_name.localeCompare(b.sector_name)
+    )
+  }
+  return rows.sort((a, b) => a.sector_name.localeCompare(b.sector_name))
+})
+
+const practiceMatchedSignalCount = computed(() =>
+  practiceSignals.value.filter(item => item.signalKey !== 'neutral' && item.signalKey !== 'insufficient').length
+)
+
+const practiceSignalStats = computed(() => {
+  const total = practiceSignals.value.length || 1
+  const definitions: Array<{
+    key: PracticeSignalKey
+    label: string
+    description: string
+    tone: PracticeSignal['tone']
+  }> = [
+    { key: 'bullish', label: '全面做多环境', description: '三线宽度同时向上扩张，类似2020年7月/2023年1月', tone: 'bullish' },
+    { key: 'dip', label: '正常分化调整', description: 'MA5收窄，MA10/MA20仍扩张', tone: 'dip' },
+    { key: 'mediumRisk', label: '中期风险信号', description: 'MA20宽度开始收窄', tone: 'risk' },
+    { key: 'retreat', label: '全面退潮', description: '三线宽度同时收窄', tone: 'retreat' }
+  ]
+
+  return definitions.map(definition => {
+    const count = practiceSignals.value.filter(item => item.signalKey === definition.key).length
+    return {
+      ...definition,
+      count,
+      ratioText: `${((count / total) * 100).toFixed(0)}%`
+    }
+  })
+})
+
+function directionClass(direction: WidthDirection): string {
+  if (direction === 'expand') return 'direction-up'
+  if (direction === 'shrink') return 'direction-down'
+  return 'direction-flat'
+}
 
 // 切换按最后一列排序的状态
 const toggleLastColumnSort = () => {
@@ -707,31 +1072,51 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
 const fetchData = async () => {
   loading.value = true
   try {
-    // 时间范围可调，做一次收敛，避免超出接口/页面预期（上限 30 天）
-    const days = Math.min(MAX_RANGE_DAYS, Math.max(1, Math.round(Number(rangeDays.value) || 1)))
+    const days = analysisMode.value === 'practice'
+      ? PRACTICE_LOOKBACK_DAYS
+      : Math.min(MAX_RANGE_DAYS, Math.max(1, Math.round(Number(rangeDays.value) || 1)))
     const [start, end] = computeDateRangeByEndDate(endDate.value, days)
+    const commonQuery = {
+      startDate: start,
+      endDate: end,
+      idxType: selectedIdxType.value,
+      level: selectedIdxType.value === '行业板块' ? selectedLevel.value : undefined
+    }
 
-    // 并行获取市场宽度数据和成交额数据
+    if (analysisMode.value === 'practice') {
+      const [ma5Data, ma10Data, ma20Data, turnoverResult] = await Promise.all([
+        fetchIndustryMaBreadth({ ...commonQuery, maWindow: 5 }),
+        fetchIndustryMaBreadth({ ...commonQuery, maWindow: 10 }),
+        fetchIndustryMaBreadth({ ...commonQuery, maWindow: 20 }),
+        fetchIndustryTurnoverPercentile(commonQuery).catch((err) => {
+          console.error('获取成交额数据失败:', err)
+          return null
+        })
+      ])
+
+      rawData.value = []
+      practiceDataByMa.value = {
+        5: ma5Data.data ?? [],
+        10: ma10Data.data ?? [],
+        20: ma20Data.data ?? []
+      }
+      turnoverData.value = turnoverResult?.data ?? []
+      return
+    }
+
     const [breadthData, turnoverResult] = await Promise.all([
       fetchIndustryMaBreadth({
-        startDate: start,
-        endDate: end,
+        ...commonQuery,
         maWindow: maWindow.value,
-        idxType: selectedIdxType.value,
-        level: selectedIdxType.value === '行业板块' ? selectedLevel.value : undefined
       }),
-      fetchIndustryTurnoverPercentile({
-        startDate: start,
-        endDate: end,
-        idxType: selectedIdxType.value,
-        level: selectedIdxType.value === '行业板块' ? selectedLevel.value : undefined
-      }).catch((err) => {
+      fetchIndustryTurnoverPercentile(commonQuery).catch((err) => {
         console.error('获取成交额数据失败:', err)
         return null
       })
     ])
 
     rawData.value = breadthData.data ?? []
+    practiceDataByMa.value = { 5: [], 10: [], 20: [] }
     turnoverData.value = turnoverResult?.data ?? []
   } catch (err) {
     console.error('获取行业MA宽度数据失败:', err)
@@ -741,6 +1126,10 @@ const fetchData = async () => {
 }
 
 const handleParamsChange = () => {
+  fetchData()
+}
+
+const handleModeChange = () => {
   fetchData()
 }
 
@@ -801,6 +1190,10 @@ onMounted(() => {
 
 .ctl {
   flex: 0 0 auto;
+}
+
+.ctl-mode {
+  width: 148px;
 }
 
 .ctl-xs {
@@ -881,6 +1274,95 @@ onMounted(() => {
   }
 }
 
+.practice-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.practice-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.practice-summary-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e1e6ee;
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.practice-summary-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.practice-summary-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.practice-summary-main strong {
+  font-size: 24px;
+  line-height: 1;
+  color: #172033;
+}
+
+.practice-summary-main span,
+.practice-summary-desc {
+  font-size: 12px;
+  color: #909399;
+}
+
+.practice-summary-desc {
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+.tone-bullish {
+  border-left-color: #67c23a;
+}
+
+.tone-dip {
+  border-left-color: #e6a23c;
+}
+
+.tone-risk {
+  border-left-color: #f56c6c;
+}
+
+.tone-retreat {
+  border-left-color: #909399;
+}
+
+.practice-table {
+  width: 100%;
+}
+
+.direction-up {
+  color: #f56c6c;
+  font-weight: 600;
+}
+
+.direction-down {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.direction-flat {
+  color: #909399;
+}
+
 .empty-tip {
   color: #999;
   padding: 24px;
@@ -895,6 +1377,10 @@ onMounted(() => {
 
   .ctl-industry {
     width: 150px;
+  }
+
+  .practice-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   :deep(.heatmap-chart) {
