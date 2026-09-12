@@ -1,202 +1,221 @@
 <template>
   <div class="industry-breadth-analysis">
-    <el-card class="control-card" shadow="never">
-      <div class="controls">
-        <div class="control-group">
-          <span class="control-label">板块类型：</span>
-          <el-select
-            v-model="selectedIdxType"
-            placeholder="选择板块类型"
-            :disabled="loading"
-            @change="handleIdxTypeChange"
-            style="width: 160px"
-          >
-            <el-option label="行业板块" value="行业板块" />
-            <el-option label="概念板块" value="概念板块" />
-          </el-select>
-        </div>
-        <div v-if="selectedIdxType === '行业板块'" class="control-group">
-          <span class="control-label">行业层级：</span>
-          <el-select
-            v-model="selectedLevel"
-            placeholder="选择行业层级"
-            :disabled="loading"
-            @change="handleParamsChange"
-            style="width: 160px"
-          >
-            <el-option
-              v-for="option in levelOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </div>
-        <div class="control-group">
-          <span class="control-label">时间范围：</span>
-          <el-input
-            value="最近10天"
-            disabled
-            style="width: 160px"
-          />
-        </div>
-        <div class="control-group">
-          <span class="control-label">结束日期：</span>
-          <el-date-picker
-            v-model="endDate"
-            type="date"
-            placeholder="选择结束日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            :clearable="false"
-            :disabled="loading"
-            :disabled-date="disableFutureDate"
-            @change="handleParamsChange"
-            style="width: 160px"
-          />
-        </div>
-        <div class="control-group">
-          <span class="control-label">MA窗口：</span>
-          <el-select
-            v-model="maWindow"
-            placeholder="选择 MA 窗口"
-            :disabled="loading"
-            @change="handleParamsChange"
-            style="width: 140px"
-          >
-            <el-option
-              v-for="option in maWindowOptions"
-              :key="option"
-              :label="`MA${option}`"
-              :value="option"
-            />
-          </el-select>
-        </div>
-        <div class="control-group">
-          <span class="control-label">宽度递增：</span>
-          <el-select
-            v-model="consecutiveIncreaseDays"
-            placeholder="筛选连续递增"
-            :disabled="loading"
-            style="width: 160px"
-          >
-            <el-option
-              v-for="option in consecutiveIncreaseDaysOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </div>
-        <div v-if="consecutiveIncreaseDays > 0" class="control-group">
-          <span class="control-label">首日宽度：</span>
-          <el-select
-            v-model="firstDayBreadthRange"
-            placeholder="第一天宽度范围"
-            clearable
-            :disabled="loading"
-            style="width: 140px"
-          >
-            <el-option
-              v-for="option in breadthRangeOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </div>
-        <div v-if="consecutiveIncreaseDays > 0" class="control-group">
-          <span class="control-label">尾日宽度：</span>
-          <el-select
-            v-model="lastDayBreadthRange"
-            placeholder="最后一天宽度范围"
-            clearable
-            :disabled="loading"
-            style="width: 140px"
-          >
-            <el-option
-              v-for="option in breadthRangeOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </div>
-        <div class="control-group amount-range-group">
-          <span class="control-label">成交额范围：</span>
-          <el-select
-            v-model="minAmount"
-            placeholder="最小值"
-            :disabled="loading"
-            style="width: 110px"
-          >
-            <el-option
-              v-for="option in amountFilterOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-          <span style="margin: 0 4px">-</span>
-          <el-select
-            v-model="maxAmount"
-            placeholder="最大值"
-            :disabled="loading"
-            style="width: 110px"
-          >
-            <el-option
-              v-for="option in amountFilterOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </div>
-        <div class="control-group">
-          <el-button type="primary" :loading="loading" @click="fetchData">刷新</el-button>
-        </div>
-        <div class="control-group">
-          <el-button
-            type="default"
-            :disabled="loading || !amountFilteredData.length"
-            @click="toggleLastColumnSort"
-            :icon="sortByLastColumn ? 'SortDown' : 'Sort'"
-          >
-            {{ sortByLastColumn ? '取消排序' : '按最后一列排序' }}
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-
-    <el-card class="chart-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>市场宽度热力图（{{ selectedBoardLabel }} / MA {{ maWindow }}）</span>
-          <div class="header-right">
-            <span class="count-info">行业总数：{{ totalIndustryCount }} / 当前显示：{{ displayedIndustryCount }}</span>
-            <span class="tips">数据来源：板块MA宽度接口</span>
-          </div>
-        </div>
-      </template>
-
-      <div class="methodology">
-        <p>
-          统计口径：基于东方财富{{ selectedIdxType === '概念板块' ? '概念板块' : '行业板块' }}成分，汇总各板块中收盘价高于 MA{{ maWindow }} 的股票占比。
-        </p>
-        <p>
-          计算方式：市场宽度 = count_above_ma / eligible_count。数值越高，表示该板块内站上均线的股票占比越高，整体走势越强。
-        </p>
+    <!--
+      单行筛选条：控件统一 size=small、nowrap + 横向滚动，
+      放不下时横向滚动而不是换行，把纵向空间尽量留给热力图
+    -->
+    <div class="control-bar">
+      <div class="ctl ctl-industry">
+        <IndustryFilter
+          :model-value="props.selectedIndustries"
+          :industries="rawIndustryNames"
+          @update:model-value="emit('update:selectedIndustries', $event)"
+        />
       </div>
 
-      <HeatmapChart
-        v-if="heatmapOption"
-        :option="heatmapOption"
-        @chart-ready="onChartReady"
-        @chart-click="onChartClick"
+      <el-select
+        v-model="selectedIdxType"
+        size="small"
+        class="ctl ctl-md"
+        placeholder="板块类型"
+        :disabled="loading"
+        @change="handleIdxTypeChange"
+      >
+        <el-option label="行业板块" value="行业板块" />
+        <el-option label="概念板块" value="概念板块" />
+      </el-select>
+
+      <el-select
+        v-if="selectedIdxType === '行业板块'"
+        v-model="selectedLevel"
+        size="small"
+        class="ctl ctl-md"
+        placeholder="行业层级"
+        :disabled="loading"
+        @change="handleParamsChange"
+      >
+        <el-option
+          v-for="option in levelOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+
+      <el-select
+        v-model="rangeDays"
+        size="small"
+        class="ctl ctl-sm"
+        placeholder="时间范围"
+        :disabled="loading"
+        @change="handleParamsChange"
+      >
+        <el-option
+          v-for="option in rangeDayOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+
+      <el-date-picker
+        v-model="endDate"
+        type="date"
+        size="small"
+        class="ctl ctl-date"
+        placeholder="结束日期"
+        format="YYYY-MM-DD"
+        value-format="YYYY-MM-DD"
+        :clearable="false"
+        :disabled="loading"
+        :disabled-date="disableFutureDate"
+        @change="handleParamsChange"
       />
 
-      <div v-else class="empty-tip">暂无数据</div>
-    </el-card>
+      <el-select
+        v-model="maWindow"
+        size="small"
+        class="ctl ctl-xs"
+        placeholder="MA窗口"
+        :disabled="loading"
+        @change="handleParamsChange"
+      >
+        <el-option
+          v-for="option in maWindowOptions"
+          :key="option"
+          :label="`MA${option}`"
+          :value="option"
+        />
+      </el-select>
+
+      <el-select
+        v-model="consecutiveIncreaseDays"
+        size="small"
+        class="ctl ctl-md"
+        placeholder="宽度递增"
+        :disabled="loading"
+      >
+        <el-option
+          v-for="option in consecutiveIncreaseDaysOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+
+      <template v-if="consecutiveIncreaseDays > 0">
+        <span class="ctl-label">首日</span>
+        <el-select
+          v-model="firstDayBreadthRange"
+          size="small"
+          class="ctl ctl-xs"
+          placeholder="首日宽度"
+          clearable
+          :disabled="loading"
+        >
+          <el-option
+            v-for="option in breadthRangeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <span class="ctl-label">尾日</span>
+        <el-select
+          v-model="lastDayBreadthRange"
+          size="small"
+          class="ctl ctl-xs"
+          placeholder="尾日宽度"
+          clearable
+          :disabled="loading"
+        >
+          <el-option
+            v-for="option in breadthRangeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+      </template>
+
+      <span class="ctl-label">成交额</span>
+      <el-select
+        v-model="minAmount"
+        size="small"
+        class="ctl ctl-xs"
+        placeholder="最小值"
+        :disabled="loading"
+      >
+        <el-option
+          v-for="option in amountFilterOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+      <span class="amount-sep">-</span>
+      <el-select
+        v-model="maxAmount"
+        size="small"
+        class="ctl ctl-xs"
+        placeholder="最大值"
+        :disabled="loading"
+      >
+        <el-option
+          v-for="option in amountFilterOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+
+      <el-button type="primary" size="small" :loading="loading" @click="fetchData">刷新</el-button>
+      <el-button
+        type="default"
+        size="small"
+        :disabled="loading || !amountFilteredData.length"
+        @click="toggleLastColumnSort"
+        :icon="sortByLastColumn ? 'SortDown' : 'Sort'"
+      >
+        {{ sortByLastColumn ? '取消排序' : '末列排序' }}
+      </el-button>
+
+      <div class="bar-spacer"></div>
+
+      <span class="count-info">行业 {{ totalIndustryCount }} · 显示 {{ displayedIndustryCount }}</span>
+      <el-popover placement="bottom-end" trigger="click" :width="380">
+        <template #reference>
+          <el-icon class="info-icon" :size="16" aria-label="查看统计口径与使用说明">
+            <InfoFilled />
+          </el-icon>
+        </template>
+        <div class="methodology">
+          <p class="methodology-title">统计口径与说明</p>
+          <p>
+            基于东方财富{{ selectedIdxType === '概念板块' ? '概念板块' : '行业板块' }}成分，汇总各板块中收盘价高于
+            MA{{ maWindow }} 的股票占比。
+          </p>
+          <p>
+            市场宽度 = count_above_ma / eligible_count。数值越高，代表该板块内站上均线的股票占比越高，走势越强。
+          </p>
+          <p>时间范围为最近 {{ rangeDays }} 天（最多 30 天），可配合结束日期一起调整。</p>
+          <p>成交额区间按最近一个交易日的板块成交额过滤。</p>
+          <p>
+            行业总数 {{ totalIndustryCount }} / 当前显示 {{ displayedIndustryCount }}，显示数量受行业筛选、宽度递增、成交额区间影响。
+          </p>
+          <p>数据来源：板块 MA 宽度接口。点击热力图任意格子可查看该板块领涨数据详情。</p>
+        </div>
+      </el-popover>
+    </div>
+
+    <HeatmapChart
+      v-if="heatmapOption"
+      :option="heatmapOption"
+      @chart-ready="onChartReady"
+      @chart-click="onChartClick"
+    />
+
+    <div v-else class="empty-tip">暂无数据</div>
 
     <LeadRiseMatrixDialog
       v-model="leadRiseVisible"
@@ -223,7 +242,9 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 import HeatmapChart from '@/components/HeatmapChart.vue'
+import IndustryFilter from '@/components/IndustryFilter.vue'
 import { useIsMobile } from '@/composables/useIsMobile'
 import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
 import {
@@ -241,9 +262,21 @@ const emit = defineEmits<{
   chartReady: [chart: echarts.ECharts]
   chartClick: [payload: { industry: string; sectorCode: string; date: string; value: number; idxType: IndustryMaBreadthIdxType }]
   industriesLoaded: [industries: string[]]
+  'update:selectedIndustries': [industries: string[]]
 }>()
 
-const FIXED_RANGE_DAYS = 10
+/** 时间范围上限：最多回溯 30 天 */
+const MAX_RANGE_DAYS = 30
+const rangeDayOptions = [
+  { label: '最近3天', value: 3 },
+  { label: '最近5天', value: 5 },
+  { label: '最近10天', value: 10 },
+  { label: '最近15天', value: 15 },
+  { label: '最近20天', value: 20 },
+  { label: '最近30天', value: 30 }
+]
+/** 回溯天数（可调，默认与原写死的 10 天一致） */
+const rangeDays = ref<number>(10)
 const loading = ref(false)
 const endDate = ref<string>(formatDate(new Date()))
 const maWindow = ref<number>(5)
@@ -674,7 +707,9 @@ const heatmapOption = computed<echarts.EChartsOption | null>(() => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const [start, end] = computeDateRangeByEndDate(endDate.value, FIXED_RANGE_DAYS)
+    // 时间范围可调，做一次收敛，避免超出接口/页面预期（上限 30 天）
+    const days = Math.min(MAX_RANGE_DAYS, Math.max(1, Math.round(Number(rangeDays.value) || 1)))
+    const [start, end] = computeDateRangeByEndDate(endDate.value, days)
 
     // 并行获取市场宽度数据和成交额数据
     const [breadthData, turnoverResult] = await Promise.all([
@@ -741,134 +776,129 @@ onMounted(() => {
 .industry-breadth-analysis {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+}
 
-  // 去掉所有 el-card 的边框、圆角和阴影
-  :deep(.el-card) {
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
+/* 单行筛选条：不换行，放不下时横向滚动，纵向只占一行高度 */
+.control-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+
+  &::-webkit-scrollbar {
+    height: 4px;
   }
 
-  // 去掉 el-card 的 header 和 body 的左右 padding
-  :deep(.el-card__header),
-  :deep(.el-card__body) {
-    padding-left: 0;
-    padding-right: 0;
+  &::-webkit-scrollbar-thumb {
+    background: #dcdfe6;
+    border-radius: 2px;
   }
 }
 
-.control-card {
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    align-items: center;
-  }
-  .control-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .control-label {
-    color: #666;
+.ctl {
+  flex: 0 0 auto;
+}
+
+.ctl-xs {
+  width: 88px;
+}
+
+.ctl-sm {
+  width: 102px;
+}
+
+.ctl-md {
+  width: 118px;
+}
+
+.ctl-date {
+  width: 132px;
+}
+
+.ctl-industry {
+  width: 190px;
+
+  :deep(.industry-filter-select) {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
   }
 }
 
-.chart-card {
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.ctl-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #909399;
+}
+
+.amount-sep {
+  flex: 0 0 auto;
+  color: #c0c4cc;
+}
+
+.bar-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.count-info {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.info-icon {
+  flex: 0 0 auto;
+  color: #909399;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--el-color-primary);
+  }
+}
+
+.methodology {
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.7;
+
+  p {
+    margin: 0;
+  }
+
+  p + p {
+    margin-top: 6px;
+  }
+
+  .methodology-title {
     font-weight: 600;
+    color: #303133;
   }
-  .methodology {
-    margin-bottom: 16px;
-    padding: 12px 14px;
-    border: 1px solid #ebeef5;
-    border-radius: 8px;
-    background: #f7f8fa;
-    color: #606266;
-    font-size: 13px;
-    line-height: 1.7;
-  }
-  .methodology p { margin: 0; }
-  .methodology p + p { margin-top: 6px; }
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-weight: normal;
-  }
-  .count-info { color: #606266; font-size: 12px; }
-  .tips { color: #999; font-size: 12px; }
-  .empty-tip { color: #999; padding: 24px; text-align: center; }
 }
 
-// 移动端适配
+.empty-tip {
+  color: #999;
+  padding: 24px;
+  text-align: center;
+}
+
+// 移动端适配：筛选条保持单行横向滚动，热力图压缩最小高度
 @media (max-width: 768px) {
   .industry-breadth-analysis {
-    gap: 12px;
+    gap: 8px;
   }
 
-  .control-card {
-    .controls {
-      flex-direction: column;
-      gap: 12px;
-      align-items: stretch;
-    }
-    .control-group {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 6px;
-
-      // 让所有控件在移动端占满宽度
-      :deep(.el-select),
-      :deep(.el-input),
-      :deep(.el-date-picker) {
-        width: 100% !important;
-      }
-
-      :deep(.el-button) {
-        width: 100%;
-      }
-
-      // 成交额范围的两个选择器特殊处理：保持横向布局
-      &.amount-range-group {
-        flex-direction: row;
-        flex-wrap: wrap;
-
-        .control-label {
-          width: 100%;
-          margin-bottom: 2px;
-        }
-
-        :deep(.el-select) {
-          flex: 1;
-          min-width: 0;
-          width: auto !important;
-        }
-
-        > span:not(.control-label) {
-          flex-shrink: 0;
-        }
-      }
-    }
-    .control-label {
-      font-weight: 500;
-    }
+  .ctl-industry {
+    width: 150px;
   }
 
-  .chart-card {
-    .methodology {
-      padding: 10px 12px;
-      font-size: 12px;
-    }
-
-    // 移动端优化热力图显示
-    :deep(.heatmap-chart) {
-      min-height: 300px;
-    }
+  :deep(.heatmap-chart) {
+    min-height: 300px;
   }
 }
 </style>
