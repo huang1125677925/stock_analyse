@@ -56,6 +56,10 @@
           </div>
           <div class="table-meta">
             <el-tag type="info" effect="plain">周期 {{ availablePeriods.join(' / ') }} 日</el-tag>
+            <el-tag v-if="effectiveTradeDate" type="warning" effect="plain">
+              交易日 {{ formatTradeDate(effectiveTradeDate) }}
+            </el-tag>
+            <el-tag v-if="selectedMarket === '全部'" type="info" effect="plain">全部市场</el-tag>
             <el-tag type="success" effect="light">更新时间 {{ queryTime || '--' }}</el-tag>
           </div>
         </div>
@@ -81,7 +85,7 @@
         <el-table-column
           prop="name"
           label="指数名称"
-          :min-width="isMobile ? 92 : 150"
+          :min-width="isMobile ? 92 : 128"
           sortable="custom"
           :fixed="isMobile ? false : 'left'"
         >
@@ -99,30 +103,19 @@
                 type="primary"
                 link
                 class="index-name-button"
+                :title="row.name"
                 @click="openTrendDialog(row)"
               >
                 {{ row.name }}
               </el-button>
-              <span class="index-code">{{ row.ts_code }}</span>
+              <span class="index-code">
+                {{ row.ts_code }}
+                <!-- 只在“全部市场”下补充市场标记，避免混合行无法区分；其余情况上方筛选已说明 -->
+                <span v-if="selectedMarket === '全部'" class="index-code-market">
+                  · {{ row.market }}
+                </span>
+              </span>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="market" label="市场" min-width="90" align="center" sortable="custom">
-          <template #default="{ row }">
-            <el-tag :type="row.market === '国内' ? 'danger' : 'success'" effect="light">
-              {{ row.market }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="trade_date"
-          label="交易日"
-          min-width="110"
-          align="center"
-          sortable="custom"
-        >
-          <template #default="{ row }">
-            {{ formatTradeDate(row.trade_date) }}
           </template>
         </el-table-column>
         <el-table-column
@@ -240,6 +233,14 @@ const isMobile = ref(window.innerWidth < 768)
 const tableHeight = computed(() => {
   if (isMobile.value) return undefined
   return props.embedded ? 520 : 'calc(100dvh - 240px)'
+})
+
+// 接口返回的是同一交易日截面，取最大日期作为表头“交易日”标签（原“交易日”列已上移到表头）
+const effectiveTradeDate = computed(() => {
+  const dates = rows.value
+    .map((item) => String(item.trade_date || ''))
+    .filter((value) => value.length === 8)
+  return dates.length ? dates.sort()[dates.length - 1] : ''
 })
 
 const filteredRows = computed(() => {
@@ -551,6 +552,16 @@ function handleResize() {
 
 .index-name-button {
   padding: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 列变窄后长指数名（如“印度孟买SENSEX指数”）在单元格内省略号截断，悬停显示完整名称 */
+.index-name-button :deep(span) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .index-name-cell {
@@ -558,11 +569,18 @@ function handleResize() {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .index-code {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+/* “全部市场”下才出现的行内市场标记 */
+.index-code-market {
+  color: var(--el-text-color-placeholder);
 }
 
 .rps-cell {
