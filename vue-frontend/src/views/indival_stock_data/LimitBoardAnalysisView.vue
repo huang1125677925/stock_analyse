@@ -100,7 +100,8 @@ const industryMappingOptions: Array<{ label: string; value: IndustryMapping }> =
 ]
 
 const industryMapping = ref<IndustryMapping>('dc_l2')
-const showStockList = ref(true)
+// 默认只展示涨停数量与状态统计，个股列表改为按需打开（右上角开关）
+const showStockList = ref(false)
 
 /** 行业映射 -> 东财板块类型，供领涨数据详情按 idx_type 拉取板块K线 */
 const industryIdxType = computed(() => {
