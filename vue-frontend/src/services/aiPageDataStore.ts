@@ -4,7 +4,7 @@
  * 功能：
  * - 自动采集：由 axios 响应拦截器调用 recordApiResponse，缓存「当前页面」最近各接口的返回数据
  * - 显式注册：页面通过 useAiPageData / registerAiPageDataProvider 提供更精炼的分析数据（优先级更高）
- * - 统一裁剪：对超长字符串、超大数组做递归裁剪并插入「已省略」标记，控制送入模型的体量
+ * - 原样传递：采集到的数据不做压缩裁剪，由模型上下文和 DeepSeek 接口自行决定可处理范围
  *
  * 采集范围仅限浏览器内存 + 当前路由：切换路由即清空，不会把上一页数据混入本次分析。
  */
@@ -60,30 +60,6 @@ export type AiPageDataProvider = () =>
 
 /** 自动采集的最大接口条数（超出后丢弃最旧的） */
 const MAX_RECORDS = 12
-interface ShrinkLimits {
-  maxDepth: number
-  maxArrayLength: number
-  maxObjectKeys: number
-  maxStringLength: number
-}
-
-/** 递归裁剪参数 */
-const SHRINK_LIMITS: ShrinkLimits = {
-  maxDepth: 6,
-  maxArrayLength: 60,
-  maxObjectKeys: 80,
-  maxStringLength: 1500,
-}
-/** 送入模型的整体字符预算 */
-const MAX_TOTAL_CHARS = 120_000
-/** 超出整体预算时的二次压缩档位，确保不会把超大数据源整条丢弃 */
-const BUDGET_SHRINK_STEPS: ShrinkLimits[] = [
-  { maxDepth: 5, maxArrayLength: 40, maxObjectKeys: 50, maxStringLength: 800 },
-  { maxDepth: 4, maxArrayLength: 25, maxObjectKeys: 35, maxStringLength: 500 },
-  { maxDepth: 4, maxArrayLength: 15, maxObjectKeys: 25, maxStringLength: 300 },
-  { maxDepth: 3, maxArrayLength: 8, maxObjectKeys: 16, maxStringLength: 180 },
-  { maxDepth: 2, maxArrayLength: 5, maxObjectKeys: 12, maxStringLength: 120 },
-]
 
 /** 不参与自动采集的接口关键字（鉴权、统计等与分析无关或涉及隐私） */
 const EXCLUDED_URL_PATTERNS = [
@@ -181,149 +157,6 @@ function shortenEndpoint(url: string): string {
 }
 
 /**
- * 递归裁剪数据：限制深度、数组长度、对象键数量与字符串长度，
- * 被裁掉的部分插入可读标记，让模型知道数据不完整。
- * 参数：value 任意数据；depth 当前深度。
- * 返回值：裁剪后的可序列化数据。
- */
-function shrinkValue(value: unknown, depth = 0, limits: ShrinkLimits = SHRINK_LIMITS): unknown {
-  if (value === null || value === undefined) return value
-
-  if (typeof value === 'string') {
-    if (value.length <= limits.maxStringLength) return value
-    return `${value.slice(0, limits.maxStringLength)}……[字符串过长已省略 ${value.length - limits.maxStringLength} 字符]`
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') return value
-
-  if (typeof value !== 'object') return String(value)
-
-  if (depth >= limits.maxDepth) return '[层级过深已省略]'
-
-  if (Array.isArray(value)) {
-    const limited = value
-      .slice(0, limits.maxArrayLength)
-      .map((item) => shrinkValue(item, depth + 1, limits))
-    if (value.length > limits.maxArrayLength) {
-      limited.push(`[共 ${value.length} 条，已省略后 ${value.length - limits.maxArrayLength} 条]`)
-    }
-    return limited
-  }
-
-  const entries = Object.entries(value as Record<string, unknown>)
-  const result: Record<string, unknown> = {}
-  for (const [key, item] of entries.slice(0, limits.maxObjectKeys)) {
-    result[key] = shrinkValue(item, depth + 1, limits)
-  }
-  if (entries.length > limits.maxObjectKeys) {
-    result.__omitted_keys__ = `[共 ${entries.length} 个字段，已省略 ${entries.length - limits.maxObjectKeys} 个]`
-  }
-  return result
-}
-
-/**
- * 生成超大数据源的结构说明。
- * 参数：value 任意数据；depth 当前递归深度。
- * 返回值：字段、数组长度等轻量信息，作为极限压缩兜底。
- */
-function describeValueShape(value: unknown, depth = 0): unknown {
-  if (value === null || value === undefined) return value
-  if (typeof value !== 'object') return typeof value
-  if (depth >= 3) return Array.isArray(value) ? `[数组，长度 ${value.length}]` : '[对象，层级已省略]'
-
-  if (Array.isArray(value)) {
-    return {
-      类型: '数组',
-      条数: value.length,
-      首条结构: value.length ? describeValueShape(value[0], depth + 1) : null,
-    }
-  }
-
-  const entries = Object.entries(value as Record<string, unknown>)
-  const fields = entries.slice(0, 30).map(([key]) => key)
-  return {
-    类型: '对象',
-    字段数: entries.length,
-    字段: fields,
-    示例结构: Object.fromEntries(
-      entries.slice(0, 8).map(([key, item]) => [key, describeValueShape(item, depth + 1)]),
-    ),
-    ...(entries.length > fields.length
-      ? { 省略字段: `已省略 ${entries.length - fields.length} 个字段名` }
-      : {}),
-  }
-}
-
-function withBudgetNotice(data: unknown, originalSize: number): unknown {
-  return {
-    数据已裁剪: `原数据约 ${originalSize} 字符，因超过单次分析预算已压缩保留代表性样本。`,
-    数据: data,
-  }
-}
-
-/**
- * 将单个超大来源压缩到剩余预算内。
- * 参数：source 原来源；remainingChars 剩余字符预算；originalSize 原数据字符数。
- * 返回值：可纳入 payload 的压缩来源；预算过低时返回 null。
- */
-function compactSourceToFit(
-  source: AiAnalysisSource,
-  remainingChars: number,
-  originalSize: number,
-): { source: AiAnalysisSource; size: number } | null {
-  if (remainingChars < 800) return null
-
-  for (const limits of BUDGET_SHRINK_STEPS) {
-    const data = withBudgetNotice(shrinkValue(source.data, 0, limits), originalSize)
-    const size = safeStringify(data).length
-    if (size <= remainingChars) {
-      return {
-        source: {
-          ...source,
-          id: `${source.id}:compact`,
-          name: `${source.name}（已压缩）`,
-          data,
-        },
-        size,
-      }
-    }
-  }
-
-  const shapeData = {
-    数据已裁剪: `原数据约 ${originalSize} 字符，体量过大，已保留数据结构和字段信息。`,
-    数据结构: describeValueShape(source.data),
-  }
-  const shapeSize = safeStringify(shapeData).length
-  if (shapeSize <= remainingChars) {
-    return {
-      source: {
-        ...source,
-        id: `${source.id}:shape`,
-        name: `${source.name}（结构摘要）`,
-        data: shapeData,
-      },
-      size: shapeSize,
-    }
-  }
-
-  const textData = `[${source.name} 原数据约 ${originalSize} 字符，超过剩余分析预算；请缩小日期区间或筛选条件后重新采集。]`
-  const textSize = safeStringify(textData).length
-  if (textSize <= remainingChars) {
-    return {
-      source: {
-        ...source,
-        id: `${source.id}:notice`,
-        name: `${source.name}（超限提示）`,
-        data: textData,
-      },
-      size: textSize,
-    }
-  }
-
-  return null
-}
-
-/**
  * 记录一次接口响应（由 axios 响应拦截器调用）。
  * 参数：input.url 接口地址；input.method 请求方法；input.params 请求参数；input.data 响应数据。
  * 返回值：无
@@ -339,7 +172,7 @@ export function recordApiResponse(input: {
   if (input.data === null || input.data === undefined || input.data === '') return
 
   const method = (input.method || 'GET').toUpperCase()
-  const params = input.params ? (shrinkValue(input.params, 1) as Record<string, unknown>) : undefined
+  const params = input.params ?? undefined
   const key = `${method} ${url} ${params ? JSON.stringify(params) : ''}`
 
   // 同一接口重复请求时保留最新一次，并移动到队尾
@@ -355,7 +188,7 @@ export function recordApiResponse(input: {
       endpoint: url,
       params,
       capturedAt: Date.now(),
-      data: shrinkValue(input.data),
+      data: input.data,
     },
   })
 
@@ -414,9 +247,7 @@ async function collectPageSources(): Promise<AiAnalysisSource[]> {
         name,
         kind: 'page',
         capturedAt: Date.now(),
-        data: shrinkValue(
-          result.summary ? { 数据说明: result.summary, 数据: result.data } : result.data,
-        ),
+        data: result.summary ? { 数据说明: result.summary, 数据: result.data } : result.data,
       })
     } catch (error) {
       console.warn('[ai-analysis] 页面数据提供者执行失败:', error)
@@ -428,42 +259,14 @@ async function collectPageSources(): Promise<AiAnalysisSource[]> {
 /**
  * 汇总一次分析所需的全部数据。
  * 参数：无
- * 返回值：数据包（页面注册数据优先，其后是自动采集的接口数据，受总字符预算约束）。
+ * 返回值：数据包（页面注册数据优先，其后是自动采集的接口数据，原样纳入）。
  */
 export async function collectAiAnalysisPayload(): Promise<AiAnalysisPayload> {
   const pageSources = await collectPageSources()
   const apiSources = getCapturedSources()
 
-  const sources: AiAnalysisSource[] = []
-  let charLength = 0
-  let truncated = false
-
-  for (const source of [...pageSources, ...apiSources]) {
-    const size = safeStringify(source.data).length
-    if (charLength + size > MAX_TOTAL_CHARS) {
-      truncated = true
-      const compacted = compactSourceToFit(source, MAX_TOTAL_CHARS - charLength, size)
-      if (compacted) {
-        sources.push(compacted.source)
-        charLength += compacted.size
-      }
-      continue
-    }
-    charLength += size
-    sources.push(source)
-  }
-
-  if (truncated) {
-    const source: AiAnalysisSource = {
-      id: 'system:truncated',
-      name: '系统提示',
-      kind: 'api',
-      capturedAt: Date.now(),
-      data: '[部分数据因体量过大已压缩或未纳入本次分析，如需完整分析请缩小日期区间或减少筛选条件]',
-    }
-    sources.push(source)
-    charLength += safeStringify(source.data).length
-  }
+  const sources = [...pageSources, ...apiSources]
+  const charLength = sources.reduce((total, source) => total + safeStringify(source.data).length, 0)
 
   return {
     routePath: currentRoutePath,
