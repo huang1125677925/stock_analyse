@@ -29,19 +29,18 @@
         <div v-if="filteredBoardItems.length" class="chart-grid">
           <section class="chart-panel">
             <div class="chart-heading">
-              <div class="chart-title">{{ selectedMetricLabel }}</div>
+              <div class="chart-title">{{ valuationChartTitle }}</div>
               <div class="color-note">
-                颜色按{{ selectedMetricLabel }}历史分位判断，不按绝对值：
+                <span class="note-item">
+                  <i class="note-bar"></i>柱＝{{ selectedMetricPercentileLabel }}（左轴，颜色按分位判断）
+                </span>
+                <span class="note-item"><i class="note-line"></i>线＝{{ selectedMetricLabel }}（右轴）</span>
                 <span class="note-item"><i class="note-dot low"></i>低估 <= 20%</span>
                 <span class="note-item"><i class="note-dot neutral"></i>中性 20%-70%</span>
                 <span class="note-item"><i class="note-dot high"></i>高估 >= 70%</span>
               </div>
             </div>
-            <div ref="valueChartRef" class="bar-chart"></div>
-          </section>
-          <section class="chart-panel">
-            <div class="chart-title">{{ selectedMetricPercentileLabel }}</div>
-            <div ref="percentileChartRef" class="bar-chart"></div>
+            <div ref="valuationChartRef" class="bar-chart"></div>
           </section>
         </div>
 
@@ -159,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch, type Ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { getSwValuationAnalysis, type SwValuationAnalysisItem } from '@/services/industryApi'
@@ -193,25 +192,14 @@ interface DialogChildRow extends SwIndexClassifyItem {
 }
 
 type ChartMetricKey = 'pe' | 'pb' | 'pe_percentile' | 'pb_percentile'
-type ChartSlotKey = 'value' | 'percentile'
 type ValuationMetric = 'pe' | 'pb'
-
-interface ValuationChartConfig {
-  id: ChartSlotKey
-  key: ChartMetricKey
-  label: string
-  ref: Ref<HTMLElement | null>
-  isPercentile?: boolean
-}
 
 const loading = ref(false)
 const tableData = ref<SwValuationAnalysisItem[]>([])
 const selectedRangeYears = ref(3)
 const selectedValuationMetric = ref<ValuationMetric>('pe')
 
-const valueChartRef = ref<HTMLElement | null>(null)
-const percentileChartRef = ref<HTMLElement | null>(null)
-const chartInstances = new Map<ChartSlotKey, echarts.ECharts>()
+const valuationChartRef = ref<HTMLElement | null>(null)
 
 const industryDialogVisible = ref(false)
 const industryDialogLoading = ref(false)
@@ -229,16 +217,8 @@ const selectedMetricPercentileLabel = computed(() => `${selectedMetricLabel.valu
 const selectedMetricKey = computed<ChartMetricKey>(() => selectedValuationMetric.value)
 const selectedPercentileKey = computed<ChartMetricKey>(() => `${selectedValuationMetric.value}_percentile` as ChartMetricKey)
 
-const chartConfigs = computed<ValuationChartConfig[]>(() => [
-  { id: 'value', key: selectedMetricKey.value, label: selectedMetricLabel.value, ref: valueChartRef },
-  {
-    id: 'percentile',
-    key: selectedPercentileKey.value,
-    label: selectedMetricPercentileLabel.value,
-    ref: percentileChartRef,
-    isPercentile: true
-  }
-])
+// 分位数与指标值合并为一张图：柱=分位数（左轴），线=指标值（右轴）
+const valuationChartTitle = computed(() => `${selectedMetricLabel.value} 估值与分位数`)
 
 const endDate = new Date()
 const startDate = new Date()
@@ -375,39 +355,46 @@ const getChartValue = (item: BoardItem, key: ChartMetricKey) => {
   return Number.isFinite(value) ? value : null
 }
 
-const getChartBarColor = (item: BoardItem, key: ChartMetricKey) => {
-  const percentile = key === 'pb' || key === 'pb_percentile' ? item.pb_percentile : item.pe_percentile
-  return getToneMeta(normalizePercentile(percentile)).color
-}
+// 柱色按分位判断（低=绿、中性=黄、高=红），与右侧指标折线区分开
+const getBarColorByPercentile = (percentile: number) => getToneMeta(normalizePercentile(percentile)).color
 
-const formatChartValue = (value: number, isPercentile?: boolean) => {
-  return isPercentile ? Number(value).toFixed(1) : formatNumber(value)
-}
-
-const getSortedChartItems = (key: ChartMetricKey) => {
+/** 行业按分位数从低到高排列，柱（分位）与线（指标值）共用同一套顺序 */
+const getSortedChartItems = () => {
   return filteredBoardItems.value
-    .map(item => ({ item, value: getChartValue(item, key) }))
-    .filter((entry): entry is { item: BoardItem; value: number } => entry.value !== null)
-    .sort((a, b) => a.value - b.value)
+    .map(item => ({
+      item,
+      percentile: getChartValue(item, selectedPercentileKey.value),
+      metricValue: getChartValue(item, selectedMetricKey.value)
+    }))
+    .filter(
+      (entry): entry is { item: BoardItem; percentile: number; metricValue: number | null } =>
+        entry.percentile !== null
+    )
+    .sort((a, b) => a.percentile - b.percentile)
 }
 
-const buildChartOption = (config: ValuationChartConfig): echarts.EChartsOption => {
-  const sortedItems = getSortedChartItems(config.key)
-  const names = sortedItems.map(({ item }) => item.name)
-  const data = sortedItems.map(({ item, value }) => ({
-    value,
+const buildChartOption = (): echarts.EChartsOption => {
+  const entries = getSortedChartItems()
+  const names = entries.map(({ item }) => item.name)
+  const metricLabel = selectedMetricLabel.value
+  const percentileLabel = selectedMetricPercentileLabel.value
+
+  const barData = entries.map(({ item, percentile }) => ({
+    value: percentile,
     item,
     itemStyle: {
-      color: getChartBarColor(item, config.key),
+      color: getBarColorByPercentile(percentile),
       borderRadius: [4, 4, 0, 0]
     }
   }))
 
+  const lineData = entries.map(({ item, metricValue }) => ({ value: metricValue, item }))
+
   return {
     animationDuration: 240,
     grid: {
-      top: 18,
-      right: 24,
+      top: 30,
+      right: 66, // 给右侧轴名称与刻度留出空间
       bottom: 76,
       left: 54,
       containLabel: true
@@ -417,14 +404,16 @@ const buildChartOption = (config: ValuationChartConfig): echarts.EChartsOption =
       axisPointer: { type: 'shadow' },
       confine: true,
       formatter(params) {
-        const row = Array.isArray(params) ? params[0] : params
-        const chartData = row?.data as { value: number; item: BoardItem } | undefined
-        if (!chartData?.item) return ''
-        const suffix = config.isPercentile ? '%' : ''
+        const list = Array.isArray(params) ? params : [params]
+        const item = (list[0]?.data as { item?: BoardItem } | undefined)?.item
+        if (!item) return ''
+        const percentile = getChartValue(item, selectedPercentileKey.value)
+        const metricValue = getChartValue(item, selectedMetricKey.value)
         return [
-          `${chartData.item.name} ${chartData.item.ts_code}`,
-          `${config.label}: ${formatChartValue(chartData.value, config.isPercentile)}${suffix}`,
-          `估值状态: ${chartData.item.direction}`
+          `${item.name} ${item.ts_code}`,
+          `${percentileLabel}: ${percentile === null ? '--' : `${percentile.toFixed(1)}%`}`,
+          `${metricLabel}: ${formatNumber(metricValue)}`,
+          `估值状态: ${item.direction}`
         ].join('<br/>')
       }
     },
@@ -442,18 +431,31 @@ const buildChartOption = (config: ValuationChartConfig): echarts.EChartsOption =
         overflow: 'truncate'
       }
     },
-    yAxis: {
-      type: 'value',
-      min: 0,
-      max: config.isPercentile ? 100 : undefined,
-      axisLabel: {
-        color: '#6b7280',
-        formatter: config.isPercentile ? '{value}%' : '{value}'
+    yAxis: [
+      {
+        type: 'value',
+        name: '分位',
+        min: 0,
+        max: 100,
+        nameTextStyle: { color: '#6b7280' },
+        axisLabel: {
+          color: '#6b7280',
+          formatter: '{value}%'
+        },
+        splitLine: {
+          lineStyle: { color: '#eef2f7' }
+        }
       },
-      splitLine: {
-        lineStyle: { color: '#eef2f7' }
+      {
+        type: 'value',
+        name: metricLabel,
+        // 折线轴自适应范围（不强拉到 0），便于看出行业间指标值的相对高低
+        scale: true,
+        nameTextStyle: { color: '#409EFF' },
+        axisLabel: { color: '#409EFF' },
+        splitLine: { show: false }
       }
-    },
+    ],
     dataZoom: [
       {
         type: 'inside',
@@ -472,13 +474,15 @@ const buildChartOption = (config: ValuationChartConfig): echarts.EChartsOption =
     ],
     series: [
       {
-        name: config.label,
+        name: percentileLabel,
         type: 'bar',
+        yAxisIndex: 0,
         barMaxWidth: 28,
-        data,
+        data: barData,
         cursor: 'pointer',
         emphasis: {
-          focus: 'self',
+          // 不用 focus:'self'：否则悬停柱子会把右侧折线整体淡化
+          focus: 'none',
           itemStyle: {
             shadowBlur: 12,
             shadowColor: 'rgba(15, 23, 42, 0.22)'
@@ -489,47 +493,58 @@ const buildChartOption = (config: ValuationChartConfig): echarts.EChartsOption =
           position: 'top',
           color: '#475569',
           fontSize: 11,
-          formatter: ({ value }) => `${formatChartValue(Number(value), config.isPercentile)}${config.isPercentile ? '%' : ''}`
+          formatter: ({ value }) => `${Number(value).toFixed(1)}%`
         }
+      },
+      {
+        name: metricLabel,
+        type: 'line',
+        yAxisIndex: 1,
+        data: lineData,
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 6,
+        connectNulls: true,
+        z: 3,
+        cursor: 'pointer',
+        lineStyle: { width: 2, color: '#409EFF' },
+        itemStyle: { color: '#409EFF' }
       }
     ]
   }
 }
 
+let chartInstance: echarts.ECharts | null = null
+
 const renderCharts = async () => {
   await nextTick()
-  for (const config of chartConfigs.value) {
-    const el = config.ref.value
-    if (!el) continue
+  const el = valuationChartRef.value
+  if (!el) return
 
-    let instance = chartInstances.get(config.id)
-    if (instance && instance.getDom() !== el) {
-      instance.dispose()
-      chartInstances.delete(config.id)
-      instance = undefined
-    }
-    if (!instance) {
-      instance = echarts.init(el)
-      instance.on('click', (params) => {
-        const chartData = params.data as { item?: BoardItem } | undefined
-        if (chartData?.item) {
-          void openIndustryDialog(chartData.item)
-        }
-      })
-      chartInstances.set(config.id, instance)
-    }
-    instance.setOption(buildChartOption(config), true)
-    instance.resize()
+  if (chartInstance && chartInstance.getDom() !== el) {
+    chartInstance.dispose()
+    chartInstance = null
   }
+  if (!chartInstance) {
+    chartInstance = echarts.init(el)
+    chartInstance.on('click', (params) => {
+      const chartData = params.data as { item?: BoardItem } | undefined
+      if (chartData?.item) {
+        void openIndustryDialog(chartData.item)
+      }
+    })
+  }
+  chartInstance.setOption(buildChartOption(), true)
+  chartInstance.resize()
 }
 
 const resizeCharts = () => {
-  chartInstances.forEach(chart => chart.resize())
+  chartInstance?.resize()
 }
 
 const disposeCharts = () => {
-  chartInstances.forEach(chart => chart.dispose())
-  chartInstances.clear()
+  chartInstance?.dispose()
+  chartInstance = null
 }
 
 const fetchData = async () => {
@@ -812,6 +827,22 @@ watch([filteredBoardItems, selectedValuationMetric], () => {
 
 .note-dot.high {
   background: #c84f44;
+}
+
+/* 图例中“柱/线”的示意标记 */
+.note-bar {
+  width: 8px;
+  height: 12px;
+  border-radius: 2px 2px 0 0;
+  background: #b88228;
+  display: inline-block;
+}
+
+.note-line {
+  width: 18px;
+  height: 0;
+  border-top: 2px solid #409eff;
+  display: inline-block;
 }
 
 .bar-chart {
