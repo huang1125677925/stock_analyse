@@ -85,42 +85,7 @@
 
     <section class="ranking-panel" aria-label="全市场股票RPS榜单">
       <div class="ranking-panel-header">
-        <div class="table-header">
-          <div class="table-title-row">
-            <div class="table-title">全市场股票 RPS 榜单</div>
-            <el-popover placement="bottom-start" trigger="click" width="420">
-              <template #reference>
-                <el-button
-                  class="info-button"
-                  circle
-                  size="small"
-                  :icon="InfoFilled"
-                  aria-label="查看RPS说明"
-                />
-              </template>
-              <div class="info-popover">
-                <p>RPS（Relative Price Strength）用于衡量股票在同一股票池中的相对强弱。</p>
-                <p>系统基于目标交易日横向计算当日涨跌幅和 5 / 20 / 60 日收益率，并生成对应排名。</p>
-                <p>
-                  计算公式：RPS = (1 - rank / total) *
-                  100。数值越高，说明该股票在当前筛选范围内越强。
-                </p>
-                <p>条件变更后自动刷新；点击股票名称可查看前复权趋势图。</p>
-              </div>
-            </el-popover>
-          </div>
-          <div class="table-summary">
-            <el-tag type="info" effect="plain">返回 {{ stockRpsData?.total ?? 0 }}</el-tag>
-            <el-tag type="primary" effect="light">筛选 {{ filteredRows.length }}</el-tag>
-            <el-tag effect="plain">{{ formatCompactDate(stockRpsData?.trade_date) }}</el-tag>
-            <el-tag effect="plain">{{ currentPeriodsText }}</el-tag>
-            <el-tag effect="plain">{{ stockRpsData?.exchange || '全市场' }}</el-tag>
-            <el-tag v-if="stockRpsData?.market" type="success" effect="light">{{
-              stockRpsData.market
-            }}</el-tag>
-            <el-tag effect="plain">{{ formatDateTime(stockRpsData?.query_time) }}</el-tag>
-          </div>
-        </div>
+        <!-- 单行头部：筛选 + 计数 + 说明入口，纵向空间尽量留给榜单 -->
         <div class="table-filter-toolbar">
           <div
             v-for="filterGroup in rpsFilterGroups"
@@ -194,6 +159,45 @@
           >
             清空筛选
           </el-button>
+
+          <div class="toolbar-spacer"></div>
+
+          <div class="table-summary">
+            <el-tag type="info" effect="plain">返回 {{ stockRpsData?.total ?? 0 }}</el-tag>
+            <el-tag type="primary" effect="light">筛选 {{ filteredRows.length }}</el-tag>
+            <el-tag v-if="stockRpsData?.trade_date" effect="plain">{{
+              formatCompactDate(stockRpsData?.trade_date)
+            }}</el-tag>
+          </div>
+
+          <el-popover placement="bottom-end" trigger="click" width="420">
+            <template #reference>
+              <el-button
+                class="info-button"
+                circle
+                size="small"
+                :icon="InfoFilled"
+                aria-label="查看RPS说明与当前查询条件"
+              />
+            </template>
+            <div class="info-popover">
+              <p>RPS（Relative Price Strength）用于衡量股票在同一股票池中的相对强弱。</p>
+              <p>系统基于目标交易日横向计算当日涨跌幅和 5 / 20 / 60 日收益率，并生成对应排名。</p>
+              <p>
+                计算公式：RPS = (1 - rank / total) *
+                100。数值越高，说明该股票在当前筛选范围内越强。
+              </p>
+              <p>条件变更后自动刷新；点击股票名称可查看前复权趋势图。</p>
+              <p class="info-popover-section">当前查询</p>
+              <p>收益周期：{{ currentPeriodsText }}</p>
+              <p>
+                交易所：{{ stockRpsData?.exchange || '全市场' }}
+                <template v-if="stockRpsData?.market"> · 市场板块：{{ stockRpsData.market }}</template>
+              </p>
+              <p>数据返回时间：{{ formatDateTime(stockRpsData?.query_time) }}</p>
+              <p>榜单返回 {{ stockRpsData?.total ?? 0 }} 条，筛选后显示 {{ filteredRows.length }} 条。</p>
+            </div>
+          </el-popover>
         </div>
       </div>
 
@@ -290,9 +294,17 @@
         >
           <template #default="{ row }">
             <div class="rps-cell">
-              <span :class="getChangeClass(row.pct_change)">{{
-                formatPercent(row.pct_change)
-              }}</span>
+              <div class="rps-cell-head">
+                <span :class="getChangeClass(row.pct_change)">{{
+                  formatPercent(row.pct_change)
+                }}</span>
+                <span
+                  class="rps-rank"
+                  :class="getRpsRankClass(getNumericValue(row.RPS_today))"
+                >
+                  {{ getRpsRankText(getNumericValue(row.RPS_today)) }}
+                </span>
+              </div>
               <el-progress
                 :percentage="getNumericValue(row.RPS_today)"
                 :color="getRpsColor(getNumericValue(row.RPS_today))"
@@ -300,9 +312,6 @@
                 :stroke-width="16"
                 :text-inside="true"
               />
-              <div class="rps-rank" :class="getRpsRankClass(getNumericValue(row.RPS_today))">
-                {{ getRpsRankText(getNumericValue(row.RPS_today)) }}
-              </div>
             </div>
           </template>
         </el-table-column>
@@ -317,9 +326,17 @@
           >
             <template #default="{ row }">
               <div class="rps-cell">
-                <span :class="getChangeClass(row[getReturnProp(period)])">
-                  {{ formatPercent(row[getReturnProp(period)]) }}
-                </span>
+                <div class="rps-cell-head">
+                  <span :class="getChangeClass(row[getReturnProp(period)])">
+                    {{ formatPercent(row[getReturnProp(period)]) }}
+                  </span>
+                  <span
+                    class="rps-rank"
+                    :class="getRpsRankClass(getNumericValue(row[getRpsProp(period)]))"
+                  >
+                    {{ getRpsRankText(getNumericValue(row[getRpsProp(period)])) }}
+                  </span>
+                </div>
                 <el-progress
                   :percentage="getNumericValue(row[getRpsProp(period)])"
                   :color="getRpsColor(getNumericValue(row[getRpsProp(period)]))"
@@ -327,12 +344,6 @@
                   :stroke-width="16"
                   :text-inside="true"
                 />
-                <div
-                  class="rps-rank"
-                  :class="getRpsRankClass(getNumericValue(row[getRpsProp(period)]))"
-                >
-                  {{ getRpsRankText(getNumericValue(row[getRpsProp(period)])) }}
-                </div>
               </div>
             </template>
           </el-table-column>
@@ -1342,13 +1353,13 @@ watch(
 
 .filter-panel {
   flex-shrink: 0;
-  padding: 12px 14px 0;
+  padding: 8px 14px 0;
   background: #ffffff;
   border: 1px solid #e5e9f0;
 }
 
 .compact-filter-form :deep(.el-form-item) {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .compact-filter-form :deep(.el-form-item__label) {
@@ -1395,22 +1406,9 @@ watch(
   border: 1px solid #e1e6ee;
 }
 
-.table-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #172033;
-  letter-spacing: 0;
-}
-
-.table-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .ranking-panel-header {
   flex-shrink: 0;
-  padding: 12px 14px 10px;
+  padding: 8px 14px;
   border-bottom: 1px solid #e8edf3;
   background: #ffffff;
 }
@@ -1450,7 +1448,18 @@ watch(
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 10px;
+}
+
+/* 把计数与说明入口推到右侧，和筛选控件共用一行 */
+.toolbar-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.info-popover-section {
+  margin-top: 4px !important;
+  font-weight: 600;
+  color: #303133;
 }
 
 .toolbar-filter {
@@ -1513,16 +1522,24 @@ watch(
 .rps-cell {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+
+/* 涨跌幅与强弱标签同排，省掉原来单独一行，行高从 ~85px 降到 ~55px */
+.rps-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
 .rps-rank {
-  align-self: center;
-  min-width: 42px;
-  padding: 2px 7px;
+  min-width: 0;
+  padding: 1px 6px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.4;
+  white-space: nowrap;
 }
 
 .rank-excellent {
