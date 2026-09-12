@@ -51,6 +51,7 @@
  */
 import { computed, defineComponent, h, onMounted, ref } from 'vue'
 import LimitBoardIndustryTrendMatrix from '@/components/LimitBoardIndustryTrendMatrix.vue'
+import { useAiPageData } from '@/composables/useAiPageData'
 import {
   fetchIndustryTrendStrength,
   type IndustryMapping,
@@ -115,6 +116,26 @@ const loading = ref(false)
 const industryTrendData = ref<IndustryTrendStrengthData | null>(null)
 
 const industryTrendDaily = computed(() => industryTrendData.value?.data || {})
+
+/** 当前行业映射方式的中文名，用于分析数据说明 */
+const industryMappingLabel = computed(
+  () =>
+    industryMappingOptions.find((option) => option.value === industryMapping.value)?.label ??
+    industryMapping.value
+)
+
+/**
+ * 向全局 DeepSeek 分析组件注册本页数据。
+ * 传入 getter：用户切换行业映射或重新拉取数据后，分析时自动取最新值。
+ */
+useAiPageData(() => ({
+  title: '行业涨停趋势矩阵',
+  summary:
+    `区间 ${trendStartDate.value} ~ ${trendEndDate.value}，行业映射方式：${industryMappingLabel.value}。` +
+    'data 为「交易日 -> 行业 -> 涨停家数/强度指标」明细，summary 为区间汇总，' +
+    'source_counts 为打板策略各数据源记录数',
+  data: industryTrendData.value
+}))
 
 async function loadIndustryTrend(force = false) {
   if (loading.value && !force) return

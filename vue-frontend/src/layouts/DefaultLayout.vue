@@ -112,6 +112,7 @@
           <el-icon><View /></el-icon>
           <strong>{{ formattedVisitCount }}</strong>
         </div>
+        <AiAnalysisButton size="small" :show-label="false" />
         <el-button class="mobile-menu-btn" type="text" @click="mobileMenuVisible = true">
           <el-icon><Menu /></el-icon>
         </el-button>
@@ -127,12 +128,17 @@
             </el-breadcrumb-item>
           </el-breadcrumb>
         </div>
+        <!-- 全局数据分析入口：所有页面共用，数据由当前页面自动采集 -->
+        <AiAnalysisButton />
       </div>
     </div>
 
     <el-main class="main-content">
       <router-view />
     </el-main>
+
+    <!-- 全局数据分析弹窗：只渲染一份，不随断点切换销毁，分析过程不会被窗口尺寸变化打断 -->
+    <AiAnalysisDialog v-model="aiAnalysisDialogVisible" />
 
     <el-drawer v-model="mobileMenuVisible" direction="rtl" size="100%" :with-header="false">
       <div class="mobile-drawer">
@@ -209,6 +215,9 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { recordSiteVisit } from '../services/siteStatsApi'
 import { Fold, Menu, ArrowDown, View } from '@element-plus/icons-vue'
+import AiAnalysisButton from '@/components/AiAnalysisButton.vue'
+import AiAnalysisDialog from '@/components/AiAnalysisDialog.vue'
+import { aiAnalysisDialogVisible } from '@/composables/useAiAnalysisDialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -394,6 +403,13 @@ watch(
 .breadcrumb {
   margin-left: 8px;
   white-space: nowrap;
+}
+
+/* 面包屑行右侧承载全局数据分析入口，窄屏下只保留面包屑 */
+@media (max-width: 992px) {
+  .subbar-content :deep(.ai-analysis-button-label) {
+    display: none;
+  }
 }
 
 .risk-warning {

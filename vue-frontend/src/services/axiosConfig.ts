@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
 import { API_BASE_URL } from '@/config/api';
+import { recordApiResponse } from './aiPageDataStore';
 
 // 创建axios实例
 const instance = axios.create({
@@ -48,6 +49,25 @@ const normalizeResponseData = (payload: unknown) => {
   return payload;
 };
 
+/**
+ * 采集接口返回，供「DeepSeek 数据分析」使用。
+ * 只记录业务成功的数据；鉴权/统计类接口与超长数据由采集层自行过滤、裁剪。
+ */
+const collectForAnalysis = (response: { config: { url?: string; method?: string; params?: unknown } }, res: unknown) => {
+  const method = response.config.method?.toLowerCase();
+  if (method !== 'get' && method !== 'post') return;
+  try {
+    recordApiResponse({
+      url: response.config.url,
+      method: response.config.method,
+      params: (response.config.params as Record<string, unknown> | undefined) ?? null,
+      data: res,
+    });
+  } catch (error) {
+    console.warn('采集分析数据失败（不影响业务）:', error);
+  }
+};
+
 // 响应拦截器
 instance.interceptors.response.use(
   response => {
@@ -56,12 +76,14 @@ instance.interceptors.response.use(
 
     // 如果响应成功
     if (res?.code === 200 || res?.code === '200') {
+      collectForAnalysis(response, res);
       return res;
     }
 
     // 部分后端接口直接返回业务数据，不带统一 code 字段。
     // HTTP 2xx 已由 axios 确认成功，这里直接放行给具体 service 解析。
     if (res && typeof res === 'object' && !('code' in res)) {
+      collectForAnalysis(response, res);
       return res;
     }
     
