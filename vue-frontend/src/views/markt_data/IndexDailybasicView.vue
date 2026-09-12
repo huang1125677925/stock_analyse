@@ -43,44 +43,66 @@
 
     <el-card class="table-section" shadow="hover">
       <template #header>
-        <div class="header-content">
-          <span>{{ metricLabel }} 最新估值与分位数对比</span>
-          <el-tag type="info" effect="plain">共 {{ comparisonRows.length }} 个指数</el-tag>
+        <div class="header-content header-content-wrap">
+          <div class="header-title">
+            <span>{{ metricLabel }} 估值分位速览</span>
+            <span class="header-hint">
+              按历史分位从低到高 · 详细分位线见下方指数趋势图
+            </span>
+          </div>
+          <el-tag type="info" effect="plain">{{ comparisonRows.length }} 个指数</el-tag>
         </div>
       </template>
       <el-table
         :data="comparisonRows"
         border
         stripe
+        size="small"
+        class="valuation-table"
         style="width: 100%"
         empty-text="暂无指数估值对比数据"
       >
-        <el-table-column
-          prop="label"
-          label="指数"
-          :min-width="isMobile ? 96 : 160"
-          :fixed="isMobile ? false : 'left'"
-          align="center"
-        />
-        <el-table-column prop="latestTradeDate" label="最新日期" min-width="120" align="center" />
-        <el-table-column label="最新估值" min-width="140" align="center">
+        <el-table-column label="指数" :min-width="isMobile ? 104 : 150">
           <template #default="{ row }">
-            {{ formatMetricValue(row.latestValue) }}
+            <div class="index-cell">
+              <span class="index-cell-name">{{ row.label }}</span>
+              <span class="index-cell-code">{{ row.code }}</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="历史分位" min-width="140" align="center">
+        <el-table-column :min-width="isMobile ? 96 : 140" align="center">
+          <template #header>
+            <span>最新估值（{{ metricShortLabel }}）</span>
+          </template>
           <template #default="{ row }">
-            <span v-if="row.percentile !== null">{{ row.percentile.toFixed(2) }}%</span>
-            <span v-else>--</span>
+            <span class="latest-value">{{ formatMetricValue(row.latestValue) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="估值状态" min-width="120" align="center">
+        <el-table-column label="历史分位" :min-width="isMobile ? 132 : 200">
           <template #default="{ row }">
-            <el-tag v-if="row.status" :type="row.type" effect="dark">{{ row.status }}</el-tag>
-            <span v-else>--</span>
+            <div v-if="row.percentile !== null" class="percentile-cell">
+              <el-progress
+                class="percentile-bar"
+                :percentage="row.percentile"
+                :color="percentileColor(row.type)"
+                :stroke-width="10"
+                :show-text="false"
+              />
+              <span class="percentile-text" :style="{ color: percentileColor(row.type) }">
+                {{ row.percentile.toFixed(1) }}%
+              </span>
+            </div>
+            <span v-else class="empty-text">--</span>
           </template>
         </el-table-column>
-        <el-table-column prop="totalCount" label="样本数" min-width="100" align="center" />
+        <el-table-column label="估值状态" :min-width="isMobile ? 88 : 110" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.status" :type="row.type" effect="dark" size="small">
+              {{ row.status }}
+            </el-tag>
+            <span v-else class="empty-text">--</span>
+          </template>
+        </el-table-column>
       </el-table>
     </el-card>
 
@@ -203,6 +225,8 @@ const metricLabel = computed(
   () =>
     metricOptions.find((opt) => opt.value === selectedMetric.value)?.label || selectedMetric.value,
 )
+// 表头展示用的短指标名，例如 “PE TTM (滚动市盈率)” -> “PE TTM”
+const metricShortLabel = computed(() => metricLabel.value.split(' (')[0])
 
 // 查询时间范围：以截止日期为基准，向前回溯指定年数
 const endDate = ref<string>('')
@@ -234,12 +258,24 @@ interface IndexDataset {
 
 interface ComparisonRow {
   label: string
-  latestTradeDate: string
+  code: string
   latestValue: number | null
   percentile: number | null
   status: string
   type: IndexValuationStatus['type']
-  totalCount: number
+}
+
+// 分位进度条配色：沿用估值状态的语义色，保持与图表卡片标签一致
+const VALUATION_BAR_COLORS: Record<IndexValuationStatus['type'], string> = {
+  success: '#67c23a',
+  primary: '#409eff',
+  info: '#909399',
+  warning: '#e6a23c',
+  danger: '#f56c6c',
+}
+
+function percentileColor(type: IndexValuationStatus['type']): string {
+  return VALUATION_BAR_COLORS[type] ?? VALUATION_BAR_COLORS.info
 }
 
 const datasets = ref<IndexDataset[]>(
@@ -265,12 +301,11 @@ const comparisonRows = computed<ComparisonRow[]>(() =>
 
       return {
         label: dataset.label,
-        latestTradeDate: String(latestRecord?.trade_date || '--'),
+        code: dataset.value,
         latestValue: Number.isFinite(latestValue) ? latestValue : null,
         percentile: dataset.valuation?.percentile ?? null,
         status: dataset.valuation?.status ?? '',
         type: dataset.valuation?.type ?? 'info',
-        totalCount: dataset.totalCount,
       }
     })
     .sort((a, b) => {
@@ -612,6 +647,72 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.header-content-wrap {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.header-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--el-text-color-secondary);
+}
+/* 精简后的估值速览表：压缩行高，让表格不再占满首屏 */
+:deep(.valuation-table th.el-table__cell) {
+  padding: 6px 0;
+  color: #475467;
+  font-weight: 600;
+  background: #f8fafc;
+}
+:deep(.valuation-table td.el-table__cell) {
+  padding: 6px 0;
+}
+:deep(.valuation-table .cell) {
+  padding: 0 8px;
+  line-height: 1.35;
+}
+:deep(.valuation-table .el-progress-bar__outer) {
+  background-color: #edf1f6;
+  border-radius: 3px;
+}
+:deep(.valuation-table .el-progress-bar__inner) {
+  border-radius: 3px;
+}
+.index-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.index-cell-name {
+  font-weight: 600;
+}
+.index-cell-code {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.latest-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* 分位meter：细条 + 右侧数值，低分位时数字也不会被裁掉 */
+.percentile-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.percentile-bar {
+  flex: 1;
+  min-width: 0;
+}
+.percentile-text {
+  flex: 0 0 auto;
+  min-width: 46px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.empty-text {
+  color: var(--el-text-color-secondary);
 }
 .card-header {
   display: flex;
