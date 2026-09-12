@@ -1,68 +1,64 @@
 <template>
   <div class="index-dailybasic-view" :class="{ 'is-embedded': props.embedded }">
-    <el-card class="page-header" shadow="hover">
+    <el-card v-loading="loading" class="valuation-panel" shadow="hover">
       <template #header>
-        <div class="header-content">
-          <h2>大盘指数估值</h2>
-        </div>
-      </template>
-      <div class="search-section">
-        <el-form :inline="true" class="query-form">
-          <el-form-item label="指标">
-            <el-select
-              v-model="selectedMetric"
-              placeholder="请选择展示指标"
-              style="width: 200px"
-              @change="updateChart"
-            >
-              <el-option
-                v-for="item in metricOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="截止日期">
-            <el-date-picker
-              v-model="endDate"
-              type="date"
-              placeholder="请选择截止日期"
-              value-format="YYYYMMDD"
-            />
-            <el-button-group class="range-buttons">
-              <el-button @click="setYearRange(1)">最近一年</el-button>
-              <el-button @click="setYearRange(3)">最近三年</el-button>
-              <el-button @click="setYearRange(5)">最近五年</el-button>
-            </el-button-group>
-            <span class="range-text">当前范围：{{ dateRangeText }}</span>
-          </el-form-item>
-        </el-form>
-      </div>
-    </el-card>
-
-    <el-card class="table-section" shadow="hover">
-      <template #header>
-        <div class="header-content header-content-wrap">
-          <div class="header-title">
-            <span>{{ metricLabel }} 估值分位速览</span>
-            <span class="header-hint">
-              按历史分位从低到高 · 详细分位线见下方指数趋势图
-            </span>
+        <div class="panel-header">
+          <div class="panel-title-row">
+            <span class="panel-title">大盘指数估值</span>
+            <el-tag type="info" effect="plain" size="small">
+              {{ comparisonRows.length }} 个指数
+            </el-tag>
           </div>
-          <el-tag type="info" effect="plain">{{ comparisonRows.length }} 个指数</el-tag>
+          <div class="panel-subtitle">
+            {{ metricLabel }} · {{ dateRangeText }} · 按历史分位从低到高
+          </div>
         </div>
       </template>
+
+      <el-form :inline="true" size="small" class="query-form">
+        <el-form-item label="指标">
+          <el-select
+            v-model="selectedMetric"
+            placeholder="请选择展示指标"
+            class="metric-select"
+            @change="updateChart"
+          >
+            <el-option
+              v-for="item in metricOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="截止日期">
+          <el-date-picker
+            v-model="endDate"
+            type="date"
+            placeholder="请选择截止日期"
+            value-format="YYYYMMDD"
+            class="date-input"
+          />
+          <el-button-group class="range-buttons">
+            <el-button @click="setYearRange(1)">近一年</el-button>
+            <el-button @click="setYearRange(3)">近三年</el-button>
+            <el-button @click="setYearRange(5)">近五年</el-button>
+          </el-button-group>
+        </el-form-item>
+      </el-form>
+
       <el-table
         :data="comparisonRows"
         border
         stripe
         size="small"
         class="valuation-table"
+        :row-class-name="rowClassName"
         style="width: 100%"
         empty-text="暂无指数估值对比数据"
+        @row-click="handleRowClick"
       >
-        <el-table-column label="指数" :min-width="isMobile ? 104 : 150">
+        <el-table-column label="指数" :min-width="isMobile ? 104 : 124">
           <template #default="{ row }">
             <div class="index-cell">
               <span class="index-cell-name">{{ row.label }}</span>
@@ -70,7 +66,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column :min-width="isMobile ? 96 : 140" align="center">
+        <el-table-column :min-width="isMobile ? 96 : 116" align="center">
           <template #header>
             <span>最新估值（{{ metricShortLabel }}）</span>
           </template>
@@ -78,7 +74,7 @@
             <span class="latest-value">{{ formatMetricValue(row.latestValue) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="历史分位" :min-width="isMobile ? 132 : 200">
+        <el-table-column label="历史分位" :min-width="isMobile ? 132 : 170">
           <template #default="{ row }">
             <div v-if="row.percentile !== null" class="percentile-cell">
               <el-progress
@@ -95,7 +91,7 @@
             <span v-else class="empty-text">--</span>
           </template>
         </el-table-column>
-        <el-table-column label="估值状态" :min-width="isMobile ? 88 : 110" align="center">
+        <el-table-column label="估值状态" :min-width="isMobile ? 88 : 100" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.status" :type="row.type" effect="dark" size="small">
               {{ row.status }}
@@ -104,64 +100,52 @@
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
 
-    <div class="chart-section" v-loading="loading">
-      <div class="chart-carousel-toolbar">
-        <div class="chart-carousel-summary">
-          <span class="chart-carousel-title">指数趋势图</span>
-          <span v-if="activeDataset" class="chart-carousel-counter">
-            {{ activeChartIndex + 1 }} / {{ datasets.length }} · {{ activeDataset.label }}
-          </span>
+      <div class="chart-section">
+        <div class="chart-toolbar">
+          <div class="chart-toolbar-left">
+            <span class="chart-toolbar-title">指数趋势图</span>
+            <span v-if="activeDataset" class="chart-toolbar-hint">
+              点击表格行可切换 · {{ activeChartIndex + 1 }}/{{ datasets.length }} · 图中标注 10/30/50/70/90
+              分位线
+            </span>
+          </div>
+          <div class="chart-toolbar-actions">
+            <el-button size="small" :disabled="activeChartIndex === 0" @click="showPrevChart">
+              上一张
+            </el-button>
+            <el-button
+              size="small"
+              type="primary"
+              :disabled="activeChartIndex === datasets.length - 1"
+              @click="showNextChart"
+            >
+              下一张
+            </el-button>
+          </div>
         </div>
-        <div class="chart-carousel-actions">
-          <el-button :disabled="activeChartIndex === 0" @click="showPrevChart">上一张</el-button>
-          <el-button
-            type="primary"
-            :disabled="activeChartIndex === datasets.length - 1"
-            @click="showNextChart"
-            >下一张</el-button
-          >
-        </div>
-      </div>
 
-      <div class="chart-carousel-viewport">
-        <div class="chart-carousel-track" :style="carouselTrackStyle">
-          <el-card v-for="dataset in datasets" :key="dataset.value" class="index-card chart-slide">
-            <template #header>
-              <div class="card-header">
-                <div class="header-title">
-                  <span>{{ dataset.label }}（{{ dataset.totalCount }} 条数据）</span>
-                  <el-tag
-                    v-if="dataset.valuation"
-                    :type="dataset.valuation.type"
-                    effect="dark"
-                    class="valuation-tag"
-                  >
-                    当前{{ metricLabel }}分位: {{ dataset.valuation.percentile.toFixed(2) }}% -
-                    {{ dataset.valuation.status }}
-                  </el-tag>
-                </div>
+        <div class="chart-carousel-viewport">
+          <div class="chart-carousel-track" :style="carouselTrackStyle">
+            <div v-for="dataset in datasets" :key="dataset.value" class="chart-slide">
+              <div class="chart-slide-header">
+                <span class="chart-slide-title">{{ dataset.label }}</span>
+                <el-tag
+                  v-if="dataset.valuation"
+                  :type="dataset.valuation.type"
+                  effect="dark"
+                  size="small"
+                >
+                  当前{{ metricShortLabel }}分位 {{ dataset.valuation.percentile.toFixed(1) }}% ·
+                  {{ dataset.valuation.status }}
+                </el-tag>
               </div>
-            </template>
-            <div :ref="(el) => setChartRef(dataset.value, el)" class="chart-container"></div>
-          </el-card>
+              <div :ref="(el) => setChartRef(dataset.value, el)" class="chart-container"></div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div class="chart-carousel-dots">
-        <button
-          v-for="(dataset, index) in datasets"
-          :key="dataset.value"
-          type="button"
-          class="chart-dot"
-          :class="{ 'is-active': index === activeChartIndex }"
-          @click="goToChart(index)"
-        >
-          {{ dataset.label }}
-        </button>
-      </div>
-    </div>
+    </el-card>
   </div>
 </template>
 
@@ -194,7 +178,7 @@ const emit = defineEmits<{ (e: 'loaded', count: number): void }>()
 // 加载状态
 const loading = ref(false)
 
-// 指数代码选项
+// 指数代码选项（科创50 接口长期无数据，已移除）
 const indexOptions = [
   { label: '上证综指', value: '000001.SH' },
   { label: '上证50', value: '000016.SH' },
@@ -202,7 +186,6 @@ const indexOptions = [
   { label: '沪深300', value: '000300.SH' },
   { label: '深证成指', value: '399001.SZ' },
   { label: '创业板指', value: '399006.SZ' },
-  { label: '科创50', value: '000688.SH' },
 ]
 
 // 指标选项
@@ -411,6 +394,16 @@ function goToChart(index: number) {
   activeChartIndex.value = index
 }
 
+// 表格行与趋势图联动：点击某一行切换到对应指数的趋势图，当前行高亮
+function handleRowClick(row: ComparisonRow) {
+  const index = datasets.value.findIndex((dataset) => dataset.value === row.code)
+  if (index >= 0) goToChart(index)
+}
+
+function rowClassName({ row }: { row: ComparisonRow }): string {
+  return row.code === activeDataset.value?.value ? 'is-chart-active' : ''
+}
+
 function showPrevChart() {
   goToChart(activeChartIndex.value - 1)
 }
@@ -535,19 +528,21 @@ function updateChart() {
     const p90 = calculatePercentile(validValues, 90)
 
     const option = {
-      title: {
-        text: `${dataset.label} - ${metricLabel.value} 趋势`,
-        left: 'center',
-      },
+      // 指数名与分位标签由卡片内的图表标题行展示，图内不再重复 title，节省纵向空间
       tooltip: {
         trigger: 'axis',
       },
       grid: {
-        right: '15%', // 留出右侧空间显示 markLine 标签
+        top: 24,
+        bottom: 8,
+        left: 8,
+        right: 24, // 分位标签改为网格内绘制，右侧只需少量留白
+        containLabel: true,
       },
       xAxis: {
         type: 'category',
         data: dates,
+        axisLabel: { hideOverlap: true },
       },
       yAxis: {
         type: 'value',
@@ -562,6 +557,8 @@ function updateChart() {
           showSymbol: false,
           markLine: {
             symbol: 'none',
+            // 标签绘制在网格内右端，窄卡片下不会被容器裁掉
+            label: { position: 'insideEndTop', fontSize: 11 },
             data: [
               {
                 yAxis: p90,
@@ -638,24 +635,56 @@ onUnmounted(() => {
 .index-dailybasic-view.is-embedded {
   padding: 0;
 }
-.page-header,
-.search-section,
-.table-section {
-  margin-bottom: 20px;
+/* 单卡片容器：筛选 + 表格 + 趋势图合并，内边距压缩以适应半宽布局 */
+:deep(.valuation-panel .el-card__header) {
+  padding: 10px 14px;
 }
-.header-content {
+:deep(.valuation-panel .el-card__body) {
+  padding: 12px 14px 14px;
+}
+.panel-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
 }
-.header-content-wrap {
+.panel-title-row {
+  display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
-.header-hint {
+.panel-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #172033;
+}
+.panel-subtitle {
   font-size: 12px;
-  font-weight: 400;
   color: var(--el-text-color-secondary);
+}
+.query-form {
+  margin-bottom: 0;
+}
+.query-form :deep(.el-form-item) {
+  margin-right: 12px;
+  margin-bottom: 10px;
+}
+.query-form :deep(.el-form-item__label) {
+  color: #5f6876;
+  font-weight: 500;
+}
+.metric-select {
+  width: 144px;
+}
+.date-input {
+  width: 150px;
+}
+/* 点击表格行切换趋势图：当前行高亮并给出可点击反馈 */
+:deep(.valuation-table tbody tr) {
+  cursor: pointer;
+}
+:deep(.valuation-table .is-chart-active td.el-table__cell) {
+  background-color: #eef5ff !important;
 }
 /* 精简后的估值速览表：压缩行高，让表格不再占满首屏 */
 :deep(.valuation-table th.el-table__cell) {
@@ -714,47 +743,37 @@ onUnmounted(() => {
 .empty-text {
   color: var(--el-text-color-secondary);
 }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.header-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.valuation-tag {
-  margin-left: 10px;
-  font-weight: bold;
-}
 .chart-section {
+  margin-top: 4px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
-.chart-carousel-toolbar {
+.chart-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-}
-.chart-carousel-summary {
-  display: flex;
-  align-items: baseline;
   gap: 12px;
   flex-wrap: wrap;
 }
-.chart-carousel-title {
-  font-size: 18px;
-  font-weight: 600;
+.chart-toolbar-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.chart-carousel-counter {
+.chart-toolbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #172033;
+}
+.chart-toolbar-hint {
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-.chart-carousel-actions {
+.chart-toolbar-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 .chart-carousel-viewport {
   overflow: hidden;
@@ -764,67 +783,47 @@ onUnmounted(() => {
   transition: transform 0.3s ease;
   will-change: transform;
 }
-.index-card {
+.chart-slide {
   width: 100%;
   min-width: 100%;
   flex: 0 0 100%;
   box-sizing: border-box;
 }
-.chart-slide {
-  scroll-snap-align: start;
+.chart-slide-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.chart-slide-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #172033;
 }
 .chart-container {
   width: 100%;
-  height: 420px;
-}
-.chart-carousel-dots {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.chart-dot {
-  border: 1px solid var(--el-border-color);
-  background: var(--el-fill-color-blank);
-  color: var(--el-text-color-regular);
-  border-radius: 999px;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.chart-dot.is-active {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
+  height: 280px;
 }
 .range-buttons {
   margin-left: 8px;
-}
-.range-text {
-  margin-left: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
 }
 @media (max-width: 768px) {
   .index-dailybasic-view {
     padding: 0;
   }
-  .page-header,
-  .search-section,
-  .table-section {
-    margin-bottom: 12px;
-  }
-  .chart-carousel-toolbar {
+  .chart-toolbar {
     flex-direction: column;
     align-items: flex-start;
   }
-  .chart-carousel-actions {
+  .chart-toolbar-actions {
     width: 100%;
   }
-  .chart-carousel-actions :deep(.el-button) {
+  .chart-toolbar-actions :deep(.el-button) {
     flex: 1;
   }
   .chart-container {
-    height: 300px;
+    height: 240px;
   }
   /* 指标下拉、日期、快捷范围按钮在窄屏占满整宽、整齐换行 */
   .query-form :deep(.el-select) {
@@ -842,12 +841,6 @@ onUnmounted(() => {
   }
   .range-buttons :deep(.el-button) {
     width: 100%;
-  }
-  .range-text {
-    margin-left: 0;
-    margin-top: 8px;
-    display: block;
-    white-space: normal;
   }
 }
 </style>

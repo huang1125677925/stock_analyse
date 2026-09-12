@@ -81,7 +81,7 @@
         <el-table-column
           prop="name"
           label="指数名称"
-          :min-width="isMobile ? 92 : 180"
+          :min-width="isMobile ? 92 : 150"
           sortable="custom"
           :fixed="isMobile ? false : 'left'"
         >
@@ -127,8 +127,8 @@
         </el-table-column>
         <el-table-column
           prop="RPS_today"
-          label="当日涨跌幅 / RPS_today"
-          :min-width="isMobile ? 118 : 180"
+          label="当日 / RPS_today"
+          :min-width="isMobile ? 108 : 132"
           align="center"
           sortable="custom"
         >
@@ -152,8 +152,8 @@
         <template v-for="period in availablePeriods" :key="period">
           <el-table-column
             :prop="getRpsProp(period)"
-            :label="`${period}日涨跌幅 / RPS_${period}`"
-            :min-width="isMobile ? 118 : 180"
+            :label="`${period}日 / RPS_${period}`"
+            :min-width="isMobile ? 108 : 132"
             align="center"
             sortable="custom"
           >
@@ -566,7 +566,7 @@ function handleResize() {
 }
 
 .rps-cell {
-  min-width: 120px;
+  min-width: 96px;
 }
 
 .rps-cell-with-change {
