@@ -20,6 +20,11 @@ export const DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
 /** 内置模型选项，模型名仍允许用户自由填写（兼容中转网关的自定义模型名） */
 export const DEEPSEEK_MODEL_OPTIONS = [
   {
+    label: 'deepseek-flash',
+    value: 'deepseek-flash',
+    description: '快速响应模型，适合页面数据的即时分析与概览总结',
+  },
+  {
     label: 'deepseek-chat',
     value: 'deepseek-chat',
     description: '通用对话模型，速度快，适合行情解读与总结',
@@ -51,7 +56,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
 export interface DeepSeekConfig {
   /** API Key，形如 sk-xxxx */
   apiKey: string
-  /** 模型名，如 deepseek-chat / deepseek-reasoner */
+  /** 模型名，如 deepseek-flash / deepseek-chat / deepseek-reasoner */
   model: string
   /** API 基址，默认官方地址；中转网关可自定义 */
   baseUrl: string
@@ -67,7 +72,7 @@ export interface DeepSeekConfig {
 
 const DEFAULT_CONFIG: DeepSeekConfig = {
   apiKey: '',
-  model: 'deepseek-chat',
+  model: 'deepseek-flash',
   baseUrl: DEFAULT_DEEPSEEK_BASE_URL,
   temperature: 1,
   maxTokens: 0,
