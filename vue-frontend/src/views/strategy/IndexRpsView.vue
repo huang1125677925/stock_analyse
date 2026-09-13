@@ -3,153 +3,165 @@
     <div class="rps-data-section" v-if="rpsData.length > 0">
       <el-card shadow="never" class="rps-card">
         <template #header>
-          <div class="table-header">
-            <div class="toolbar-row">
-              <div class="table-controls">
-                <el-input
-                  v-model="searchKeyword"
-                  placeholder="搜索指数名称"
-                  :prefix-icon="Search"
-                  clearable
-                  class="control-item control-search"
-                />
-                <el-select
-                  v-model="idxType"
-                  placeholder="选择板块类型"
-                  class="control-item"
-                >
-                  <el-option label="行业板块" value="行业板块" />
-                  <el-option label="概念板块" value="概念板块" />
-                  <el-option label="地域板块" value="地域板块" />
-                </el-select>
-                <el-select
-                  v-if="idxType === '行业板块'"
-                  v-model="industryLevel"
-                  placeholder="选择行业级别"
-                  class="control-item"
-                >
-                  <el-option
-                    v-for="level in industryLevelOptions"
-                    :key="level"
-                    :label="level"
-                    :value="level"
-                  />
-                </el-select>
+          <div class="control-bar">
+            <el-segmented
+              v-model="viewMode"
+              :options="viewModeOptions"
+              size="small"
+              class="ctl ctl-mode"
+            />
+
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索指数"
+              :prefix-icon="Search"
+              clearable
+              size="small"
+              class="ctl ctl-search"
+            />
+
+            <el-select
+              v-model="idxType"
+              size="small"
+              placeholder="板块类型"
+              class="ctl ctl-md"
+            >
+              <el-option label="行业板块" value="行业板块" />
+              <el-option label="概念板块" value="概念板块" />
+              <el-option label="地域板块" value="地域板块" />
+            </el-select>
+
+            <el-select
+              v-if="idxType === '行业板块'"
+              v-model="industryLevel"
+              size="small"
+              placeholder="行业级别"
+              class="ctl ctl-level"
+            >
+              <el-option
+                v-for="level in industryLevelOptions"
+                :key="level"
+                :label="level"
+                :value="level"
+              />
+            </el-select>
+
+            <el-select
+              v-model="selectedStrengthFields"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              size="small"
+              placeholder="RPS强度项"
+              class="ctl ctl-strength"
+            >
+              <el-option
+                v-for="option in strengthFieldOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+
+            <el-select
+              v-model="minimumStrengthRank"
+              size="small"
+              placeholder="最低强度"
+              class="ctl ctl-md"
+            >
+              <el-option
+                v-for="option in minimumStrengthOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+
+            <el-select
+              v-model="changeRelationMode"
+              size="small"
+              placeholder="涨跌幅关系"
+              class="ctl ctl-md"
+            >
+              <el-option
+                v-for="option in changeRelationOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+
+            <span class="ctl-label">成交额</span>
+            <el-select
+              v-model="minAmount"
+              size="small"
+              placeholder="最小值"
+              class="ctl ctl-xs"
+            >
+              <el-option
+                v-for="option in amountFilterOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <span class="amount-sep">-</span>
+            <el-select
+              v-model="maxAmount"
+              size="small"
+              placeholder="最大值"
+              class="ctl ctl-xs"
+            >
+              <el-option
+                v-for="option in amountFilterOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+
+            <el-button type="primary" size="small" :loading="loading" @click="refreshData">刷新</el-button>
+            <el-button
+              v-if="hasActiveSimpleFilter"
+              type="default"
+              size="small"
+              :disabled="loading"
+              @click="resetSimpleFilters"
+            >
+              清空
+            </el-button>
+
+            <div class="bar-spacer"></div>
+            <span class="count-info">
+              {{ viewMode === 'display'
+                ? `板块 ${filteredRpsData.length}`
+                : `实战 ${practiceMatchedStageCount} / ${rpsData.length}` }}
+            </span>
+            <span v-if="queryTime" class="count-info">更新 {{ queryTime }}</span>
+            <el-popover placement="bottom-end" trigger="click" :width="390">
+              <template #reference>
+                <el-icon class="info-icon" :size="16" aria-label="查看RPS说明">
+                  <InfoFilled />
+                </el-icon>
+              </template>
+              <div class="methodology">
+                <p class="methodology-title">RPS统计口径与实战说明</p>
+                <template v-if="viewMode === 'display'">
+                  <p>RPS 用于衡量当前指数相对同组指数的价格强度。</p>
+                  <p>系统计算 5、20、60、120、250 日涨跌幅，再按涨跌幅从高到低排序。</p>
+                  <p>RPS = (1 - 排名 / 总板块数) * 100。数值越高，相对强度越靠前。</p>
+                </template>
+                <template v-else>
+                  <p>实战模式以 RPS_5、RPS_20、RPS_60 的组合判断板块阶段。</p>
+                  <p>RPS_5 高、RPS_20 低看新启动；双高看主升；RPS_5 回落且 RPS_20 仍高看分歧和轮动低吸。</p>
+                  <p>RPS_20 分布用于辅助择时，决定当前适合进攻、收缩还是等待。</p>
+                </template>
               </div>
-              <div class="table-summary">
-                <el-tag type="info" effect="plain">共 {{ filteredRpsData.length }} 条</el-tag>
-                <el-tag v-if="queryTime" type="success" effect="light">更新时间 {{ queryTime }}</el-tag>
-              </div>
-            </div>
-            <div class="simple-filter-panel">
-              <div class="simple-filter-group view-mode-group">
-                <span class="simple-filter-label">页面模式</span>
-                <el-radio-group v-model="viewMode" class="view-mode-switch">
-                  <el-radio-button label="display">展示模式</el-radio-button>
-                  <el-radio-button label="practice">实战模式</el-radio-button>
-                </el-radio-group>
-              </div>
-              <div class="simple-filter-group">
-                <span class="simple-filter-label">RPS强度项</span>
-                <el-select
-                  v-model="selectedStrengthFields"
-                  multiple
-                  collapse-tags
-                  collapse-tags-tooltip
-                  placeholder="选择一个或多个强度项"
-                  class="simple-filter-select strength-filter-select"
-                >
-                  <el-option
-                    v-for="option in strengthFieldOptions"
-                    :key="option.value"
-                    :label="option.label"
-                    :value="option.value"
-                  />
-                </el-select>
-              </div>
-              <div class="simple-filter-group">
-                <span class="simple-filter-label">最低强度</span>
-                <el-select
-                  v-model="minimumStrengthRank"
-                  placeholder="选择强度下限"
-                  class="simple-filter-select"
-                >
-                  <el-option
-                    v-for="option in minimumStrengthOptions"
-                    :key="option.value"
-                    :label="option.label"
-                    :value="option.value"
-                  />
-                </el-select>
-              </div>
-              <div class="simple-filter-group">
-                <span class="simple-filter-label">涨跌幅关系</span>
-                <el-select
-                  v-model="changeRelationMode"
-                  placeholder="选择关系"
-                  class="simple-filter-select relation-filter-select"
-                >
-                  <el-option
-                    v-for="option in changeRelationOptions"
-                    :key="option.value"
-                    :label="option.label"
-                    :value="option.value"
-                  />
-                </el-select>
-              </div>
-              <div class="simple-filter-group">
-                <span class="simple-filter-label">成交额范围</span>
-                <div class="amount-range-inputs">
-                  <el-select
-                    v-model="minAmount"
-                    placeholder="最小值"
-                    class="amount-range-select"
-                  >
-                    <el-option
-                      v-for="option in amountFilterOptions"
-                      :key="option.value"
-                      :label="option.label"
-                      :value="option.value"
-                    />
-                  </el-select>
-                  <span class="amount-range-separator">-</span>
-                  <el-select
-                    v-model="maxAmount"
-                    placeholder="最大值"
-                    class="amount-range-select"
-                  >
-                    <el-option
-                      v-for="option in amountFilterOptions"
-                      :key="option.value"
-                      :label="option.label"
-                      :value="option.value"
-                    />
-                  </el-select>
-                </div>
-              </div>
-              <el-button
-                v-if="hasActiveSimpleFilter"
-                link
-                type="primary"
-                class="simple-filter-reset"
-                @click="resetSimpleFilters"
-              >
-                清空筛选
-              </el-button>
-            </div>
+            </el-popover>
           </div>
         </template>
 
-        <div v-if="viewMode === 'display'" class="methodology">
-          <p>
-            RPS（Relative Price Strength）用于衡量当前指数相对同组指数的价格强度。系统会计算各指数在 5、20、60、120、250 日周期内的涨跌幅，再按涨跌幅从高到低排序。
-          </p>
-          <p>
-            计算方式：RPS = (1 - 排名 / 总板块数) × 100。数值越高，表示该指数在同组指数中的相对强度越靠前。
-          </p>
-        </div>
-
-        <div v-else class="practice-mode">
+        <div v-if="viewMode === 'practice'" class="practice-mode">
           <section class="practice-overview" :class="`tone-${marketEnvironment.tone}`">
             <div class="practice-overview-main">
               <div class="practice-kicker">择时</div>
@@ -301,10 +313,13 @@
         
         <el-table
           :data="filteredRpsData"
+          border
           stripe
+          size="small"
+          class="rps-table"
           style="width: 100%"
           :default-sort="{ prop: getDefaultSortProp(), order: 'descending' }"
-          :height="isMobile ? undefined : 600"
+          :height="isMobile ? undefined : viewMode === 'practice' ? 'calc(100dvh - 590px)' : 'calc(100dvh - 190px)'"
           :row-class-name="tableRowClassName"
           highlight-current-row
           @sort-change="handleSortChange"
@@ -995,6 +1010,11 @@ const amountFilterOptions: Array<{ label: string; value: number }> = [
   { label: '2000亿', value: 200000000000 }
 ]
 
+const viewModeOptions: Array<{ label: string; value: ViewMode }> = [
+  { label: '展示模式', value: 'display' },
+  { label: '实战模式', value: 'practice' }
+]
+
 const strengthFieldOptions: Array<{ label: string; value: RpsField }> = [
   ...rpsPeriods.map((period) => ({
     label: `RPS_${period}`,
@@ -1273,6 +1293,14 @@ const practicalStageGroups = computed(() => practicalStageDefinitions.map((defin
     rows
   }
 }))
+
+const practiceMatchedStageCount = computed(() => {
+  const matchedCodes = new Set<string>()
+  practicalStageDefinitions.forEach((definition) => {
+    rpsData.value.filter(definition.matcher).forEach((item) => matchedCodes.add(item.ts_code))
+  })
+  return matchedCodes.size
+})
 
 const activePracticalStageLabel = computed(() => {
   if (activePracticalStage.value === 'all') return '全部'
@@ -1977,6 +2005,87 @@ watch(() => route.query.level, (level) => {
   flex-wrap: wrap;
 }
 
+.control-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+.control-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.control-bar::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 2px;
+}
+
+.ctl {
+  flex: 0 0 auto;
+}
+
+.ctl-mode {
+  width: 148px;
+}
+
+.ctl-search {
+  width: 170px;
+}
+
+.ctl-xs {
+  width: 88px;
+}
+
+.ctl-md {
+  width: 118px;
+}
+
+.ctl-level {
+  width: 132px;
+}
+
+.ctl-strength {
+  width: 170px;
+}
+
+.ctl-label {
+  flex: 0 0 auto;
+  color: #909399;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.amount-sep {
+  flex: 0 0 auto;
+  color: #c0c4cc;
+}
+
+.bar-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.count-info {
+  flex: 0 0 auto;
+  color: #606266;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.info-icon {
+  flex: 0 0 auto;
+  color: #909399;
+  cursor: pointer;
+}
+
+.info-icon:hover {
+  color: var(--el-color-primary);
+}
+
 .simple-filter-panel {
   display: flex;
   align-items: flex-end;
@@ -2243,19 +2352,22 @@ watch(() => route.query.level, (level) => {
 }
 
 :deep(.rps-card .el-card__header) {
-  padding: 18px 0 16px;
+  padding: 0 0 10px;
 }
 
 :deep(.rps-card .el-card__body) {
   padding: 0 0 20px;
 }
 
+.rps-table {
+  width: 100%;
+}
+
+:deep(.rps-table .el-table__cell) {
+  padding: 6px 0;
+}
+
 .methodology {
-  margin-bottom: 16px;
-  padding: 12px 14px;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  background: #f7f8fa;
   color: #606266;
   font-size: 13px;
   line-height: 1.7;
@@ -2269,31 +2381,28 @@ watch(() => route.query.level, (level) => {
   margin-top: 6px;
 }
 
-.view-mode-group {
-  min-width: 206px;
-}
-
-.view-mode-switch {
-  white-space: nowrap;
+.methodology-title {
+  color: #303133;
+  font-weight: 600;
 }
 
 .practice-mode {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .practice-overview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 12px;
   align-items: stretch;
-  padding: 18px;
-  border: 1px solid #dcdfe6;
-  border-left-width: 5px;
-  border-radius: 8px;
-  background: #fbfcfd;
+  padding: 12px;
+  border: 1px solid #e1e6ee;
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: #ffffff;
 }
 
 .practice-overview-main {
@@ -2304,17 +2413,14 @@ watch(() => route.query.level, (level) => {
 
 .practice-kicker {
   width: fit-content;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #eef2f6;
-  color: #5b6472;
+  color: #909399;
   font-size: 12px;
   font-weight: 600;
 }
 
 .practice-regime {
-  color: #202328;
-  font-size: 24px;
+  color: #172033;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
 }
@@ -2330,25 +2436,25 @@ watch(() => route.query.level, (level) => {
 .practice-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(88px, 1fr));
-  gap: 10px;
-  min-width: 330px;
+  gap: 8px;
+  min-width: 300px;
 }
 
 .practice-stat {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
-  min-height: 82px;
-  padding: 12px;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  background: #ffffff;
+  gap: 5px;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #f9fafb;
 }
 
 .practice-stat-value {
-  color: #202328;
-  font-size: 22px;
+  color: #172033;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1;
 }
@@ -2378,9 +2484,9 @@ watch(() => route.query.level, (level) => {
 .practice-leaders,
 .practice-reference,
 .practice-table-bridge {
-  padding: 14px;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e1e6ee;
+  border-radius: 6px;
   background: #ffffff;
 }
 
@@ -2406,7 +2512,7 @@ watch(() => route.query.level, (level) => {
 .leader-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .leader-item {
@@ -2417,7 +2523,7 @@ watch(() => route.query.level, (level) => {
   min-height: 44px;
   padding: 8px 10px;
   border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #f9fafb;
 }
 
@@ -2442,39 +2548,39 @@ watch(() => route.query.level, (level) => {
 
 .stage-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(188px, 1fr));
+  gap: 8px;
 }
 
 .stage-panel {
   display: flex;
   flex-direction: column;
-  min-height: 360px;
-  border: 1px solid #e4e7ed;
-  border-top: 4px solid #909399;
-  border-radius: 8px;
+  min-height: 312px;
+  border: 1px solid #e1e6ee;
+  border-left: 4px solid #909399;
+  border-radius: 6px;
   background: #ffffff;
   overflow: hidden;
 }
 
 .stage-attack {
-  border-top-color: #d84b4b;
+  border-left-color: #f56c6c;
 }
 
 .stage-rotate {
-  border-top-color: #8a6fdf;
+  border-left-color: #e6a23c;
 }
 
 .stage-start {
-  border-top-color: #409eff;
+  border-left-color: #409eff;
 }
 
 .stage-watch {
-  border-top-color: #d9902f;
+  border-left-color: #8a6fdf;
 }
 
 .stage-avoid {
-  border-top-color: #657180;
+  border-left-color: #909399;
 }
 
 .stage-panel-header {
@@ -2482,13 +2588,13 @@ watch(() => route.query.level, (level) => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-  padding: 14px 14px 10px;
+  padding: 10px 10px 8px;
 }
 
 .stage-panel h3 {
   margin: 0 0 6px;
   color: #303133;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.3;
 }
 
@@ -2500,8 +2606,8 @@ watch(() => route.query.level, (level) => {
 }
 
 .stage-rule {
-  margin: 0 14px 10px;
-  padding: 8px 10px;
+  margin: 0 10px 8px;
+  padding: 7px 8px;
   border-radius: 6px;
   background: #f5f7fa;
   color: #5b6472;
@@ -2513,16 +2619,16 @@ watch(() => route.query.level, (level) => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
-  padding: 0 12px 12px;
+  gap: 6px;
+  padding: 0 8px 8px;
 }
 
 .stage-row {
   display: grid;
-  gap: 6px;
-  padding: 9px;
+  gap: 5px;
+  padding: 7px 8px;
   border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #fbfcfd;
 }
 
@@ -2567,7 +2673,7 @@ watch(() => route.query.level, (level) => {
   justify-content: space-between;
   gap: 12px;
   margin-top: auto;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-top: 1px solid #ebeef5;
   background: #f9fafb;
 }
