@@ -87,6 +87,13 @@
       <div class="ranking-panel-header">
         <!-- 单行头部：筛选 + 计数 + 说明入口，纵向空间尽量留给榜单 -->
         <div class="table-filter-toolbar">
+          <el-segmented
+            v-model="viewMode"
+            :options="viewModeOptions"
+            size="small"
+            class="toolbar-mode"
+          />
+
           <div
             v-for="filterGroup in rpsFilterGroups"
             :key="filterGroup.field"
@@ -165,6 +172,9 @@
           <div class="table-summary">
             <el-tag type="info" effect="plain">返回 {{ stockRpsData?.total ?? 0 }}</el-tag>
             <el-tag type="primary" effect="light">筛选 {{ filteredRows.length }}</el-tag>
+            <el-tag v-if="activePracticeStage !== 'all'" type="warning" effect="light">
+              {{ activePracticeStageLabel }}
+            </el-tag>
             <el-tag v-if="stockRpsData?.trade_date" effect="plain">{{
               formatCompactDate(stockRpsData?.trade_date)
             }}</el-tag>
@@ -181,13 +191,20 @@
               />
             </template>
             <div class="info-popover">
-              <p>RPS（Relative Price Strength）用于衡量股票在同一股票池中的相对强弱。</p>
-              <p>系统基于目标交易日横向计算当日涨跌幅和 5 / 20 / 60 日收益率，并生成对应排名。</p>
-              <p>
-                计算公式：RPS = (1 - rank / total) *
-                100。数值越高，说明该股票在当前筛选范围内越强。
-              </p>
-              <p>条件变更后自动刷新；点击股票名称可查看前复权趋势图。</p>
+              <template v-if="viewMode === 'display'">
+                <p>RPS（Relative Price Strength）用于衡量股票在同一股票池中的相对强弱。</p>
+                <p>系统基于目标交易日横向计算当日涨跌幅和 5 / 20 / 60 日收益率，并生成对应排名。</p>
+                <p>
+                  计算公式：RPS = (1 - rank / total) *
+                  100。数值越高，说明该股票在当前筛选范围内越强。
+                </p>
+                <p>条件变更后自动刷新；点击股票名称可查看前复权趋势图。</p>
+              </template>
+              <template v-else>
+                <p>实战模式用 RPS_5 判断短线资金攻击，用 RPS_20 判断趋势核心，用 RPS_60 判断长线背景。</p>
+                <p>RPS_5 高、RPS_20 低看新启动；RPS_5/RPS_20 双高看主升；RPS_5 回落、RPS_20 仍高看分歧低吸。</p>
+                <p>同一行业在前 100 强中出现 3 只以上，视为板块集群信号，可结合行业领涨详情继续下钻。</p>
+              </template>
               <p class="info-popover-section">当前查询</p>
               <p>收益周期：{{ currentPeriodsText }}</p>
               <p>
@@ -201,11 +218,133 @@
         </div>
       </div>
 
+      <section v-if="viewMode === 'practice'" class="practice-mode-panel">
+        <div class="practice-market-strip" :class="`tone-${stockMarketEnvironment.tone}`">
+          <div>
+            <span class="practice-kicker">市场环境</span>
+            <strong>{{ stockMarketEnvironment.label }}</strong>
+            <p>{{ stockMarketEnvironment.advice }}</p>
+          </div>
+          <div class="practice-market-stats">
+            <div>
+              <strong>{{ stockMarketEnvironment.strong20Count }}</strong>
+              <span>RPS_20>80</span>
+            </div>
+            <div>
+              <strong>{{ stockMarketEnvironment.strong20Ratio.toFixed(1) }}%</strong>
+              <span>强势占比</span>
+            </div>
+            <div>
+              <strong>{{ stockRpsRows.length }}</strong>
+              <span>股票池</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="practice-stage-grid">
+          <article
+            v-for="group in practiceStageGroups"
+            :key="group.key"
+            class="practice-stage-card"
+            :class="`stage-${group.tone}`"
+          >
+            <div class="practice-stage-head">
+              <div>
+                <h3>{{ group.title }}</h3>
+                <p>{{ group.focus }}</p>
+              </div>
+              <el-tag effect="plain" :type="group.rows.length ? 'primary' : 'info'">
+                {{ group.rows.length }}
+              </el-tag>
+            </div>
+            <div class="practice-stage-rule">{{ group.rule }}</div>
+            <div v-if="group.rows.length" class="practice-stock-list">
+              <div
+                v-for="item in group.rows"
+                :key="item.ts_code"
+                class="practice-stock-row"
+              >
+                <div class="practice-stock-main">
+                  <el-button type="primary" link @click="openTrendDialog(item)">
+                    {{ item.name }}
+                  </el-button>
+                  <span>{{ formatPercent(item.pct_change) }}</span>
+                </div>
+                <div class="practice-stock-meta">
+                  <span>{{ item.industry || '-' }}</span>
+                  <span>5 {{ formatRpsValue(getRpsScore(item, 5)) }}</span>
+                  <span>20 {{ formatRpsValue(getRpsScore(item, 20)) }}</span>
+                  <span>60 {{ formatRpsValue(getRpsScore(item, 60)) }}</span>
+                </div>
+              </div>
+            </div>
+            <el-empty v-else description="暂无匹配" :image-size="46" />
+            <div class="practice-stage-foot">
+              <span>{{ group.action }}</span>
+              <el-button :icon="Aim" size="small" @click="applyPracticeStage(group.key)">
+                套用
+              </el-button>
+            </div>
+          </article>
+        </div>
+
+        <div class="practice-reference-grid">
+          <section class="practice-reference-block">
+            <div class="practice-section-title">
+              <span>板块集群</span>
+              <small>前 100 强同业聚集</small>
+            </div>
+            <div v-if="industryClusters.length" class="cluster-list">
+              <div
+                v-for="cluster in industryClusters"
+                :key="cluster.industry"
+                class="cluster-row"
+              >
+                <div>
+                  <strong>{{ cluster.industry }}</strong>
+                  <span>{{ cluster.count }} 只入围</span>
+                </div>
+                <el-button type="primary" link @click="openTrendDialog(cluster.leader)">
+                  {{ cluster.leader.name }}
+                </el-button>
+                <span>综合 {{ cluster.score.toFixed(1) }}</span>
+              </div>
+            </div>
+            <el-empty v-else description="暂无板块集群" :image-size="50" />
+          </section>
+
+          <section class="practice-reference-block">
+            <div class="practice-section-title">
+              <span>每日复盘</span>
+              <small>个股 RPS 模板</small>
+            </div>
+            <div class="review-checklist">
+              <p v-for="item in practiceReviewChecklist" :key="item">{{ item }}</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="practice-table-bridge">
+          <div>
+            <strong>候选池明细</strong>
+            <span v-if="activePracticeStage !== 'all'">已套用：{{ activePracticeStageLabel }}</span>
+          </div>
+          <el-button
+            v-if="activePracticeStage !== 'all'"
+            link
+            type="primary"
+            @click="clearPracticeStage"
+          >
+            取消实战分组
+          </el-button>
+        </div>
+      </section>
+
       <el-table
         class="ranking-table"
         :data="filteredRows"
         stripe
-        :height="isMobile ? undefined : 'calc(100dvh - 300px)'"
+        :height="isMobile ? undefined : viewMode === 'practice' ? 'calc(100dvh - 690px)' : 'calc(100dvh - 300px)'"
         :max-height="isMobile ? 560 : undefined"
         style="width: 100%"
         empty-text="暂无股票RPS数据"
@@ -448,7 +587,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, InfoFilled, Search } from '@element-plus/icons-vue'
+import { Aim, ArrowLeft, ArrowRight, InfoFilled, Search } from '@element-plus/icons-vue'
 import { useIsMobile } from '@/composables/useIsMobile'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import LeadRiseMatrixDialog from '@/components/LeadRiseMatrixDialog.vue'
@@ -469,6 +608,9 @@ type DynamicRpsField = `RPS_${number}`
 type RpsRankLabel = '极强' | '强势' | '良好' | '一般' | '弱势'
 type ChangeDirectionLabel = '上涨' | '平盘' | '下跌'
 type ValueRangeField = 'latest_price' | 'circ_mv'
+type ViewMode = 'display' | 'practice'
+type PracticeStageKey = 'leader' | 'freshStart' | 'divergence' | 'oversold' | 'avoid'
+type PracticeStageTone = 'leader' | 'start' | 'divergence' | 'oversold' | 'avoid'
 
 interface RangeOption {
   label: string
@@ -483,6 +625,25 @@ interface StockRpsFilters {
   exchange: string
   market: string
   industryMapping: IndustryMapping
+}
+
+interface PracticeStageDefinition {
+  key: PracticeStageKey
+  title: string
+  focus: string
+  rule: string
+  action: string
+  tone: PracticeStageTone
+  sortPeriod: number
+  sortDirection?: 'ascending' | 'descending'
+  matcher: (item: StockRpsItem) => boolean
+}
+
+interface IndustryCluster {
+  industry: string
+  count: number
+  leader: StockRpsItem
+  score: number
 }
 
 /**
@@ -537,6 +698,10 @@ const marketOptions = computed(() => {
 })
 const rpsRankOptions: RpsRankLabel[] = ['极强', '强势', '良好', '一般', '弱势']
 const changeDirectionOptions: ChangeDirectionLabel[] = ['上涨', '平盘', '下跌']
+const viewModeOptions: Array<{ label: string; value: ViewMode }> = [
+  { label: '展示模式', value: 'display' },
+  { label: '实战模式', value: 'practice' },
+]
 
 const YI = 1e8
 const priceRangeOptions: RangeOption[] = [
@@ -559,6 +724,8 @@ const filters = reactive<StockRpsFilters>({
 })
 
 const loading = ref(false)
+const viewMode = ref<ViewMode>('display')
+const activePracticeStage = ref<PracticeStageKey | 'all'>('all')
 const stockRpsData = ref<StockRpsData | null>(null)
 const stockRpsRows = ref<StockRpsItem[]>([])
 let stockRpsRequestId = 0
@@ -799,6 +966,104 @@ const getReturnProp = (period: number): DynamicReturnField =>
   `return_${period}` as DynamicReturnField
 const getRpsProp = (period: number): DynamicRpsField => `RPS_${period}` as DynamicRpsField
 
+const getRpsScore = (item: StockRpsItem, period: number): number => {
+  return getNumericValue(getRowFieldValue(item, getRpsProp(period)))
+}
+
+const getReturnScore = (item: StockRpsItem, period: number): number => {
+  return getNumericValue(getRowFieldValue(item, getReturnProp(period)))
+}
+
+const getCompositeStrengthScore = (item: StockRpsItem): number => {
+  return getRpsScore(item, 5) * 0.55 + getRpsScore(item, 20) * 0.45
+}
+
+const sortPracticeRows = (
+  rows: StockRpsItem[],
+  period: number,
+  direction: 'ascending' | 'descending' = 'descending',
+): StockRpsItem[] => {
+  return [...rows].sort((left, right) => {
+    const diff = getRpsScore(left, period) - getRpsScore(right, period)
+    return direction === 'ascending' ? diff : -diff
+  })
+}
+
+const practiceStageDefinitions: PracticeStageDefinition[] = [
+  {
+    key: 'leader',
+    title: '主升龙头',
+    focus: 'RPS_5 与 RPS_20 双高，优先定位空间龙和趋势核心。',
+    rule: 'RPS_5 >= 90 且 RPS_20 >= 80',
+    action: '可追踪主升，但成本不舒服时等分歧回踩。',
+    tone: 'leader',
+    sortPeriod: 20,
+    matcher: (item) => getRpsScore(item, 5) >= 90 && getRpsScore(item, 20) >= 80,
+  },
+  {
+    key: 'freshStart',
+    title: '新启动/补涨',
+    focus: '短线突然转强，中线排名还没有充分反映。',
+    rule: 'RPS_5 >= 85 且 RPS_20 < 50',
+    action: '关注是否突破关键位，适合作为首板、1进2或高低切候选。',
+    tone: 'start',
+    sortPeriod: 5,
+    matcher: (item) => getRpsScore(item, 5) >= 85 && getRpsScore(item, 20) < 50,
+  },
+  {
+    key: 'divergence',
+    title: '分歧低吸',
+    focus: '中线仍强，短线攻击回落，适合等板块回流。',
+    rule: '60 <= RPS_5 < 80 且 RPS_20 >= 80',
+    action: '做强势股的回踩，不做失去辨识度的下跌接力。',
+    tone: 'divergence',
+    sortPeriod: 20,
+    matcher: (item) => {
+      const rps5 = getRpsScore(item, 5)
+      return rps5 >= 60 && rps5 < 80 && getRpsScore(item, 20) >= 80
+    },
+  },
+  {
+    key: 'oversold',
+    title: '超跌反弹',
+    focus: '冰点后短线回升，但中长期仍弱。',
+    rule: 'RPS_5 >= 70 且 RPS_20 < 30 且 RPS_60 < 20',
+    action: '只按反弹看，确认转强前不把它当趋势主升。',
+    tone: 'oversold',
+    sortPeriod: 5,
+    matcher: (item) => (
+      getRpsScore(item, 5) >= 70
+      && getRpsScore(item, 20) < 30
+      && getRpsScore(item, 60) < 20
+    ),
+  },
+  {
+    key: 'avoid',
+    title: '退潮回避',
+    focus: 'RPS_5 与 RPS_20 双低，资金攻击和趋势都不占优。',
+    rule: 'RPS_5 < 30 且 RPS_20 < 50',
+    action: '等待强度重建，不用在弱势股里寻找奇迹。',
+    tone: 'avoid',
+    sortPeriod: 5,
+    sortDirection: 'ascending',
+    matcher: (item) => getRpsScore(item, 5) < 30 && getRpsScore(item, 20) < 50,
+  },
+]
+
+const practiceReviewChecklist = [
+  '1. 先看全市场 RPS_20>80 的占比，决定今天进攻还是收缩。',
+  '2. 再看 RPS_5+RPS_20 综合排名前 100，寻找行业集群。',
+  '3. RPS_5/RPS_20 双高是主升龙头，RPS_5 高、RPS_20 低是新启动或补涨。',
+  '4. RPS_5 回落但 RPS_20 仍高，按分歧低吸处理，重点看趋势核心。',
+  '5. RPS_5 和 RPS_20 双低直接回避，把精力留给新周期强股。',
+]
+
+const getPracticeStageDefinition = (
+  key: PracticeStageKey,
+): PracticeStageDefinition | undefined => {
+  return practiceStageDefinitions.find((item) => item.key === key)
+}
+
 const getRpsColor = (rpsValue: number): string => {
   if (rpsValue >= 90) return '#ef4444'
   if (rpsValue >= 80) return '#f59e0b'
@@ -863,6 +1128,99 @@ const defaultSortProp = computed(() => {
 })
 
 const warningMessages = computed(() => stockRpsData.value?.errors || [])
+
+const stockMarketEnvironment = computed(() => {
+  const total = stockRpsRows.value.length
+  const strong20Count = stockRpsRows.value.filter((item) => getRpsScore(item, 20) > 80).length
+  const strong20Ratio = total > 0 ? (strong20Count / total) * 100 : 0
+
+  if (total === 0) {
+    return {
+      label: '等待数据',
+      tone: 'neutral',
+      advice: '暂无个股 RPS 数据，先等待榜单加载完成。',
+      strong20Count,
+      strong20Ratio,
+    }
+  }
+
+  if (strong20Ratio > 20) {
+    return {
+      label: '强市',
+      tone: 'strong',
+      advice: 'RPS_20 强势股扩散充分，可以围绕板块集群和双高龙头提高进攻性。',
+      strong20Count,
+      strong20Ratio,
+    }
+  }
+
+  if (strong20Ratio >= 10) {
+    return {
+      label: '正常轮动',
+      tone: 'mixed',
+      advice: '强势股有一定数量，但仍偏轮动，优先做行业集群里的分歧低吸和新启动。',
+      strong20Count,
+      strong20Ratio,
+    }
+  }
+
+  return {
+    label: '弱市',
+    tone: 'weak',
+    advice: 'RPS_20 强势占比较低，仓位应收缩，只看极少数高辨识度强股。',
+    strong20Count,
+    strong20Ratio,
+  }
+})
+
+const practiceStageGroups = computed(() => practiceStageDefinitions.map((definition) => {
+  const rows = sortPracticeRows(
+    stockRpsRows.value.filter(definition.matcher),
+    definition.sortPeriod,
+    definition.sortDirection,
+  ).slice(0, 5)
+
+  return {
+    ...definition,
+    rows,
+  }
+}))
+
+const industryClusters = computed<IndustryCluster[]>(() => {
+  const topRows = [...stockRpsRows.value]
+    .sort((left, right) => getCompositeStrengthScore(right) - getCompositeStrengthScore(left))
+    .slice(0, 100)
+  const clusterMap = new Map<string, StockRpsItem[]>()
+
+  topRows.forEach((item) => {
+    const industry = item.industry || '未分类'
+    const rows = clusterMap.get(industry) ?? []
+    rows.push(item)
+    clusterMap.set(industry, rows)
+  })
+
+  return Array.from(clusterMap.entries())
+    .map(([industry, rows]) => {
+      const sortedRows = [...rows].sort(
+        (left, right) => getCompositeStrengthScore(right) - getCompositeStrengthScore(left),
+      )
+      const leader = sortedRows[0]
+      return {
+        industry,
+        count: rows.length,
+        leader,
+        score: getCompositeStrengthScore(leader),
+      }
+    })
+    .filter((cluster) => cluster.count >= 3)
+    .sort((left, right) => right.count - left.count || right.score - left.score)
+    .slice(0, 6)
+})
+
+const activePracticeStageLabel = computed(() => {
+  if (activePracticeStage.value === 'all') return '全部'
+  return getPracticeStageDefinition(activePracticeStage.value)?.title || '全部'
+})
 
 /**
  * 工具：根据涨跌幅数值返回方向标签。
@@ -955,13 +1313,17 @@ const hasActiveValueFilter = computed(() => {
 })
 
 const hasAnyTableFilter = computed(() => {
-  return hasActiveRpsFilter.value || hasActiveChangeFilter.value || hasActiveValueFilter.value
+  return hasActiveRpsFilter.value
+    || hasActiveChangeFilter.value
+    || hasActiveValueFilter.value
+    || activePracticeStage.value !== 'all'
 })
 
 const resetAllTableFilters = (): void => {
   resetRpsFilters()
   resetChangeFilters()
   resetValueFilters()
+  activePracticeStage.value = 'all'
 }
 
 /**
@@ -1017,6 +1379,20 @@ const matchesValueFilters = (item: StockRpsItem): boolean => {
   })
 }
 
+const matchesPracticeStage = (item: StockRpsItem): boolean => {
+  if (activePracticeStage.value === 'all') return true
+  return getPracticeStageDefinition(activePracticeStage.value)?.matcher(item) ?? true
+}
+
+const applyPracticeStage = (stage: PracticeStageKey): void => {
+  activePracticeStage.value = stage
+  viewMode.value = 'practice'
+}
+
+const clearPracticeStage = (): void => {
+  activePracticeStage.value = 'all'
+}
+
 const filteredRows = computed<StockRpsItem[]>(() => {
   const keyword = filters.searchKeyword.trim().toLowerCase()
   let result = stockRpsRows.value
@@ -1032,6 +1408,7 @@ const filteredRows = computed<StockRpsItem[]>(() => {
   result = result.filter(matchesRpsFilters)
   result = result.filter(matchesChangeFilters)
   result = result.filter(matchesValueFilters)
+  result = result.filter(matchesPracticeStage)
   return result
 })
 
@@ -1450,6 +1827,10 @@ watch(
   flex-wrap: wrap;
 }
 
+.toolbar-mode {
+  width: 148px;
+}
+
 /* 把计数与说明入口推到右侧，和筛选控件共用一行 */
 .toolbar-spacer {
   flex: 1 1 auto;
@@ -1483,6 +1864,335 @@ watch(
 
 .toolbar-filter-reset {
   padding: 0;
+}
+
+.practice-mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e8edf3;
+  background: #f8fafc;
+}
+
+.practice-market-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
+  padding: 12px;
+  border: 1px solid #e1e6ee;
+  border-left: 4px solid #98a2b3;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.practice-market-strip.tone-strong {
+  border-left-color: #d92d20;
+}
+
+.practice-market-strip.tone-mixed {
+  border-left-color: #f79009;
+}
+
+.practice-market-strip.tone-weak {
+  border-left-color: #667085;
+}
+
+.practice-market-strip.tone-neutral {
+  border-left-color: #98a2b3;
+}
+
+.practice-market-strip > div:first-child {
+  min-width: 0;
+}
+
+.practice-kicker {
+  display: block;
+  margin-bottom: 4px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.practice-market-strip strong {
+  color: #172033;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.practice-market-strip p {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: #5f6876;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.practice-market-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(88px, 1fr));
+  gap: 8px;
+  min-width: 300px;
+}
+
+.practice-market-stats div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid #edf1f6;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.practice-market-stats strong {
+  color: #172033;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.practice-market-stats span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.practice-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(184px, 1fr));
+  gap: 8px;
+}
+
+.practice-stage-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 308px;
+  border: 1px solid #e1e6ee;
+  border-left: 4px solid #98a2b3;
+  border-radius: 6px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.practice-stage-card.stage-leader {
+  border-left-color: #d92d20;
+}
+
+.practice-stage-card.stage-start {
+  border-left-color: #175cd3;
+}
+
+.practice-stage-card.stage-divergence {
+  border-left-color: #f79009;
+}
+
+.practice-stage-card.stage-oversold {
+  border-left-color: #12b76a;
+}
+
+.practice-stage-card.stage-avoid {
+  border-left-color: #667085;
+}
+
+.practice-stage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px 8px;
+}
+
+.practice-stage-head h3 {
+  margin: 0 0 5px;
+  color: #303133;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.practice-stage-head p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.practice-stage-rule {
+  margin: 0 10px 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: #f5f7fa;
+  color: #5f6876;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.practice-stock-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.practice-stock-row {
+  display: grid;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid #edf1f6;
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.practice-stock-main,
+.practice-stock-meta,
+.practice-stage-foot,
+.practice-table-bridge,
+.cluster-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.practice-stock-main {
+  justify-content: space-between;
+}
+
+.practice-stock-main .el-button {
+  min-width: 0;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.practice-stock-main span {
+  color: #5f6876;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.practice-stock-meta {
+  flex-wrap: wrap;
+  color: #667085;
+  font-size: 12px;
+}
+
+.practice-stage-foot {
+  justify-content: space-between;
+  margin-top: auto;
+  padding: 8px 10px;
+  border-top: 1px solid #edf1f6;
+  background: #f8fafc;
+}
+
+.practice-stage-foot span {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.practice-reference-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+  gap: 8px;
+}
+
+.practice-reference-block,
+.practice-table-bridge {
+  padding: 10px 12px;
+  border: 1px solid #e1e6ee;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.practice-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.practice-section-title span {
+  color: #303133;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.practice-section-title small {
+  color: #98a2b3;
+  font-size: 12px;
+}
+
+.cluster-list,
+.review-checklist {
+  display: grid;
+  gap: 7px;
+}
+
+.cluster-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(82px, auto) auto;
+  min-height: 38px;
+  padding: 7px 8px;
+  border: 1px solid #edf1f6;
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.cluster-row div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.cluster-row strong {
+  overflow: hidden;
+  color: #303133;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cluster-row span {
+  color: #667085;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.review-checklist p {
+  margin: 0;
+  padding: 7px 9px;
+  border-left: 3px solid #d8dee8;
+  background: #fbfcfd;
+  color: #5f6876;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.practice-table-bridge {
+  justify-content: space-between;
+}
+
+.practice-table-bridge div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.practice-table-bridge strong {
+  color: #303133;
+  font-size: 14px;
+}
+
+.practice-table-bridge span {
+  color: #667085;
+  font-size: 12px;
 }
 
 .stock-name-cell {
@@ -1710,6 +2420,44 @@ watch(
   .table-filter-toolbar,
   .toolbar-filter {
     width: 100%;
+  }
+
+  .toolbar-mode {
+    width: 100%;
+  }
+
+  .practice-mode-panel {
+    padding: 8px;
+  }
+
+  .practice-market-strip,
+  .practice-reference-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .practice-market-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .practice-stage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .practice-stage-card {
+    min-height: auto;
+  }
+
+  .practice-section-title,
+  .practice-table-bridge,
+  .practice-table-bridge div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cluster-row {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
   }
 
   .trend-toolbar-right,
