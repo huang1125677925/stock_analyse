@@ -300,6 +300,7 @@ const stockPickerMegaMenuSections = [
     items: [
       { title: '涨停分析选股', path: '/stock-picker/limit-board-analysis' },
       { title: '波段趋势选股', path: '/stock-picker/swing-practice' },
+      { title: '箱体突破选股', path: '/stock-picker/box-breakout' },
     ],
   },
 ]

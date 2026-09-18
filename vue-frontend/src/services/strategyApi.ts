@@ -601,3 +601,99 @@ export async function getSwingChannelCandidates(
     throw error
   }
 }
+
+export interface BoxBreakoutCondition {
+  key: string
+  name: string
+  passed: boolean
+  threshold: string
+  value: number | string | boolean | Record<string, unknown> | null
+  description: string
+}
+
+export interface BoxBreakoutFailureStatus {
+  invalid: boolean
+  reasons: string[]
+  warnings: string[]
+  observed_days: number
+}
+
+export interface BoxBreakoutCandidateItem {
+  stock_code: string
+  ts_code: string
+  stock_name: string
+  industry: string | null
+  trade_date: string
+  breakout_date: string
+  breakout_is_latest: boolean
+  consecutive_limit_days: number
+  match_count: number
+  match_ratio: number
+  latest_close: number | null
+  total_market_cap_yi: number | null
+  box: {
+    start_date: string
+    end_date: string
+    days: number
+    high_close: number | null
+    low_close: number | null
+    amplitude_pct: number | null
+    avg_volume: number
+  }
+  condition_metrics: {
+    median_abs_change_20d: number | null
+    ma_adhesion_pct: number | null
+    position_80d_pct: number | null
+    pre_decline_drawdown_pct: number | null
+    breakout_gain_pct: number | null
+    breakout_above_box_pct: number | null
+    volume_ratio: number | null
+  }
+  hard_gates: Record<string, boolean>
+  conditions: BoxBreakoutCondition[]
+  failure_status: BoxBreakoutFailureStatus
+}
+
+export interface BoxBreakoutCandidatesData {
+  trade_date: string | null
+  total: number
+  matched_total: number
+  scanned_total: number
+  pool_total: number
+  filters: {
+    min_match_count: number
+    limit: number
+    codes: string[]
+    include_failed: boolean
+    min_box_days: number
+  }
+  condition_definitions: Array<{ key: string; name: string; threshold: string }>
+  data: BoxBreakoutCandidateItem[]
+  skipped: Record<string, number>
+  errors: string[]
+  query_time: string
+}
+
+export interface BoxBreakoutCandidatesParams {
+  trade_date?: string
+  min_match_count?: number
+  limit?: number
+  codes?: string
+  include_failed?: boolean
+  min_box_days?: number
+}
+
+export async function getBoxBreakoutCandidates(
+  params: BoxBreakoutCandidatesParams = {}
+): Promise<BoxBreakoutCandidatesData> {
+  try {
+    const response = await axios.get<BoxBreakoutCandidatesData>(
+      '/django/api/strategy/box-breakout-candidates/',
+      { params }
+    )
+    return response.data
+  } catch (error) {
+    console.error('获取箱体突破候选列表失败:', error)
+    throw error
+  }
+}

@@ -100,6 +100,12 @@ const router = createRouter({
           component: () => import('@/views/indival_stock_data/StockSwingPracticeView.vue'),
           meta: { title: '波段趋势选股' },
         },
+        {
+          path: '/stock-picker/box-breakout',
+          name: 'stock-box-breakout',
+          component: () => import('@/views/indival_stock_data/BoxBreakoutCandidatesView.vue'),
+          meta: { title: '箱体突破选股' },
+        },
       ],
     },
     {
@@ -109,6 +115,10 @@ const router = createRouter({
     {
       path: '/stock-swing-practice',
       redirect: '/stock-picker/swing-practice',
+    },
+    {
+      path: '/stock-box-breakout',
+      redirect: '/stock-picker/box-breakout',
     },
     {
       path: '/admin/invite-codes',
