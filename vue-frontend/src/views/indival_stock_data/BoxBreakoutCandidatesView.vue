@@ -219,17 +219,30 @@
       </template>
 
       <div class="trend-dialog-body">
-        <div class="trend-meta">
-          <el-tag type="info" effect="plain">代码 {{ selectedTrendStock.code }}</el-tag>
-          <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">
-            {{ selectedTrendStock.industry }}
-          </el-tag>
-          <el-tag type="danger" effect="light">
-            观察日 {{ formatDisplayDate(selectedTrendStock.observationDate) }}
-          </el-tag>
-          <el-tag v-if="latestTrendPoint" type="info" effect="light">
-            区间末收盘 {{ formatNumber(latestTrendPoint.close_price) }}
-          </el-tag>
+        <div class="trend-toolbar">
+          <div class="trend-meta">
+            <el-tag type="info" effect="plain">代码 {{ selectedTrendStock.code }}</el-tag>
+            <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">
+              {{ selectedTrendStock.industry }}
+            </el-tag>
+            <el-tag type="danger" effect="light">
+              观察日 {{ formatDisplayDate(selectedTrendStock.observationDate) }}
+            </el-tag>
+            <el-tag v-if="latestTrendPoint" type="info" effect="light">
+              区间末收盘 {{ formatNumber(latestTrendPoint.close_price) }}
+            </el-tag>
+          </div>
+
+          <div class="trend-nav" aria-label="切换观察日筛选股票">
+            <el-button :icon="ArrowLeft" :disabled="!hasPrevTrendStock" @click="stepTrendStock(-1)">
+              上一只
+            </el-button>
+            <span class="trend-nav-position">{{ trendNavPositionText }}</span>
+            <el-button :disabled="!hasNextTrendStock" @click="stepTrendStock(1)">
+              下一只
+              <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+            </el-button>
+          </div>
         </div>
 
         <div class="trend-preview" v-loading="trendLoading">
@@ -247,6 +260,49 @@
             :image-size="80"
           />
         </div>
+
+        <section v-if="selectedTrendConditions.length" class="trend-condition-panel">
+          <div class="trend-condition-heading">
+            <div>
+              <h3>条件状态</h3>
+              <p>观察日对应的箱体突破条件</p>
+            </div>
+            <strong>
+              {{ selectedTrendCandidate?.match_count ?? 0 }}/{{ selectedTrendConditions.length }}
+              条满足
+            </strong>
+          </div>
+
+          <div class="trend-condition-grid">
+            <article
+              v-for="condition in selectedTrendConditions"
+              :key="condition.key"
+              class="trend-condition-item"
+              :class="condition.passed ? 'is-passed' : 'is-failed'"
+            >
+              <div class="trend-condition-topline">
+                <span class="trend-condition-key">{{ condition.key.toUpperCase() }}</span>
+                <el-tag :type="condition.passed ? 'success' : 'danger'" effect="plain" size="small">
+                  {{ condition.passed ? '满足' : '未满足' }}
+                </el-tag>
+              </div>
+              <strong class="trend-condition-name">{{ condition.name }}</strong>
+              <dl class="trend-condition-values">
+                <div>
+                  <dt>指标值</dt>
+                  <dd>{{ formatConditionValue(condition.value) }}</dd>
+                </div>
+                <div>
+                  <dt>判定阈值</dt>
+                  <dd>{{ condition.threshold || '-' }}</dd>
+                </div>
+              </dl>
+              <p v-if="condition.description" class="trend-condition-description">
+                {{ condition.description }}
+              </p>
+            </article>
+          </div>
+        </section>
       </div>
     </el-dialog>
   </div>
@@ -255,6 +311,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { useAiPageData } from '@/composables/useAiPageData'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
@@ -293,6 +350,8 @@ const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendData = ref<StockHistoryDataItem[]>([])
 const trendDateRange = reactive({ start: '', end: '' })
+const selectedTrendCandidate = ref<BoxBreakoutCandidateItem | null>(null)
+const currentTrendIndex = ref(-1)
 const selectedTrendStock = reactive({
   code: '',
   tsCode: '',
@@ -308,6 +367,15 @@ const trendEventLines = computed(() =>
 const latestTrendPoint = computed(() =>
   trendData.value.length ? trendData.value[trendData.value.length - 1] : null,
 )
+const selectedTrendConditions = computed(() => selectedTrendCandidate.value?.conditions ?? [])
+const hasPrevTrendStock = computed(() => currentTrendIndex.value > 0)
+const hasNextTrendStock = computed(
+  () => currentTrendIndex.value >= 0 && currentTrendIndex.value < rows.value.length - 1,
+)
+const trendNavPositionText = computed(() => {
+  if (currentTrendIndex.value < 0 || !rows.value.length) return '- / -'
+  return `${currentTrendIndex.value + 1} / ${rows.value.length}`
+})
 const skippedText = computed(() => {
   const skipped = data.value?.skipped
   if (!skipped) return '-'
@@ -456,27 +524,44 @@ async function loadTrendData() {
   }
 }
 
-function openTrendDialog(row: BoxBreakoutCandidateItem) {
+function showTrendStock(row: BoxBreakoutCandidateItem) {
   const observationDate = row.trade_date || data.value?.trade_date || query.trade_date
   if (!observationDate || !setTrendDateRange(observationDate)) {
     ElMessage.warning('当前记录缺少有效的观察日期，无法加载趋势图')
-    return
+    return false
   }
 
+  selectedTrendCandidate.value = row
   selectedTrendStock.code = row.stock_code
   selectedTrendStock.tsCode = row.ts_code
   selectedTrendStock.name = row.stock_name
   selectedTrendStock.industry = row.industry || ''
   selectedTrendStock.observationDate = observationDate
   trendData.value = []
-  trendDialogVisible.value = true
   loadTrendData()
+  return true
+}
+
+function openTrendDialog(row: BoxBreakoutCandidateItem) {
+  const rowIndex = rows.value.findIndex((item) => item.stock_code === row.stock_code)
+  if (!showTrendStock(row)) return
+  currentTrendIndex.value = rowIndex
+  trendDialogVisible.value = true
+}
+
+function stepTrendStock(step: -1 | 1) {
+  const nextIndex = currentTrendIndex.value + step
+  const targetRow = rows.value[nextIndex]
+  if (!targetRow || !showTrendStock(targetRow)) return
+  currentTrendIndex.value = nextIndex
 }
 
 function handleTrendDialogClosed() {
   trendRequestId += 1
   trendLoading.value = false
   trendData.value = []
+  selectedTrendCandidate.value = null
+  currentTrendIndex.value = -1
 }
 
 onMounted(() => {
@@ -670,14 +755,150 @@ watch(
   gap: 16px;
 }
 
+.trend-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .trend-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
+.trend-nav {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.trend-nav-position {
+  min-width: 58px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
 .trend-preview {
   min-height: 420px;
+}
+
+.trend-condition-panel {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 16px;
+}
+
+.trend-condition-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.trend-condition-heading h3,
+.trend-condition-heading p {
+  margin: 0;
+}
+
+.trend-condition-heading h3 {
+  color: #111827;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.trend-condition-heading p {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.trend-condition-heading > strong {
+  color: #1d4ed8;
+  font-size: 14px;
+}
+
+.trend-condition-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.trend-condition-item {
+  min-width: 0;
+  padding: 11px 12px 12px;
+  border: 1px solid #e2e8f0;
+  border-left-width: 3px;
+  background: #ffffff;
+}
+
+.trend-condition-item.is-passed {
+  border-left-color: #16a34a;
+}
+
+.trend-condition-item.is-failed {
+  border-left-color: #dc2626;
+}
+
+.trend-condition-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.trend-condition-key {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.trend-condition-name {
+  display: block;
+  margin-top: 8px;
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.trend-condition-values {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 0;
+}
+
+.trend-condition-values > div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.trend-condition-values dt,
+.trend-condition-values dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.trend-condition-values dt {
+  color: #94a3b8;
+}
+
+.trend-condition-values dd {
+  overflow-wrap: anywhere;
+  color: #475569;
+}
+
+.trend-condition-description {
+  margin: 9px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
@@ -707,6 +928,20 @@ watch(
 
   .trend-preview {
     min-height: 300px;
+  }
+
+  .trend-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .trend-nav {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .trend-condition-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
