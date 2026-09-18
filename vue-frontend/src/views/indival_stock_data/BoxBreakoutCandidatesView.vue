@@ -3,8 +3,17 @@
     <section class="toolbar">
       <div class="toolbar-main">
         <div class="control">
-          <span class="control-label">交易日</span>
-          <el-input v-model="query.trade_date" clearable placeholder="默认最新" />
+          <span class="control-label">观察日期</span>
+          <el-date-picker
+            v-model="query.trade_date"
+            type="date"
+            value-format="YYYYMMDD"
+            format="YYYY-MM-DD"
+            clearable
+            placeholder="默认最新交易日"
+            :disabled-date="disableFutureDate"
+            class="date-picker"
+          />
         </div>
         <div class="control compact">
           <span class="control-label">命中数</span>
@@ -178,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useAiPageData } from '@/composables/useAiPageData'
 import {
   getBoxBreakoutCandidates,
@@ -189,6 +198,7 @@ import {
 
 const loading = ref(false)
 const data = ref<BoxBreakoutCandidatesData | null>(null)
+let latestRequestId = 0
 const query = reactive<Required<Pick<BoxBreakoutCandidatesParams, 'min_match_count' | 'limit' | 'include_failed' | 'min_box_days'>> & {
   trade_date: string
   codes: string
@@ -230,12 +240,24 @@ function buildParams(): BoxBreakoutCandidatesParams {
 }
 
 async function loadData() {
+  const requestId = ++latestRequestId
   loading.value = true
   try {
-    data.value = await getBoxBreakoutCandidates(buildParams())
+    const result = await getBoxBreakoutCandidates(buildParams())
+    if (requestId === latestRequestId) {
+      data.value = result
+    }
   } finally {
-    loading.value = false
+    if (requestId === latestRequestId) {
+      loading.value = false
+    }
   }
+}
+
+function disableFutureDate(date: Date) {
+  const today = new Date()
+  today.setHours(23, 59, 59, 999)
+  return date.getTime() > today.getTime()
 }
 
 function formatNumber(value: number | null | undefined, digits = 2) {
@@ -258,6 +280,13 @@ function formatConditionValue(value: unknown) {
 onMounted(() => {
   loadData()
 })
+
+watch(
+  () => query.trade_date,
+  () => {
+    loadData()
+  },
+)
 </script>
 
 <style scoped>
@@ -298,6 +327,10 @@ onMounted(() => {
 
 .control.codes {
   width: 220px;
+}
+
+.date-picker {
+  width: 100%;
 }
 
 .control-label {
