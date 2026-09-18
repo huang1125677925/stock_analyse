@@ -33,9 +33,7 @@
         </div>
         <el-switch v-model="query.include_failed" active-text="包含失效" />
       </div>
-      <el-button type="primary" :loading="loading" @click="loadData">
-        开始筛选
-      </el-button>
+      <el-button type="primary" :loading="loading" @click="loadData"> 开始筛选 </el-button>
     </section>
 
     <section class="summary-strip">
@@ -84,7 +82,10 @@
                 </div>
                 <div>
                   <span>箱体上下沿</span>
-                  <strong>{{ formatNumber(row.box.high_close) }} / {{ formatNumber(row.box.low_close) }}</strong>
+                  <strong
+                    >{{ formatNumber(row.box.high_close) }} /
+                    {{ formatNumber(row.box.low_close) }}</strong
+                  >
                 </div>
                 <div>
                   <span>放量倍数</span>
@@ -92,7 +93,9 @@
                 </div>
                 <div>
                   <span>失效状态</span>
-                  <strong>{{ row.failure_status.invalid ? row.failure_status.reasons.join('；') : '未触发' }}</strong>
+                  <strong>{{
+                    row.failure_status.invalid ? row.failure_status.reasons.join('；') : '未触发'
+                  }}</strong>
                 </div>
               </div>
               <el-table :data="row.conditions" border size="small" class="condition-detail-table">
@@ -116,7 +119,18 @@
           </template>
         </el-table-column>
         <el-table-column prop="stock_code" label="代码" width="92" fixed />
-        <el-table-column prop="stock_name" label="名称" width="120" fixed />
+        <el-table-column prop="stock_name" label="名称" width="120" fixed>
+          <template #default="{ row }">
+            <el-button
+              type="primary"
+              link
+              :aria-label="`查看${row.stock_name || row.stock_code}趋势图`"
+              @click="openTrendDialog(row)"
+            >
+              {{ row.stock_name || row.stock_code }}
+            </el-button>
+          </template>
+        </el-table-column>
         <el-table-column prop="industry" label="行业" min-width="120" />
         <el-table-column label="命中" width="96" align="center">
           <template #default="{ row }">
@@ -183,12 +197,67 @@
         </el-table-column>
       </el-table>
     </section>
+
+    <el-dialog
+      v-model="trendDialogVisible"
+      width="88%"
+      top="6vh"
+      destroy-on-close
+      append-to-body
+      :close-on-click-modal="false"
+      @closed="handleTrendDialogClosed"
+    >
+      <template #header>
+        <div class="trend-dialog-header">
+          <div class="trend-dialog-title">
+            {{ selectedTrendStock.name || selectedTrendStock.code }} 趋势图
+          </div>
+          <div class="trend-dialog-subtitle">
+            {{ trendDateRange.start || '-' }} 至 {{ trendDateRange.end || '-' }}
+          </div>
+        </div>
+      </template>
+
+      <div class="trend-dialog-body">
+        <div class="trend-meta">
+          <el-tag type="info" effect="plain">代码 {{ selectedTrendStock.code }}</el-tag>
+          <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">
+            {{ selectedTrendStock.industry }}
+          </el-tag>
+          <el-tag type="danger" effect="light">
+            观察日 {{ formatDisplayDate(selectedTrendStock.observationDate) }}
+          </el-tag>
+          <el-tag v-if="latestTrendPoint" type="info" effect="light">
+            区间末收盘 {{ formatNumber(latestTrendPoint.close_price) }}
+          </el-tag>
+        </div>
+
+        <div class="trend-preview" v-loading="trendLoading">
+          <StockKLineChart
+            v-if="trendData.length"
+            :stock-code="selectedTrendStock.tsCode || selectedTrendStock.code"
+            :stock-name="selectedTrendStock.name"
+            :kline-data="trendData"
+            :event-lines="trendEventLines"
+            height="420px"
+          />
+          <el-empty
+            v-else-if="!trendLoading"
+            description="观察日前3个月至后1个月区间暂无K线数据"
+            :image-size="80"
+          />
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import StockKLineChart from '@/components/StockKLineChart.vue'
 import { useAiPageData } from '@/composables/useAiPageData'
+import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import {
   getBoxBreakoutCandidates,
   type BoxBreakoutCandidateItem,
@@ -199,10 +268,18 @@ import {
 const loading = ref(false)
 const data = ref<BoxBreakoutCandidatesData | null>(null)
 let latestRequestId = 0
-const query = reactive<Required<Pick<BoxBreakoutCandidatesParams, 'min_match_count' | 'limit' | 'include_failed' | 'min_box_days'>> & {
-  trade_date: string
-  codes: string
-}>({
+let trendRequestId = 0
+const query = reactive<
+  Required<
+    Pick<
+      BoxBreakoutCandidatesParams,
+      'min_match_count' | 'limit' | 'include_failed' | 'min_box_days'
+    >
+  > & {
+    trade_date: string
+    codes: string
+  }
+>({
   trade_date: '',
   min_match_count: 7,
   limit: 100,
@@ -212,6 +289,25 @@ const query = reactive<Required<Pick<BoxBreakoutCandidatesParams, 'min_match_cou
 })
 
 const rows = computed<BoxBreakoutCandidateItem[]>(() => data.value?.data ?? [])
+const trendDialogVisible = ref(false)
+const trendLoading = ref(false)
+const trendData = ref<StockHistoryDataItem[]>([])
+const trendDateRange = reactive({ start: '', end: '' })
+const selectedTrendStock = reactive({
+  code: '',
+  tsCode: '',
+  name: '',
+  industry: '',
+  observationDate: '',
+})
+const trendEventLines = computed(() =>
+  selectedTrendStock.observationDate
+    ? [{ date: selectedTrendStock.observationDate, label: '观察日', color: '#dc2626' }]
+    : [],
+)
+const latestTrendPoint = computed(() =>
+  trendData.value.length ? trendData.value[trendData.value.length - 1] : null,
+)
 const skippedText = computed(() => {
   const skipped = data.value?.skipped
   if (!skipped) return '-'
@@ -275,6 +371,112 @@ function formatConditionValue(value: unknown) {
       .join('；')
   }
   return String(value)
+}
+
+function parseCompactDate(dateText: string): Date | null {
+  const digits = String(dateText || '').replace(/[^0-9]/g, '')
+  if (digits.length !== 8) return null
+  const year = Number(digits.slice(0, 4))
+  const month = Number(digits.slice(4, 6))
+  const day = Number(digits.slice(6, 8))
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null
+  }
+  return date
+}
+
+function formatDate(date: Date, separator = '-') {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return [year, month, day].join(separator)
+}
+
+function formatDisplayDate(dateText: string) {
+  const date = parseCompactDate(dateText)
+  return date ? formatDate(date) : dateText || '-'
+}
+
+function shiftCalendarMonths(date: Date, months: number) {
+  const shifted = new Date(date.getFullYear(), date.getMonth(), 1)
+  shifted.setMonth(shifted.getMonth() + months)
+  const lastDay = new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0).getDate()
+  shifted.setDate(Math.min(date.getDate(), lastDay))
+  return shifted
+}
+
+function setTrendDateRange(observationDate: string) {
+  const observedAt = parseCompactDate(observationDate)
+  if (!observedAt) {
+    trendDateRange.start = ''
+    trendDateRange.end = ''
+    return false
+  }
+  trendDateRange.start = formatDate(shiftCalendarMonths(observedAt, -3))
+  trendDateRange.end = formatDate(shiftCalendarMonths(observedAt, 1))
+  return true
+}
+
+async function requestTrendHistoryData() {
+  const candidateCodes = [selectedTrendStock.tsCode, selectedTrendStock.code].filter(
+    (value, index, array): value is string => Boolean(value) && array.indexOf(value) === index,
+  )
+  let lastError: unknown = null
+
+  for (const code of candidateCodes) {
+    try {
+      return await fetchStockHistoryData(
+        code,
+        trendDateRange.start.replace(/-/g, ''),
+        trendDateRange.end.replace(/-/g, ''),
+        'qfq',
+      )
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
+async function loadTrendData() {
+  const requestId = ++trendRequestId
+  trendLoading.value = true
+  try {
+    const result = await requestTrendHistoryData()
+    if (requestId !== trendRequestId) return
+    trendData.value = [...result].sort((left, right) => left.date.localeCompare(right.date))
+  } catch (error) {
+    if (requestId !== trendRequestId) return
+    console.error('加载箱体突破股票趋势图失败:', error)
+    trendData.value = []
+    ElMessage.error('加载股票趋势图失败，请稍后重试')
+  } finally {
+    if (requestId === trendRequestId) trendLoading.value = false
+  }
+}
+
+function openTrendDialog(row: BoxBreakoutCandidateItem) {
+  const observationDate = row.trade_date || data.value?.trade_date || query.trade_date
+  if (!observationDate || !setTrendDateRange(observationDate)) {
+    ElMessage.warning('当前记录缺少有效的观察日期，无法加载趋势图')
+    return
+  }
+
+  selectedTrendStock.code = row.stock_code
+  selectedTrendStock.tsCode = row.ts_code
+  selectedTrendStock.name = row.stock_name
+  selectedTrendStock.industry = row.industry || ''
+  selectedTrendStock.observationDate = observationDate
+  trendData.value = []
+  trendDialogVisible.value = true
+  loadTrendData()
+}
+
+function handleTrendDialogClosed() {
+  trendRequestId += 1
+  trendLoading.value = false
+  trendData.value = []
 }
 
 onMounted(() => {
@@ -445,6 +647,39 @@ watch(
   width: 100%;
 }
 
+.trend-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trend-dialog-title {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.trend-dialog-subtitle {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.trend-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trend-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trend-preview {
+  min-height: 420px;
+}
+
 @media (max-width: 900px) {
   .box-breakout-page {
     padding: 12px;
@@ -468,6 +703,10 @@ watch(
 
   .summary-strip {
     display: grid;
+  }
+
+  .trend-preview {
+    min-height: 300px;
   }
 }
 </style>
