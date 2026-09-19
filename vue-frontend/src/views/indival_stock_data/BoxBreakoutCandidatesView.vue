@@ -2,6 +2,10 @@
   <div class="box-breakout-page">
     <section class="toolbar">
       <div class="toolbar-main">
+        <div class="control category-control">
+          <span class="control-label">市场类别</span>
+          <el-segmented v-model="query.market_category" :options="marketCategoryOptions" />
+        </div>
         <div class="control trade-date-control">
           <span class="control-label">观察日期</span>
           <div class="trade-date-selector">
@@ -172,10 +176,10 @@
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="主板归属" width="120">
+        <el-table-column label="市场类别" width="120">
           <template #default="{ row }">
             <div class="market-cell">
-              <strong>{{ row.main_board_name }}</strong>
+              <strong>{{ row.board_name }}</strong>
               <span>{{ row.exchange }}</span>
             </div>
           </template>
@@ -303,7 +307,7 @@
           <div class="trend-meta">
             <el-tag type="info" effect="plain">代码 {{ selectedTrendStock.code }}</el-tag>
             <el-tag type="success" effect="light">
-              {{ selectedTrendStock.mainBoardName }}
+              {{ selectedTrendStock.boardName }}
             </el-tag>
             <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">
               {{ selectedTrendStock.industry }} {{ selectedTrendStock.industryCode }}
@@ -365,7 +369,9 @@
           <div class="trend-chart-heading">
             <div>
               <h3>对应大盘走势</h3>
-              <p>{{ selectedTrendStock.marketIndexName }} · {{ selectedTrendStock.marketIndexCode }}</p>
+              <p>
+                {{ selectedTrendStock.marketIndexName }} · {{ selectedTrendStock.marketIndexCode }}
+              </p>
             </div>
           </div>
           <div class="trend-preview market-trend-preview" v-loading="marketTrendLoading">
@@ -480,6 +486,7 @@ import {
   getBoxBreakoutCandidates,
   type BoxBreakoutCandidateItem,
   type BoxBreakoutCandidatesData,
+  type BoxBreakoutMarketCategory,
   type BoxBreakoutCandidatesParams,
 } from '@/services/strategyApi'
 
@@ -494,18 +501,24 @@ const query = reactive<
   Required<
     Pick<
       BoxBreakoutCandidatesParams,
-      'limit' | 'include_failed' | 'min_box_days' | 'signal_lookback_days'
+      'limit' | 'include_failed' | 'min_box_days' | 'signal_lookback_days' | 'market_category'
     >
   > & {
     trade_date: string
   }
 >({
   trade_date: '',
+  market_category: 'main_board',
   limit: 100,
   include_failed: false,
   min_box_days: 20,
   signal_lookback_days: 3,
 })
+const marketCategoryOptions: Array<{ label: string; value: BoxBreakoutMarketCategory }> = [
+  { label: '主板', value: 'main_board' },
+  { label: '科创板', value: 'star_market' },
+  { label: '创业板', value: 'chinext' },
+]
 
 const rows = computed<BoxBreakoutCandidateItem[]>(() => data.value?.data ?? [])
 const effectiveTradeDate = computed(() => query.trade_date || data.value?.trade_date || '')
@@ -523,7 +536,7 @@ const selectedTrendStock = reactive({
   code: '',
   tsCode: '',
   name: '',
-  mainBoardName: '',
+  boardName: '',
   marketIndexCode: '',
   marketIndexName: '',
   industry: '',
@@ -589,13 +602,14 @@ const skippedText = computed(() => {
 
 useAiPageData(() => ({
   title: '箱体整理放量突破选股',
-  summary: '按主板、低价、小市值股票池筛选，C1-C8 全部满足后输出。',
+  summary: `按${data.value?.market_category_name || '主板'}、低价、小市值股票池筛选，C1-C8 全部满足后输出。`,
   data: data.value,
 }))
 
 function buildParams(): BoxBreakoutCandidatesParams {
   return {
     trade_date: query.trade_date || undefined,
+    market_category: query.market_category,
     limit: query.limit,
     include_failed: query.include_failed,
     min_box_days: query.min_box_days,
@@ -925,7 +939,7 @@ function showTrendStock(row: BoxBreakoutCandidateItem) {
   selectedTrendStock.code = row.stock_code
   selectedTrendStock.tsCode = row.ts_code
   selectedTrendStock.name = row.stock_name
-  selectedTrendStock.mainBoardName = row.main_board_name
+  selectedTrendStock.boardName = row.board_name
   selectedTrendStock.marketIndexCode = row.market_index_code
   selectedTrendStock.marketIndexName = row.market_index_name
   selectedTrendStock.industry = row.industry || ''
@@ -979,6 +993,14 @@ watch(
     loadData()
   },
 )
+
+watch(
+  () => query.market_category,
+  () => {
+    trendDialogVisible.value = false
+    loadData()
+  },
+)
 </script>
 
 <style scoped>
@@ -1015,6 +1037,10 @@ watch(
 
 .control.compact {
   width: 118px;
+}
+
+.control.category-control {
+  width: 270px;
 }
 
 .control.trade-date-control {

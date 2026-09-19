@@ -640,15 +640,20 @@ export interface BoxBreakoutPostPerformance {
   returns: BoxBreakoutPostReturn[]
 }
 
+export type BoxBreakoutMarketCategory = 'main_board' | 'star_market' | 'chinext'
+
 export interface BoxBreakoutCandidateItem {
   stock_code: string
   ts_code: string
   stock_name: string
   exchange: 'SH' | 'SZ'
   exchange_name: '上证' | '深证'
-  main_board_name: '上证主板' | '深证主板'
-  market_index_code: '000001.SH' | '399001.SZ'
-  market_index_name: '上证综指' | '深证成指'
+  market_category: BoxBreakoutMarketCategory
+  market_category_name: '主板' | '科创板' | '创业板'
+  board_name: '上证主板' | '深证主板' | '科创板' | '创业板'
+  main_board_name: string
+  market_index_code: '000001.SH' | '399001.SZ' | '000688.SH' | '399006.SZ'
+  market_index_name: '上证综指' | '深证成指' | '科创50' | '创业板指'
   industry: string | null
   industry_code: string | null
   industries: string[]
@@ -692,6 +697,8 @@ export interface BoxBreakoutCandidateItem {
 
 export interface BoxBreakoutCandidatesData {
   trade_date: string | null
+  market_category: BoxBreakoutMarketCategory
+  market_category_name: '主板' | '科创板' | '创业板'
   total: number
   matched_total: number
   scanned_total: number
@@ -709,6 +716,7 @@ export interface BoxBreakoutCandidatesData {
     include_failed: boolean
     min_box_days: number
     signal_lookback_days: number
+    market_category: BoxBreakoutMarketCategory
   }
   signal_window?: {
     trade_dates: string[]
@@ -729,6 +737,7 @@ export interface BoxBreakoutCandidatesData {
 
 export interface BoxBreakoutCandidatesParams {
   trade_date?: string
+  market_category?: BoxBreakoutMarketCategory
   limit?: number
   codes?: string
   include_failed?: boolean
