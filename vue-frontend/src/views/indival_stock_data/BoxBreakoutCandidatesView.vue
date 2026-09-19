@@ -243,7 +243,8 @@
                 placement="top"
               >
                 <el-tag :type="condition.passed ? 'success' : 'danger'" effect="plain">
-                  {{ condition.key.toUpperCase() }} {{ condition.passed ? '✓' : '×' }}
+                  {{ condition.key.toUpperCase() }}{{ condition.required ? ' 必选' : '' }}
+                  {{ condition.passed ? '✓' : '×' }}
                 </el-tag>
               </el-tooltip>
             </div>
@@ -387,7 +388,9 @@
               :class="condition.passed ? 'is-passed' : 'is-failed'"
             >
               <div class="trend-condition-topline">
-                <span class="trend-condition-key">{{ condition.key.toUpperCase() }}</span>
+                <span class="trend-condition-key">
+                  {{ condition.key.toUpperCase() }}{{ condition.required ? ' · 必选' : '' }}
+                </span>
                 <el-tag :type="condition.passed ? 'success' : 'danger'" effect="plain" size="small">
                   {{ condition.passed ? '满足' : '未满足' }}
                 </el-tag>
@@ -522,6 +525,7 @@ const skippedText = computed(() => {
   return [
     `市值门槛 ${skipped.pool_gate ?? 0}`,
     `涨幅粗筛 ${skipped.latest_strength_gate ?? 0}`,
+    `核心条件 ${skipped.mandatory_condition_miss ?? 0}`,
     `条件不足 ${skipped.condition_miss ?? 0}`,
   ].join(' / ')
 })

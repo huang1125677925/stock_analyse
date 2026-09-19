@@ -609,6 +609,7 @@ export interface BoxBreakoutCondition {
   threshold: string
   value: number | string | boolean | Record<string, unknown> | null
   description: string
+  required: boolean
 }
 
 export interface BoxBreakoutFailureStatus {
@@ -709,6 +710,7 @@ export interface BoxBreakoutCandidatesData {
     trade_dates: string[]
     description: string
   }
+  mandatory_condition_keys?: string[]
   condition_definitions: Array<{ key: string; name: string; threshold: string }>
   post_performance_definition?: {
     buy_rule: string
