@@ -618,6 +618,26 @@ export interface BoxBreakoutFailureStatus {
   observed_days: number
 }
 
+export interface BoxBreakoutPostReturn {
+  holding_days: 3 | 5 | 10
+  target_date: string | null
+  close_price: number | null
+  return_pct: number | null
+  available: boolean
+}
+
+export interface BoxBreakoutPostPerformance {
+  status: 'pending' | 'unavailable' | 'partial' | 'complete'
+  message: string
+  observation_date: string
+  buy_date: string | null
+  buy_price: number | null
+  buy_price_type: 'next_trade_day_open'
+  holding_day_rule: string
+  available_trade_days: number
+  returns: BoxBreakoutPostReturn[]
+}
+
 export interface BoxBreakoutCandidateItem {
   stock_code: string
   ts_code: string
@@ -652,6 +672,7 @@ export interface BoxBreakoutCandidateItem {
   hard_gates: Record<string, boolean>
   conditions: BoxBreakoutCondition[]
   failure_status: BoxBreakoutFailureStatus
+  post_performance?: BoxBreakoutPostPerformance
 }
 
 export interface BoxBreakoutCandidatesData {
@@ -668,6 +689,11 @@ export interface BoxBreakoutCandidatesData {
     min_box_days: number
   }
   condition_definitions: Array<{ key: string; name: string; threshold: string }>
+  post_performance_definition?: {
+    buy_rule: string
+    holding_day_rule: string
+    periods: number[]
+  }
   data: BoxBreakoutCandidateItem[]
   skipped: Record<string, number>
   errors: string[]

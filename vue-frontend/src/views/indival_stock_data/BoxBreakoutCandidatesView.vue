@@ -97,6 +97,14 @@
                     row.failure_status.invalid ? row.failure_status.reasons.join('；') : '未触发'
                   }}</strong>
                 </div>
+                <div>
+                  <span>后验买入</span>
+                  <strong v-if="row.post_performance?.buy_date">
+                    {{ row.post_performance.buy_date }} 开盘
+                    {{ formatNumber(row.post_performance.buy_price, 3) }}
+                  </strong>
+                  <strong v-else>{{ row.post_performance?.message || '待观察' }}</strong>
+                </div>
               </div>
               <el-table :data="row.conditions" border size="small" class="condition-detail-table">
                 <el-table-column prop="name" label="条件" min-width="120" />
@@ -169,6 +177,30 @@
               <span>涨幅 {{ formatNumber(row.condition_metrics.breakout_gain_pct) }}%</span>
               <span>量比 {{ formatNumber(row.condition_metrics.volume_ratio) }}x</span>
               <span>分位 {{ formatNumber(row.condition_metrics.position_80d_pct) }}%</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="持有涨幅" width="210">
+          <template #default="{ row }">
+            <div class="holding-return-cell">
+              <span v-if="row.post_performance?.buy_date" class="holding-buy-line">
+                {{ row.post_performance.buy_date }} 开盘
+                {{ formatNumber(row.post_performance.buy_price, 3) }}
+              </span>
+              <span v-else class="holding-pending">
+                {{ row.post_performance?.message || '待观察' }}
+              </span>
+              <div class="holding-return-values">
+                <span
+                  v-for="item in row.post_performance?.returns || []"
+                  :key="item.holding_days"
+                >
+                  <em>{{ item.holding_days }}日</em>
+                  <strong :class="holdingReturnClass(item.return_pct)">
+                    {{ formatHoldingReturn(item.return_pct) }}
+                  </strong>
+                </span>
+              </div>
             </div>
           </template>
         </el-table-column>
@@ -427,6 +459,19 @@ function disableFutureDate(date: Date) {
 function formatNumber(value: number | null | undefined, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
   return Number(value).toFixed(digits)
+}
+
+function formatHoldingReturn(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
+  const number = Number(value)
+  return `${number > 0 ? '+' : ''}${number.toFixed(2)}%`
+}
+
+function holdingReturnClass(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return 'is-pending'
+  if (Number(value) > 0) return 'is-positive'
+  if (Number(value) < 0) return 'is-negative'
+  return 'is-flat'
 }
 
 function formatConditionValue(value: unknown) {
@@ -695,6 +740,54 @@ watch(
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.holding-return-cell {
+  display: grid;
+  gap: 5px;
+  line-height: 1.3;
+}
+
+.holding-buy-line,
+.holding-pending {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.holding-return-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.holding-return-values > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.holding-return-values em {
+  color: #94a3b8;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.holding-return-values strong {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.holding-return-values .is-positive {
+  color: #dc2626;
+}
+
+.holding-return-values .is-negative {
+  color: #16a34a;
+}
+
+.holding-return-values .is-flat,
+.holding-return-values .is-pending {
+  color: #64748b;
 }
 
 .expanded {
