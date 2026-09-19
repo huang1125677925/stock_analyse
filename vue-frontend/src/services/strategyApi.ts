@@ -745,6 +745,58 @@ export interface BoxBreakoutCandidatesParams {
   signal_lookback_days?: number
 }
 
+export type BoxBreakoutBuyStatus = 'supported' | 'rejected' | 'insufficient_data'
+
+export interface BoxBreakoutBuySignal {
+  key: string
+  passed: boolean
+  weight: number
+  score: number
+  hard_reject: boolean
+  description: string
+}
+
+export interface BoxBreakoutBuyDimension {
+  name: string
+  score: number
+  max_score: number
+  metrics: Record<string, string | number | null>
+  signals: BoxBreakoutBuySignal[]
+}
+
+export interface BoxBreakoutBuyAnalysis {
+  ts_code: string
+  industry_code: string | null
+  market_index_code: string
+  market_category: BoxBreakoutMarketCategory
+  observation_date: string
+  breakout_date: string
+  status: BoxBreakoutBuyStatus
+  status_label: string
+  can_buy: boolean
+  score: number | null
+  score_threshold: number
+  summary: string
+  support_reasons: string[]
+  reject_reasons: string[]
+  hard_reject_reasons: string[]
+  dimensions: Partial<Record<'stock' | 'industry' | 'market', BoxBreakoutBuyDimension>>
+  breakout_close?: number
+  data_scope: string
+  data_sources: Record<string, string>
+  data_errors: string[]
+  risk_notice: string
+}
+
+export interface BoxBreakoutBuyAnalysisParams {
+  ts_code: string
+  observation_date: string
+  breakout_date: string
+  industry_code?: string
+  market_index_code?: string
+  market_category?: BoxBreakoutMarketCategory
+}
+
 export async function getBoxBreakoutCandidates(
   params: BoxBreakoutCandidatesParams = {}
 ): Promise<BoxBreakoutCandidatesData> {
@@ -756,6 +808,21 @@ export async function getBoxBreakoutCandidates(
     return response.data
   } catch (error) {
     console.error('获取箱体突破候选列表失败:', error)
+    throw error
+  }
+}
+
+export async function getBoxBreakoutBuyAnalysis(
+  params: BoxBreakoutBuyAnalysisParams
+): Promise<BoxBreakoutBuyAnalysis> {
+  try {
+    const response = await axios.get<BoxBreakoutBuyAnalysis>(
+      '/django/api/strategy/box-breakout-buy-analysis/',
+      { params }
+    )
+    return response.data
+  } catch (error) {
+    console.error(`获取箱体突破买入判断失败: ${params.ts_code}`, error)
     throw error
   }
 }

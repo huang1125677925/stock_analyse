@@ -210,6 +210,28 @@
             </div>
           </template>
         </el-table-column>
+        <el-table-column label="买入判断" width="130" align="center">
+          <template #default="{ row }">
+            <div class="buy-status-cell">
+              <el-tag
+                v-if="buyAnalysisState(row)?.data"
+                :type="buyStatusTagType(buyAnalysisState(row)?.data?.status)"
+                effect="dark"
+              >
+                {{ buyAnalysisState(row)?.data?.status_label }}
+              </el-tag>
+              <el-tag v-else-if="buyAnalysisState(row)?.loading" type="info" effect="plain">
+                分析中
+              </el-tag>
+              <el-tag v-else-if="buyAnalysisState(row)?.error" type="danger" effect="plain">
+                分析失败
+              </el-tag>
+              <span v-if="buyAnalysisState(row)?.data?.score != null">
+                {{ buyAnalysisState(row)?.data?.score ?? '-' }}/100
+              </span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="观察收盘/市值" width="140">
           <template #default="{ row }">
             <div class="metric-cell">
@@ -338,6 +360,68 @@
             </el-button>
           </div>
         </div>
+
+        <section class="buy-analysis-panel" v-loading="selectedBuyAnalysisState?.loading">
+          <div class="buy-analysis-heading">
+            <div>
+              <h3>观察日买入判断</h3>
+              <p>个股 60 分、行业 20 分、大盘 20 分，达到 65 分且无硬性拒绝项</p>
+            </div>
+            <el-tag
+              v-if="selectedBuyAnalysisState?.data"
+              :type="buyStatusTagType(selectedBuyAnalysisState.data.status)"
+              effect="dark"
+              size="large"
+            >
+              {{ selectedBuyAnalysisState.data.status_label }}
+              <template v-if="selectedBuyAnalysisState.data.score !== null">
+                {{ selectedBuyAnalysisState.data.score }}/100
+              </template>
+            </el-tag>
+          </div>
+
+          <template v-if="selectedBuyAnalysisState?.data">
+            <p class="buy-analysis-summary">{{ selectedBuyAnalysisState.data.summary }}</p>
+            <div v-if="buyAnalysisDimensions.length" class="buy-dimension-strip">
+              <div v-for="dimension in buyAnalysisDimensions" :key="dimension.name">
+                <span>{{ dimension.name }}</span>
+                <strong>{{ dimension.score }}/{{ dimension.max_score }}</strong>
+              </div>
+            </div>
+            <div class="buy-reason-grid">
+              <div class="buy-reason-group is-support">
+                <h4>支持理由</h4>
+                <p
+                  v-for="reason in selectedBuyAnalysisState.data.support_reasons"
+                  :key="`support-${reason}`"
+                >
+                  {{ reason }}
+                </p>
+                <span v-if="!selectedBuyAnalysisState.data.support_reasons.length">暂无</span>
+              </div>
+              <div class="buy-reason-group is-reject">
+                <h4>拒绝与风险理由</h4>
+                <p
+                  v-for="reason in selectedBuyAnalysisState.data.reject_reasons"
+                  :key="`reject-${reason}`"
+                  :class="{
+                    'is-hard-reject':
+                      selectedBuyAnalysisState.data.hard_reject_reasons.includes(reason),
+                  }"
+                >
+                  {{ reason }}
+                </p>
+                <span v-if="!selectedBuyAnalysisState.data.reject_reasons.length">暂无</span>
+              </div>
+            </div>
+          </template>
+          <el-empty
+            v-else-if="selectedBuyAnalysisState?.error"
+            :description="selectedBuyAnalysisState.error"
+            :image-size="64"
+          />
+          <p v-else class="buy-analysis-pending">买入判断正在排队分析</p>
+        </section>
 
         <section class="trend-chart-section">
           <div class="trend-chart-heading">
@@ -483,7 +567,10 @@ import { fetchDcDaily } from '@/services/dcDailyApi'
 import { fetchIndexDailyKline } from '@/services/indexDailyApi'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import {
+  getBoxBreakoutBuyAnalysis,
   getBoxBreakoutCandidates,
+  type BoxBreakoutBuyAnalysis,
+  type BoxBreakoutBuyStatus,
   type BoxBreakoutCandidateItem,
   type BoxBreakoutCandidatesData,
   type BoxBreakoutMarketCategory,
@@ -497,6 +584,15 @@ let latestRequestId = 0
 let trendRequestId = 0
 let industryTrendRequestId = 0
 let marketTrendRequestId = 0
+let buyAnalysisBatchId = 0
+
+interface BuyAnalysisState {
+  loading: boolean
+  data: BoxBreakoutBuyAnalysis | null
+  error: string
+}
+
+const buyAnalysisStates = ref<Record<string, BuyAnalysisState>>({})
 const query = reactive<
   Required<
     Pick<
@@ -575,6 +671,17 @@ const latestTrendPoint = computed(() =>
   trendData.value.length ? trendData.value[trendData.value.length - 1] : null,
 )
 const selectedTrendConditions = computed(() => selectedTrendCandidate.value?.conditions ?? [])
+const selectedBuyAnalysisState = computed(() => {
+  const candidate = selectedTrendCandidate.value
+  return candidate ? buyAnalysisStates.value[buyAnalysisKey(candidate)] : undefined
+})
+const buyAnalysisDimensions = computed(() => {
+  const dimensions = selectedBuyAnalysisState.value?.data?.dimensions
+  if (!dimensions) return []
+  return [dimensions.stock, dimensions.industry, dimensions.market].filter(
+    (dimension): dimension is NonNullable<typeof dimension> => Boolean(dimension),
+  )
+})
 const hasPrevTrendStock = computed(() => currentTrendIndex.value > 0)
 const hasNextTrendStock = computed(
   () => currentTrendIndex.value >= 0 && currentTrendIndex.value < rows.value.length - 1,
@@ -617,13 +724,65 @@ function buildParams(): BoxBreakoutCandidatesParams {
   }
 }
 
+function buyAnalysisKey(row: BoxBreakoutCandidateItem) {
+  return `${row.ts_code}:${row.observation_date || row.trade_date}:${row.breakout_date}`
+}
+
+function buyAnalysisState(row: BoxBreakoutCandidateItem) {
+  return buyAnalysisStates.value[buyAnalysisKey(row)]
+}
+
+function buyStatusTagType(status: BoxBreakoutBuyStatus | undefined) {
+  if (status === 'supported') return 'success'
+  if (status === 'rejected') return 'danger'
+  return 'info'
+}
+
+async function loadBuyAnalyses(candidates: BoxBreakoutCandidateItem[]) {
+  const batchId = ++buyAnalysisBatchId
+  buyAnalysisStates.value = Object.fromEntries(
+    candidates.map((row) => [
+      buyAnalysisKey(row),
+      { loading: true, data: null, error: '' } satisfies BuyAnalysisState,
+    ]),
+  )
+
+  for (const row of candidates) {
+    if (batchId !== buyAnalysisBatchId) return
+    const key = buyAnalysisKey(row)
+    try {
+      const result = await getBoxBreakoutBuyAnalysis({
+        ts_code: row.ts_code,
+        observation_date: row.observation_date || row.trade_date,
+        breakout_date: row.breakout_date,
+        industry_code: row.industry_code || undefined,
+        market_index_code: row.market_index_code,
+        market_category: row.market_category,
+      })
+      if (batchId !== buyAnalysisBatchId) return
+      buyAnalysisStates.value[key] = { loading: false, data: result, error: '' }
+    } catch (error) {
+      if (batchId !== buyAnalysisBatchId) return
+      console.error(`加载 ${row.ts_code} 买入判断失败:`, error)
+      buyAnalysisStates.value[key] = {
+        loading: false,
+        data: null,
+        error: '买入判断加载失败，请稍后重新筛选',
+      }
+    }
+  }
+}
+
 async function loadData() {
   const requestId = ++latestRequestId
+  buyAnalysisBatchId += 1
+  buyAnalysisStates.value = {}
   loading.value = true
   try {
     const result = await getBoxBreakoutCandidates(buildParams())
     if (requestId === latestRequestId) {
       data.value = result
+      void loadBuyAnalyses(result.data || [])
     }
   } finally {
     if (requestId === latestRequestId) {
@@ -1137,6 +1296,17 @@ watch(
   font-size: 13px;
 }
 
+.buy-status-cell {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.buy-status-cell span {
+  color: #64748b;
+  font-size: 11px;
+}
+
 .industry-cell,
 .market-cell {
   display: grid;
@@ -1304,6 +1474,132 @@ watch(
   color: #64748b;
   font-size: 13px;
   text-align: center;
+}
+
+.buy-analysis-panel {
+  min-height: 108px;
+  padding: 14px 16px;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #2563eb;
+  border-radius: 4px;
+  background: #f8fafc;
+}
+
+.buy-analysis-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.buy-analysis-heading h3,
+.buy-analysis-heading p,
+.buy-analysis-summary,
+.buy-reason-group h4,
+.buy-reason-group p {
+  margin: 0;
+}
+
+.buy-analysis-heading h3 {
+  color: #111827;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.buy-analysis-heading p {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.buy-analysis-summary {
+  margin-top: 12px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.buy-dimension-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #e2e8f0;
+}
+
+.buy-dimension-strip > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  background: #ffffff;
+}
+
+.buy-dimension-strip span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.buy-dimension-strip strong {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.buy-reason-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 14px;
+}
+
+.buy-reason-group {
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 3px solid #94a3b8;
+}
+
+.buy-reason-group.is-support {
+  border-left-color: #16a34a;
+}
+
+.buy-reason-group.is-reject {
+  border-left-color: #dc2626;
+}
+
+.buy-reason-group h4 {
+  margin-bottom: 7px;
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.buy-reason-group p,
+.buy-reason-group > span {
+  display: block;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.buy-reason-group p::before {
+  content: '·';
+  margin-right: 6px;
+  font-weight: 700;
+}
+
+.buy-reason-group p.is-hard-reject {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.buy-analysis-pending {
+  margin: 18px 0 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .trend-preview {
@@ -1506,6 +1802,16 @@ watch(
   .trend-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .buy-analysis-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .buy-dimension-strip,
+  .buy-reason-grid {
+    grid-template-columns: 1fr;
   }
 
   .trend-nav {
