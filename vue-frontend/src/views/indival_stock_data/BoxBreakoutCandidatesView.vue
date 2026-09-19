@@ -24,6 +24,10 @@
           <el-input-number v-model="query.min_box_days" :min="10" :max="70" />
         </div>
         <div class="control compact">
+          <span class="control-label">信号回看</span>
+          <el-input-number v-model="query.signal_lookback_days" :min="1" :max="10" />
+        </div>
+        <div class="control compact">
           <span class="control-label">返回数</span>
           <el-input-number v-model="query.limit" :min="1" :max="500" />
         </div>
@@ -38,8 +42,12 @@
 
     <section class="summary-strip">
       <div class="summary-item">
-        <span>交易日</span>
+        <span>观察日</span>
         <strong>{{ data?.trade_date || '-' }}</strong>
+      </div>
+      <div class="summary-item compact-value">
+        <span>信号窗口</span>
+        <strong>{{ signalWindowText }}</strong>
       </div>
       <div class="summary-item">
         <span>命中</span>
@@ -77,6 +85,10 @@
             <div class="expanded">
               <div class="expanded-grid">
                 <div>
+                  <span>观察日 / 突破日</span>
+                  <strong>{{ row.observation_date }} / {{ row.breakout_date }}</strong>
+                </div>
+                <div>
                   <span>箱体区间</span>
                   <strong>{{ row.box.start_date }} ~ {{ row.box.end_date }}</strong>
                 </div>
@@ -86,6 +98,13 @@
                     >{{ formatNumber(row.box.high_close) }} /
                     {{ formatNumber(row.box.low_close) }}</strong
                   >
+                </div>
+                <div>
+                  <span>突破 / 观察收盘</span>
+                  <strong>
+                    {{ formatNumber(row.breakout_close) }} /
+                    {{ formatNumber(row.latest_close) }}
+                  </strong>
                 </div>
                 <div>
                   <span>放量倍数</span>
@@ -155,15 +174,17 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="突破日" width="120">
+        <el-table-column label="突破信号" width="150">
           <template #default="{ row }">
-            <div class="date-cell">
-              <span>{{ row.breakout_date }}</span>
-              <em v-if="!row.breakout_is_latest">首板回溯</em>
+            <div class="signal-cell">
+              <strong>{{ row.breakout_date }}</strong>
+              <el-tag :type="signalStatusType(row.signal_status)" effect="plain" size="small">
+                {{ row.signal_status_label }}
+              </el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="价格/市值" width="130">
+        <el-table-column label="观察收盘/市值" width="140">
           <template #default="{ row }">
             <div class="metric-cell">
               <strong>{{ formatNumber(row.latest_close) }}</strong>
@@ -266,6 +287,13 @@
               {{ selectedTrendStock.industry }} {{ selectedTrendStock.industryCode }}
             </el-tag>
             <el-tag type="danger" effect="light">
+              突破日 {{ formatDisplayDate(selectedTrendStock.breakoutDate) }}
+            </el-tag>
+            <el-tag
+              v-if="selectedTrendStock.observationDate !== selectedTrendStock.breakoutDate"
+              type="primary"
+              effect="light"
+            >
               观察日 {{ formatDisplayDate(selectedTrendStock.observationDate) }}
             </el-tag>
             <el-tag v-if="latestTrendPoint" type="info" effect="light">
@@ -410,7 +438,7 @@ const query = reactive<
   Required<
     Pick<
       BoxBreakoutCandidatesParams,
-      'min_match_count' | 'limit' | 'include_failed' | 'min_box_days'
+      'min_match_count' | 'limit' | 'include_failed' | 'min_box_days' | 'signal_lookback_days'
     >
   > & {
     trade_date: string
@@ -423,6 +451,7 @@ const query = reactive<
   codes: '',
   include_failed: false,
   min_box_days: 20,
+  signal_lookback_days: 3,
 })
 
 const rows = computed<BoxBreakoutCandidateItem[]>(() => data.value?.data ?? [])
@@ -440,13 +469,22 @@ const selectedTrendStock = reactive({
   name: '',
   industry: '',
   industryCode: '',
+  breakoutDate: '',
   observationDate: '',
 })
-const trendEventLines = computed(() =>
-  selectedTrendStock.observationDate
-    ? [{ date: selectedTrendStock.observationDate, label: '观察日', color: '#dc2626' }]
-    : [],
-)
+const trendEventLines = computed(() => {
+  const lines = []
+  if (selectedTrendStock.breakoutDate) {
+    lines.push({ date: selectedTrendStock.breakoutDate, label: '突破日', color: '#dc2626' })
+  }
+  if (
+    selectedTrendStock.observationDate
+    && selectedTrendStock.observationDate !== selectedTrendStock.breakoutDate
+  ) {
+    lines.push({ date: selectedTrendStock.observationDate, label: '观察日', color: '#2563eb' })
+  }
+  return lines
+})
 const trendPriceRanges = computed(() => {
   const box = selectedTrendCandidate.value?.box
   if (!box?.start_date || !box?.end_date) return []
@@ -470,6 +508,13 @@ const hasNextTrendStock = computed(
 const trendNavPositionText = computed(() => {
   if (currentTrendIndex.value < 0 || !rows.value.length) return '- / -'
   return `${currentTrendIndex.value + 1} / ${rows.value.length}`
+})
+const signalWindowText = computed(() => {
+  const dates = data.value?.signal_window?.trade_dates ?? []
+  if (!dates.length) return `${query.signal_lookback_days} 个交易日`
+  const newest = dates[0]
+  const oldest = dates[dates.length - 1]
+  return dates.length === 1 ? newest : `${oldest} ~ ${newest}`
 })
 const skippedText = computed(() => {
   const skipped = data.value?.skipped
@@ -495,6 +540,7 @@ function buildParams(): BoxBreakoutCandidatesParams {
     codes: query.codes || undefined,
     include_failed: query.include_failed,
     min_box_days: query.min_box_days,
+    signal_lookback_days: query.signal_lookback_days,
   }
 }
 
@@ -535,6 +581,13 @@ function holdingReturnClass(value: number | null | undefined) {
   if (Number(value) > 0) return 'is-positive'
   if (Number(value) < 0) return 'is-negative'
   return 'is-flat'
+}
+
+function signalStatusType(status: BoxBreakoutCandidateItem['signal_status']) {
+  if (status === 'new_breakout') return 'danger'
+  if (status === 'valid_follow_up') return 'success'
+  if (status === 'warning') return 'warning'
+  return 'info'
 }
 
 function formatConditionValue(value: unknown) {
@@ -717,6 +770,7 @@ function showTrendStock(row: BoxBreakoutCandidateItem) {
   selectedTrendStock.name = row.stock_name
   selectedTrendStock.industry = row.industry || ''
   selectedTrendStock.industryCode = row.industry_code || ''
+  selectedTrendStock.breakoutDate = row.breakout_date
   selectedTrendStock.observationDate = observationDate
   trendData.value = []
   industryTrendData.value = []
@@ -813,7 +867,7 @@ watch(
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr)) minmax(260px, 2fr);
+  grid-template-columns: repeat(5, minmax(120px, 1fr)) minmax(260px, 2fr);
   gap: 10px;
   margin: 14px 0;
 }
@@ -841,6 +895,11 @@ watch(
   font-size: 14px;
 }
 
+.summary-item.compact-value strong {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .notice {
   display: grid;
   gap: 6px;
@@ -863,11 +922,22 @@ watch(
   width: 100%;
 }
 
-.date-cell,
 .metric-cell {
   display: grid;
   gap: 3px;
   line-height: 1.35;
+}
+
+.signal-cell {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+  line-height: 1.35;
+}
+
+.signal-cell strong {
+  color: #1f2937;
+  font-size: 13px;
 }
 
 .industry-cell {
@@ -891,7 +961,6 @@ watch(
   font-size: 11px;
 }
 
-.date-cell em,
 .metric-cell span {
   font-style: normal;
   font-size: 12px;

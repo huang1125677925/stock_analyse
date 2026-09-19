@@ -647,11 +647,16 @@ export interface BoxBreakoutCandidateItem {
   industries: string[]
   industry_codes: string[]
   trade_date: string
+  observation_date: string
   breakout_date: string
   breakout_is_latest: boolean
   consecutive_limit_days: number
+  signal_age_trade_days: number
+  signal_status: 'new_breakout' | 'valid_follow_up' | 'warning' | 'invalid'
+  signal_status_label: string
   match_count: number
   match_ratio: number
+  breakout_close: number | null
   latest_close: number | null
   total_market_cap_yi: number | null
   box: {
@@ -697,6 +702,11 @@ export interface BoxBreakoutCandidatesData {
     codes: string[]
     include_failed: boolean
     min_box_days: number
+    signal_lookback_days: number
+  }
+  signal_window?: {
+    trade_dates: string[]
+    description: string
   }
   condition_definitions: Array<{ key: string; name: string; threshold: string }>
   post_performance_definition?: {
@@ -717,6 +727,7 @@ export interface BoxBreakoutCandidatesParams {
   codes?: string
   include_failed?: boolean
   min_box_days?: number
+  signal_lookback_days?: number
 }
 
 export async function getBoxBreakoutCandidates(
