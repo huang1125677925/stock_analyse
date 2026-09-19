@@ -643,6 +643,9 @@ export interface BoxBreakoutCandidateItem {
   ts_code: string
   stock_name: string
   industry: string | null
+  industry_code: string | null
+  industries: string[]
+  industry_codes: string[]
   trade_date: string
   breakout_date: string
   breakout_is_latest: boolean
@@ -681,6 +684,13 @@ export interface BoxBreakoutCandidatesData {
   matched_total: number
   scanned_total: number
   pool_total: number
+  industry_mapping?: {
+    source: string
+    idx_type: string
+    level: string
+    mapped_count: number
+    unmapped_count: number
+  }
   filters: {
     min_match_count: number
     limit: number

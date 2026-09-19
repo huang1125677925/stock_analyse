@@ -139,7 +139,15 @@
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column prop="industry" label="行业" min-width="120" />
+        <el-table-column label="东财二级行业" min-width="150">
+          <template #default="{ row }">
+            <div v-if="row.industry" class="industry-cell">
+              <strong>{{ row.industry }}</strong>
+              <span>{{ row.industry_code || '代码未匹配' }}</span>
+            </div>
+            <span v-else class="industry-unmapped">未匹配</span>
+          </template>
+        </el-table-column>
         <el-table-column label="命中" width="96" align="center">
           <template #default="{ row }">
             <el-tag :type="row.match_count >= 8 ? 'success' : 'warning'" effect="dark">
@@ -255,7 +263,7 @@
           <div class="trend-meta">
             <el-tag type="info" effect="plain">代码 {{ selectedTrendStock.code }}</el-tag>
             <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">
-              {{ selectedTrendStock.industry }}
+              {{ selectedTrendStock.industry }} {{ selectedTrendStock.industryCode }}
             </el-tag>
             <el-tag type="danger" effect="light">
               观察日 {{ formatDisplayDate(selectedTrendStock.observationDate) }}
@@ -277,23 +285,59 @@
           </div>
         </div>
 
-        <div class="trend-preview" v-loading="trendLoading">
-          <StockKLineChart
-            v-if="trendData.length"
-            :stock-code="selectedTrendStock.tsCode || selectedTrendStock.code"
-            :stock-name="selectedTrendStock.name"
-            :kline-data="trendData"
-            :event-lines="trendEventLines"
-            :price-ranges="trendPriceRanges"
-            show-volume
-            height="500px"
-          />
-          <el-empty
-            v-else-if="!trendLoading"
-            description="箱体起点前30天至观察日后1个月区间暂无K线数据"
-            :image-size="80"
-          />
-        </div>
+        <section class="trend-chart-section">
+          <div class="trend-chart-heading">
+            <div>
+              <h3>个股走势</h3>
+              <p>{{ selectedTrendStock.name }} · {{ selectedTrendStock.code }}</p>
+            </div>
+          </div>
+          <div class="trend-preview" v-loading="trendLoading">
+            <StockKLineChart
+              v-if="trendData.length"
+              :stock-code="selectedTrendStock.tsCode || selectedTrendStock.code"
+              :stock-name="selectedTrendStock.name"
+              :kline-data="trendData"
+              :event-lines="trendEventLines"
+              :price-ranges="trendPriceRanges"
+              show-volume
+              height="500px"
+            />
+            <el-empty
+              v-else-if="!trendLoading"
+              description="箱体起点前30天至观察日后1个月区间暂无K线数据"
+              :image-size="80"
+            />
+          </div>
+        </section>
+
+        <section class="trend-chart-section industry-trend-section">
+          <div class="trend-chart-heading">
+            <div>
+              <h3>所属东财二级行业走势</h3>
+              <p v-if="selectedTrendStock.industry">
+                {{ selectedTrendStock.industry }} · {{ selectedTrendStock.industryCode }}
+              </p>
+              <p v-else>当前股票未匹配到本地东财二级行业</p>
+            </div>
+          </div>
+          <div class="trend-preview industry-trend-preview" v-loading="industryTrendLoading">
+            <StockKLineChart
+              v-if="industryTrendData.length"
+              :stock-code="selectedTrendStock.industryCode"
+              :stock-name="selectedTrendStock.industry"
+              :kline-data="industryTrendData"
+              :event-lines="trendEventLines"
+              show-volume
+              height="420px"
+            />
+            <el-empty
+              v-else-if="!industryTrendLoading"
+              :description="selectedTrendStock.industryCode ? '该日期区间暂无行业K线数据' : '未匹配到东财二级行业代码'"
+              :image-size="80"
+            />
+          </div>
+        </section>
 
         <section v-if="selectedTrendConditions.length" class="trend-condition-panel">
           <div class="trend-condition-heading">
@@ -348,6 +392,7 @@ import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { useAiPageData } from '@/composables/useAiPageData'
+import { fetchDcDaily } from '@/services/dcDailyApi'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import {
   getBoxBreakoutCandidates,
@@ -360,6 +405,7 @@ const loading = ref(false)
 const data = ref<BoxBreakoutCandidatesData | null>(null)
 let latestRequestId = 0
 let trendRequestId = 0
+let industryTrendRequestId = 0
 const query = reactive<
   Required<
     Pick<
@@ -383,6 +429,8 @@ const rows = computed<BoxBreakoutCandidateItem[]>(() => data.value?.data ?? [])
 const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendData = ref<StockHistoryDataItem[]>([])
+const industryTrendLoading = ref(false)
+const industryTrendData = ref<StockHistoryDataItem[]>([])
 const trendDateRange = reactive({ start: '', end: '' })
 const selectedTrendCandidate = ref<BoxBreakoutCandidateItem | null>(null)
 const currentTrendIndex = ref(-1)
@@ -391,6 +439,7 @@ const selectedTrendStock = reactive({
   tsCode: '',
   name: '',
   industry: '',
+  industryCode: '',
   observationDate: '',
 })
 const trendEventLines = computed(() =>
@@ -604,6 +653,57 @@ async function loadTrendData() {
   }
 }
 
+function numericValue(value: unknown) {
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(number) ? number : 0
+}
+
+async function loadIndustryTrendData() {
+  const requestId = ++industryTrendRequestId
+  industryTrendData.value = []
+  if (!selectedTrendStock.industryCode || !trendDateRange.start || !trendDateRange.end) {
+    industryTrendLoading.value = false
+    return
+  }
+
+  industryTrendLoading.value = true
+  try {
+    const result = await fetchDcDaily({
+      ts_code: selectedTrendStock.industryCode,
+      idx_type: '行业板块',
+      start_date: trendDateRange.start.replace(/-/g, ''),
+      end_date: trendDateRange.end.replace(/-/g, ''),
+      fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate',
+    })
+    if (requestId !== industryTrendRequestId) return
+    industryTrendData.value = [...(result.records || [])]
+      .sort((left, right) => left.trade_date.localeCompare(right.trade_date))
+      .map((item) => ({
+        stock_code: item.ts_code,
+        stock_name: selectedTrendStock.industry,
+        date: item.trade_date,
+        open_price: numericValue(item.open),
+        close_price: numericValue(item.close),
+        high_price: numericValue(item.high),
+        low_price: numericValue(item.low),
+        change_percent: numericValue(item.pct_change),
+        change_amount: numericValue(item.change),
+        volume: numericValue(item.vol),
+        amount: numericValue(item.amount),
+        amplitude: numericValue(item.swing),
+        turnover_rate: numericValue(item.turnover_rate),
+        created_at: '',
+      }))
+  } catch (error) {
+    if (requestId !== industryTrendRequestId) return
+    console.error('加载东财二级行业趋势图失败:', error)
+    industryTrendData.value = []
+    ElMessage.error('加载行业趋势图失败，请稍后重试')
+  } finally {
+    if (requestId === industryTrendRequestId) industryTrendLoading.value = false
+  }
+}
+
 function showTrendStock(row: BoxBreakoutCandidateItem) {
   const observationDate = row.trade_date || data.value?.trade_date || query.trade_date
   if (!observationDate || !setTrendDateRange(row, observationDate)) {
@@ -616,9 +716,12 @@ function showTrendStock(row: BoxBreakoutCandidateItem) {
   selectedTrendStock.tsCode = row.ts_code
   selectedTrendStock.name = row.stock_name
   selectedTrendStock.industry = row.industry || ''
+  selectedTrendStock.industryCode = row.industry_code || ''
   selectedTrendStock.observationDate = observationDate
   trendData.value = []
+  industryTrendData.value = []
   loadTrendData()
+  loadIndustryTrendData()
   return true
 }
 
@@ -638,8 +741,11 @@ function stepTrendStock(step: -1 | 1) {
 
 function handleTrendDialogClosed() {
   trendRequestId += 1
+  industryTrendRequestId += 1
   trendLoading.value = false
+  industryTrendLoading.value = false
   trendData.value = []
+  industryTrendData.value = []
   selectedTrendCandidate.value = null
   currentTrendIndex.value = -1
 }
@@ -762,6 +868,27 @@ watch(
   display: grid;
   gap: 3px;
   line-height: 1.35;
+}
+
+.industry-cell {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.industry-cell strong {
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.industry-cell span,
+.industry-unmapped {
+  color: #64748b;
+  font-size: 11px;
 }
 
 .date-cell em,
@@ -912,6 +1039,44 @@ watch(
 
 .trend-preview {
   min-height: 420px;
+}
+
+.trend-chart-section {
+  min-width: 0;
+}
+
+.trend-chart-section + .trend-chart-section {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 16px;
+}
+
+.trend-chart-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.trend-chart-heading h3,
+.trend-chart-heading p {
+  margin: 0;
+}
+
+.trend-chart-heading h3 {
+  color: #111827;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.trend-chart-heading p {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.industry-trend-preview {
+  min-height: 360px;
 }
 
 .trend-condition-panel {
