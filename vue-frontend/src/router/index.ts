@@ -98,7 +98,7 @@ const router = createRouter({
           path: '/stock-picker/swing-practice',
           name: 'stock-swing-practice',
           component: () => import('@/views/indival_stock_data/StockSwingPracticeView.vue'),
-          meta: { title: '波段趋势选股' },
+          meta: { title: 'RPS强度选股' },
         },
         {
           path: '/stock-picker/box-breakout',

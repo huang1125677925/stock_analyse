@@ -299,7 +299,7 @@ const stockPickerMegaMenuSections = [
     title: '',
     items: [
       { title: '涨停分析选股', path: '/stock-picker/limit-board-analysis' },
-      { title: '波段趋势选股', path: '/stock-picker/swing-practice' },
+      { title: 'RPS强度选股', path: '/stock-picker/swing-practice' },
       { title: '箱体突破选股', path: '/stock-picker/box-breakout' },
     ],
   },
