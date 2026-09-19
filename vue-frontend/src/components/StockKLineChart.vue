@@ -67,6 +67,15 @@ interface PatternMarker {
   description?: string
 }
 
+interface PriceRange {
+  startDate: string
+  endDate: string
+  label: string
+  low?: number | null
+  high?: number | null
+  color?: string
+}
+
 interface Props {
   title?: string
   stockCode: string
@@ -76,6 +85,8 @@ interface Props {
   eventLines?: EventLine[]
   overlayLines?: OverlayLine[]
   patternMarkers?: PatternMarker[]
+  priceRanges?: PriceRange[]
+  showVolume?: boolean
   height?: string
 }
 
@@ -86,6 +97,8 @@ const props = withDefaults(defineProps<Props>(), {
   eventLines: () => [],
   overlayLines: () => [],
   patternMarkers: () => [],
+  priceRanges: () => [],
+  showVolume: false,
   height: '600px'
 })
 
@@ -123,6 +136,12 @@ const updateChart = () => {
     item.low_price,
     item.high_price
   ])
+  const volumeData = props.klineData.map(item => ({
+    value: Number(item.volume) || 0,
+    itemStyle: {
+      color: item.close_price >= item.open_price ? '#dc2626' : '#16a34a'
+    }
+  }))
 
   console.log('更新图表数据', data)
 
@@ -209,6 +228,51 @@ const updateChart = () => {
 
   const markLineData = [...alignedEventLines, ...patternEventLines]
 
+  const priceRangeData = (props.priceRanges || [])
+    .map(range => {
+      const startIndex = alignEventLineIndex(range.startDate)
+      const endIndex = alignEventLineIndex(range.endDate)
+      if (startIndex === undefined || endIndex === undefined) return null
+
+      const low = Number(range.low)
+      const high = Number(range.high)
+      const hasPriceBounds = range.low !== null
+        && range.low !== undefined
+        && range.high !== null
+        && range.high !== undefined
+        && Number.isFinite(low)
+        && Number.isFinite(high)
+      const color = range.color || '#2563eb'
+      const start: any = {
+        name: range.label,
+        itemStyle: {
+          color: `${color}16`,
+          borderColor: `${color}99`,
+          borderWidth: 1
+        },
+        label: {
+          show: true,
+          formatter: range.label,
+          color,
+          fontSize: 11,
+          fontWeight: 600,
+          position: 'insideTopLeft'
+        }
+      }
+      const end: any = {}
+
+      if (hasPriceBounds) {
+        start.coord = [dates[startIndex], Math.min(low, high)]
+        end.coord = [dates[endIndex], Math.max(low, high)]
+      } else {
+        start.xAxis = dates[startIndex]
+        end.xAxis = dates[endIndex]
+      }
+
+      return [start, end]
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+
   const overlayLineSeries = (props.overlayLines || [])
     .filter(line => Array.isArray(line.points) && line.points.length > 0)
     .map(line => {
@@ -257,6 +321,15 @@ const updateChart = () => {
   const hasSecondaryAxisLine = (props.overlayLines || []).some(
     line => (line.yAxisIndex ?? 0) === 1 && Array.isArray(line.points) && line.points.length > 0
   )
+  const volumeYAxisIndex = hasSecondaryAxisLine ? 2 : 1
+
+  const formatVolume = (value: number | string) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return '-'
+    if (Math.abs(numeric) >= 100000000) return `${(numeric / 100000000).toFixed(2)}亿`
+    if (Math.abs(numeric) >= 10000) return `${(numeric / 10000).toFixed(2)}万`
+    return numeric.toFixed(0)
+  }
 
 // 生成交易信号标记
 const generateTradeSignals = (signals: TradeSignal[], type: 'buy' | 'sell') => {
@@ -361,6 +434,8 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
       },
       formatter: (params: any) => {
         const date = params[0].axisValue
+        const dataIndex = params[0].dataIndex
+        const dailyData = props.klineData[dataIndex]
         let res = `<div style="font-weight:bold;margin-bottom:5px;">${date}</div>`
 
         // 记录使用百分比展示的叠加线名称，用于tooltip格式化
@@ -381,6 +456,15 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
             res += `<div>收盘价: ${value[2]}</div>`
             res += `<div>最低价: ${value[4]}</div>`
             res += `<div>最高价: ${value[3]}</div>`
+            const changePercent = Number(dailyData?.change_percent)
+            if (Number.isFinite(changePercent)) {
+              const changeColor = changePercent >= 0 ? '#dc2626' : '#16a34a'
+              const sign = changePercent > 0 ? '+' : ''
+              res += `<div style="color:${changeColor};font-weight:600;">日涨跌幅: ${sign}${changePercent.toFixed(2)}%</div>`
+            }
+          } else if (seriesName === '成交量') {
+            const numeric = Array.isArray(value) ? value[1] : value
+            res += `<div style="color:${color};">成交量: ${formatVolume(numeric)} 手</div>`
           } else if (value !== null && value !== undefined) {
             const numeric = Array.isArray(value) ? value[1] : value
             if (numeric === null || numeric === undefined) return
@@ -399,19 +483,45 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
       top: 24,
       data: ['K线', ...overlayLineSeries.map(line => line.name)]
     },
-    grid: {
-      left: '10%',
-      right: '10%',
-      top: '15%',
-      bottom: '15%'
-    },
-    xAxis: {
-      type: 'category',
-      data: dates,
-      boundaryGap: false,
-      axisLine: { onZero: false },
-      splitLine: { show: false }
-    },
+    grid: props.showVolume
+      ? [
+          { left: '10%', right: '10%', top: '13%', height: '56%' },
+          { left: '10%', right: '10%', top: '73%', height: '12%' }
+        ]
+      : {
+          left: '10%',
+          right: '10%',
+          top: '15%',
+          bottom: '15%'
+        },
+    xAxis: props.showVolume
+      ? [
+          {
+            type: 'category',
+            data: dates,
+            boundaryGap: false,
+            axisLine: { onZero: false },
+            axisLabel: { show: false },
+            axisTick: { show: false },
+            splitLine: { show: false }
+          },
+          {
+            type: 'category',
+            gridIndex: 1,
+            data: dates,
+            boundaryGap: false,
+            axisLine: { onZero: false },
+            axisLabel: { hideOverlap: true },
+            splitLine: { show: false }
+          }
+        ]
+      : {
+          type: 'category',
+          data: dates,
+          boundaryGap: false,
+          axisLine: { onZero: false },
+          splitLine: { show: false }
+        },
     yAxis: [
       {
         scale: true,
@@ -431,17 +541,31 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
             },
             splitLine: { show: false }
           }]
+        : []),
+      ...(props.showVolume
+        ? [{
+            type: 'value',
+            gridIndex: 1,
+            scale: true,
+            axisLabel: {
+              formatter: (value: number) => formatVolume(value)
+            },
+            splitNumber: 2,
+            splitLine: { show: false }
+          }]
         : [])
     ],
     dataZoom: [
       {
         type: 'inside',
+        xAxisIndex: props.showVolume ? [0, 1] : 0,
         start: 0,
         end: 100
       },
       {
         show: true,
         type: 'slider',
+        xAxisIndex: props.showVolume ? [0, 1] : 0,
         bottom: '5%',
         start: 0,
         end: 100
@@ -458,6 +582,13 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
               silent: true,
               animation: false,
               data: markLineData
+            }
+          : undefined,
+        markArea: priceRangeData.length
+          ? {
+              silent: true,
+              animation: false,
+              data: priceRangeData
             }
           : undefined,
         markPoint: {
@@ -506,7 +637,20 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
           borderColor0: '#008F28'
         }
       },
-      ...overlayLineSeries
+      ...overlayLineSeries,
+      ...(props.showVolume
+        ? [{
+            name: '成交量',
+            type: 'bar',
+            xAxisIndex: 1,
+            yAxisIndex: volumeYAxisIndex,
+            data: volumeData,
+            barMaxWidth: 12,
+            large: true,
+            largeThreshold: 400,
+            emphasis: { disabled: true }
+          }]
+        : [])
     ]
   }
   
@@ -521,7 +665,15 @@ const handleResize = () => {
 
 // 监听属性变化
 watch(
-  [() => props.klineData, () => props.tradeSignals, () => props.eventLines, () => props.overlayLines, () => props.patternMarkers],
+  [
+    () => props.klineData,
+    () => props.tradeSignals,
+    () => props.eventLines,
+    () => props.overlayLines,
+    () => props.patternMarkers,
+    () => props.priceRanges,
+    () => props.showVolume
+  ],
   () => {
     nextTick(() => {
       updateChart()

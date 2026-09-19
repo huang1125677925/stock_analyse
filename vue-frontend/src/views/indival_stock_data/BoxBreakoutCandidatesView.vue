@@ -284,11 +284,13 @@
             :stock-name="selectedTrendStock.name"
             :kline-data="trendData"
             :event-lines="trendEventLines"
-            height="420px"
+            :price-ranges="trendPriceRanges"
+            show-volume
+            height="500px"
           />
           <el-empty
             v-else-if="!trendLoading"
-            description="观察日前3个月至后1个月区间暂无K线数据"
+            description="箱体起点前30天至观察日后1个月区间暂无K线数据"
             :image-size="80"
           />
         </div>
@@ -396,6 +398,18 @@ const trendEventLines = computed(() =>
     ? [{ date: selectedTrendStock.observationDate, label: '观察日', color: '#dc2626' }]
     : [],
 )
+const trendPriceRanges = computed(() => {
+  const box = selectedTrendCandidate.value?.box
+  if (!box?.start_date || !box?.end_date) return []
+  return [{
+    startDate: box.start_date,
+    endDate: box.end_date,
+    label: `箱体 ${box.days}个交易日`,
+    low: box.low_close,
+    high: box.high_close,
+    color: '#2563eb',
+  }]
+})
 const latestTrendPoint = computed(() =>
   trendData.value.length ? trendData.value[trendData.value.length - 1] : null,
 )
@@ -519,14 +533,35 @@ function shiftCalendarMonths(date: Date, months: number) {
   return shifted
 }
 
-function setTrendDateRange(observationDate: string) {
+function shiftCalendarDays(date: Date, days: number) {
+  const shifted = new Date(date)
+  shifted.setDate(shifted.getDate() + days)
+  return shifted
+}
+
+function shiftWeekdays(date: Date, tradingDays: number) {
+  const shifted = new Date(date)
+  let remainingDays = Math.max(0, Math.trunc(tradingDays))
+  while (remainingDays > 0) {
+    shifted.setDate(shifted.getDate() - 1)
+    const weekday = shifted.getDay()
+    if (weekday !== 0 && weekday !== 6) remainingDays -= 1
+  }
+  return shifted
+}
+
+function setTrendDateRange(row: BoxBreakoutCandidateItem, observationDate: string) {
   const observedAt = parseCompactDate(observationDate)
   if (!observedAt) {
     trendDateRange.start = ''
     trendDateRange.end = ''
     return false
   }
-  trendDateRange.start = formatDate(shiftCalendarMonths(observedAt, -3))
+  // 后端返回的箱体起点来自真实交易日序列，优先使用它以准确跨过周末和休市日。
+  // 旧数据缺少起点时，按工作日回推箱体大小作为兼容兜底。
+  const boxStartedAt = parseCompactDate(row.box?.start_date)
+    ?? shiftWeekdays(observedAt, row.box?.days ?? 0)
+  trendDateRange.start = formatDate(shiftCalendarDays(boxStartedAt, -30))
   trendDateRange.end = formatDate(shiftCalendarMonths(observedAt, 1))
   return true
 }
@@ -571,7 +606,7 @@ async function loadTrendData() {
 
 function showTrendStock(row: BoxBreakoutCandidateItem) {
   const observationDate = row.trade_date || data.value?.trade_date || query.trade_date
-  if (!observationDate || !setTrendDateRange(observationDate)) {
+  if (!observationDate || !setTrendDateRange(row, observationDate)) {
     ElMessage.warning('当前记录缺少有效的观察日期，无法加载趋势图')
     return false
   }
