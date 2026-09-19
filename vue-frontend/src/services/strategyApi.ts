@@ -644,6 +644,11 @@ export interface BoxBreakoutCandidateItem {
   stock_code: string
   ts_code: string
   stock_name: string
+  exchange: 'SH' | 'SZ'
+  exchange_name: '上证' | '深证'
+  main_board_name: '上证主板' | '深证主板'
+  market_index_code: '000001.SH' | '399001.SZ'
+  market_index_name: '上证综指' | '深证成指'
   industry: string | null
   industry_code: string | null
   industries: string[]

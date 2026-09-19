@@ -172,6 +172,14 @@
             </el-button>
           </template>
         </el-table-column>
+        <el-table-column label="主板归属" width="120">
+          <template #default="{ row }">
+            <div class="market-cell">
+              <strong>{{ row.main_board_name }}</strong>
+              <span>{{ row.exchange }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="东财二级行业" min-width="150">
           <template #default="{ row }">
             <div v-if="row.industry" class="industry-cell">
@@ -294,6 +302,9 @@
         <div class="trend-toolbar">
           <div class="trend-meta">
             <el-tag type="info" effect="plain">代码 {{ selectedTrendStock.code }}</el-tag>
+            <el-tag type="success" effect="light">
+              {{ selectedTrendStock.mainBoardName }}
+            </el-tag>
             <el-tag v-if="selectedTrendStock.industry" type="warning" effect="light">
               {{ selectedTrendStock.industry }} {{ selectedTrendStock.industryCode }}
             </el-tag>
@@ -345,6 +356,31 @@
             <el-empty
               v-else-if="!trendLoading"
               description="箱体起点前30天至观察日后1个月区间暂无K线数据"
+              :image-size="80"
+            />
+          </div>
+        </section>
+
+        <section class="trend-chart-section market-trend-section">
+          <div class="trend-chart-heading">
+            <div>
+              <h3>对应大盘走势</h3>
+              <p>{{ selectedTrendStock.marketIndexName }} · {{ selectedTrendStock.marketIndexCode }}</p>
+            </div>
+          </div>
+          <div class="trend-preview market-trend-preview" v-loading="marketTrendLoading">
+            <StockKLineChart
+              v-if="marketTrendData.length"
+              :stock-code="selectedTrendStock.marketIndexCode"
+              :stock-name="selectedTrendStock.marketIndexName"
+              :kline-data="marketTrendData"
+              :event-lines="trendEventLines"
+              show-volume
+              height="420px"
+            />
+            <el-empty
+              v-else-if="!marketTrendLoading"
+              description="该日期区间暂无对应大盘K线数据"
               :image-size="80"
             />
           </div>
@@ -453,6 +489,7 @@ const data = ref<BoxBreakoutCandidatesData | null>(null)
 let latestRequestId = 0
 let trendRequestId = 0
 let industryTrendRequestId = 0
+let marketTrendRequestId = 0
 const query = reactive<
   Required<
     Pick<
@@ -477,6 +514,8 @@ const trendLoading = ref(false)
 const trendData = ref<StockHistoryDataItem[]>([])
 const industryTrendLoading = ref(false)
 const industryTrendData = ref<StockHistoryDataItem[]>([])
+const marketTrendLoading = ref(false)
+const marketTrendData = ref<StockHistoryDataItem[]>([])
 const trendDateRange = reactive({ start: '', end: '' })
 const selectedTrendCandidate = ref<BoxBreakoutCandidateItem | null>(null)
 const currentTrendIndex = ref(-1)
@@ -484,6 +523,9 @@ const selectedTrendStock = reactive({
   code: '',
   tsCode: '',
   name: '',
+  mainBoardName: '',
+  marketIndexCode: '',
+  marketIndexName: '',
   industry: '',
   industryCode: '',
   breakoutDate: '',
@@ -821,6 +863,57 @@ async function loadIndustryTrendData() {
   }
 }
 
+async function loadMarketTrendData() {
+  const requestId = ++marketTrendRequestId
+  marketTrendData.value = []
+  if (!selectedTrendStock.marketIndexCode || !trendDateRange.start || !trendDateRange.end) {
+    marketTrendLoading.value = false
+    return
+  }
+
+  marketTrendLoading.value = true
+  try {
+    const result = await fetchIndexDailyKline(
+      selectedTrendStock.marketIndexCode,
+      trendDateRange.start.replace(/-/g, ''),
+      trendDateRange.end.replace(/-/g, ''),
+    )
+    if (requestId !== marketTrendRequestId) return
+    const sorted = [...result].sort((left, right) => left.date.localeCompare(right.date))
+    marketTrendData.value = sorted.map((item, index) => {
+      const previousClose = index > 0 ? numericValue(sorted[index - 1]?.close) : 0
+      const close = numericValue(item.close)
+      const changeAmount = previousClose > 0 ? close - previousClose : 0
+      return {
+        stock_code: selectedTrendStock.marketIndexCode,
+        stock_name: selectedTrendStock.marketIndexName,
+        date: item.date,
+        open_price: numericValue(item.open),
+        close_price: close,
+        high_price: numericValue(item.high),
+        low_price: numericValue(item.low),
+        change_percent: previousClose > 0 ? (changeAmount / previousClose) * 100 : 0,
+        change_amount: changeAmount,
+        volume: numericValue(item.vol),
+        amount: numericValue(item.amount),
+        amplitude:
+          previousClose > 0
+            ? ((numericValue(item.high) - numericValue(item.low)) / previousClose) * 100
+            : 0,
+        turnover_rate: 0,
+        created_at: '',
+      }
+    })
+  } catch (error) {
+    if (requestId !== marketTrendRequestId) return
+    console.error('加载对应大盘趋势图失败:', error)
+    marketTrendData.value = []
+    ElMessage.error('加载大盘趋势图失败，请稍后重试')
+  } finally {
+    if (requestId === marketTrendRequestId) marketTrendLoading.value = false
+  }
+}
+
 function showTrendStock(row: BoxBreakoutCandidateItem) {
   const observationDate = row.trade_date || data.value?.trade_date || query.trade_date
   if (!observationDate || !setTrendDateRange(row, observationDate)) {
@@ -832,13 +925,18 @@ function showTrendStock(row: BoxBreakoutCandidateItem) {
   selectedTrendStock.code = row.stock_code
   selectedTrendStock.tsCode = row.ts_code
   selectedTrendStock.name = row.stock_name
+  selectedTrendStock.mainBoardName = row.main_board_name
+  selectedTrendStock.marketIndexCode = row.market_index_code
+  selectedTrendStock.marketIndexName = row.market_index_name
   selectedTrendStock.industry = row.industry || ''
   selectedTrendStock.industryCode = row.industry_code || ''
   selectedTrendStock.breakoutDate = row.breakout_date
   selectedTrendStock.observationDate = observationDate
   trendData.value = []
   industryTrendData.value = []
+  marketTrendData.value = []
   loadTrendData()
+  loadMarketTrendData()
   loadIndustryTrendData()
   return true
 }
@@ -860,10 +958,13 @@ function stepTrendStock(step: -1 | 1) {
 function handleTrendDialogClosed() {
   trendRequestId += 1
   industryTrendRequestId += 1
+  marketTrendRequestId += 1
   trendLoading.value = false
   industryTrendLoading.value = false
+  marketTrendLoading.value = false
   trendData.value = []
   industryTrendData.value = []
+  marketTrendData.value = []
   selectedTrendCandidate.value = null
   currentTrendIndex.value = -1
 }
@@ -1010,14 +1111,16 @@ watch(
   font-size: 13px;
 }
 
-.industry-cell {
+.industry-cell,
+.market-cell {
   display: grid;
   gap: 3px;
   min-width: 0;
   line-height: 1.35;
 }
 
-.industry-cell strong {
+.industry-cell strong,
+.market-cell strong {
   overflow: hidden;
   color: #1f2937;
   font-size: 13px;
@@ -1026,6 +1129,7 @@ watch(
 }
 
 .industry-cell span,
+.market-cell span,
 .industry-unmapped {
   color: #64748b;
   font-size: 11px;
@@ -1214,7 +1318,8 @@ watch(
   font-size: 12px;
 }
 
-.industry-trend-preview {
+.industry-trend-preview,
+.market-trend-preview {
   min-height: 360px;
 }
 
