@@ -616,6 +616,7 @@ export interface BoxBreakoutFailureStatus {
   reasons: string[]
   warnings: string[]
   observed_days: number
+  observation_below_breakout_close: boolean
 }
 
 export interface BoxBreakoutPostReturn {
