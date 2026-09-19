@@ -215,8 +215,9 @@
             <div class="buy-status-cell">
               <el-tag
                 v-if="buyAnalysisState(row)?.data"
+                class="buy-conclusion-tag"
                 :type="buyStatusTagType(buyAnalysisState(row)?.data?.status)"
-                effect="dark"
+                effect="light"
               >
                 {{ buyAnalysisState(row)?.data?.status_label }}
               </el-tag>
@@ -380,8 +381,9 @@
             </div>
             <el-tag
               v-if="selectedBuyAnalysisState?.data"
+              class="buy-conclusion-tag"
               :type="buyStatusTagType(selectedBuyAnalysisState.data.status)"
-              effect="dark"
+              effect="light"
               size="large"
             >
               {{ selectedBuyAnalysisState.data.status_label }}
@@ -1448,6 +1450,10 @@ watch(
 .buy-status-cell span {
   color: #64748b;
   font-size: 11px;
+}
+
+.buy-conclusion-tag {
+  font-weight: 600;
 }
 
 .industry-cell,
