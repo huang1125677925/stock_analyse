@@ -210,7 +210,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="买入判断" width="130" align="center">
+        <el-table-column label="买入判断" width="168" align="center">
           <template #default="{ row }">
             <div class="buy-status-cell">
               <el-tag
@@ -227,6 +227,7 @@
                 分析失败
               </el-tag>
               <span v-if="buyAnalysisState(row)?.data?.score != null">
+                {{ buyAnalysisState(row)?.data?.signal_phase?.label || '阶段待定' }} ·
                 {{ buyAnalysisState(row)?.data?.score ?? '-' }}/100
               </span>
             </div>
@@ -365,7 +366,7 @@
           <div class="buy-analysis-heading">
             <div>
               <h3>观察日买入判断</h3>
-              <p>个股 60 分、行业 20 分、大盘 20 分，达到 65 分且无硬性拒绝项</p>
+              <p>总分达到 70，且个股/行业/大盘分别达到 42/10/10 分，无硬性拒绝项</p>
             </div>
             <el-tag
               v-if="selectedBuyAnalysisState?.data"
@@ -382,10 +383,56 @@
 
           <template v-if="selectedBuyAnalysisState?.data">
             <p class="buy-analysis-summary">{{ selectedBuyAnalysisState.data.summary }}</p>
+            <div class="buy-analysis-meta">
+              <el-tag type="primary" effect="plain">
+                {{ selectedBuyAnalysisState.data.signal_phase?.label || '阶段待定' }}
+              </el-tag>
+              <span>规则 v{{ selectedBuyAnalysisState.data.rule_version }}</span>
+              <span>
+                突破后
+                {{
+                  selectedBuyAnalysisState.data.signal_phase?.days_after_breakout ?? '-'
+                }}
+                个交易日
+              </span>
+              <span> 数据完整度 {{ buyDataCompletenessText(selectedBuyAnalysisState.data) }} </span>
+            </div>
             <div v-if="buyAnalysisDimensions.length" class="buy-dimension-strip">
-              <div v-for="dimension in buyAnalysisDimensions" :key="dimension.name">
-                <span>{{ dimension.name }}</span>
+              <div
+                v-for="dimension in buyAnalysisDimensions"
+                :key="dimension.name"
+                :class="{ 'is-gate-failed': dimension.score < dimension.min_score }"
+              >
+                <span>{{ dimension.name }}门槛 {{ dimension.min_score }}</span>
                 <strong>{{ dimension.score }}/{{ dimension.max_score }}</strong>
+              </div>
+            </div>
+            <div v-if="selectedBuyAnalysisState.data.trade_plan" class="buy-trade-plan">
+              <div>
+                <span>入场判断</span>
+                <strong>{{ selectedBuyAnalysisState.data.trade_plan.entry_strategy }}</strong>
+              </div>
+              <div>
+                <span>加仓触发</span>
+                <strong>{{ selectedBuyAnalysisState.data.trade_plan.add_position_trigger }}</strong>
+              </div>
+              <div>
+                <span>预警止损</span>
+                <strong>
+                  {{ formatNumber(selectedBuyAnalysisState.data.trade_plan.stop_loss_price, 3) }} ·
+                  {{ selectedBuyAnalysisState.data.trade_plan.stop_loss_basis }}
+                </strong>
+              </div>
+              <div>
+                <span>形态硬止损</span>
+                <strong>
+                  {{ formatNumber(selectedBuyAnalysisState.data.trade_plan.hard_stop_price, 3) }} ·
+                  {{ selectedBuyAnalysisState.data.trade_plan.hard_stop_basis }}
+                </strong>
+              </div>
+              <div class="is-wide">
+                <span>仓位参考</span>
+                <strong>{{ selectedBuyAnalysisState.data.trade_plan.position_reference }}</strong>
               </div>
             </div>
             <div class="buy-reason-grid">
@@ -413,6 +460,18 @@
                 </p>
                 <span v-if="!selectedBuyAnalysisState.data.reject_reasons.length">暂无</span>
               </div>
+            </div>
+            <div
+              v-if="selectedBuyAnalysisState.data.trade_plan?.exit_warnings.length"
+              class="buy-exit-warnings"
+            >
+              <strong>退出观察项</strong>
+              <span
+                v-for="warning in selectedBuyAnalysisState.data.trade_plan.exit_warnings"
+                :key="warning"
+              >
+                {{ warning }}
+              </span>
             </div>
           </template>
           <el-empty
@@ -733,9 +792,18 @@ function buyAnalysisState(row: BoxBreakoutCandidateItem) {
 }
 
 function buyStatusTagType(status: BoxBreakoutBuyStatus | undefined) {
-  if (status === 'supported') return 'success'
-  if (status === 'rejected') return 'danger'
+  if (status === 'buy_now') return 'success'
+  if (status === 'wait_retest' || status === 'avoid_chasing') return 'warning'
+  if (status === 'breakout_failed' || status === 'market_reject' || status === 'industry_reject') {
+    return 'danger'
+  }
   return 'info'
+}
+
+function buyDataCompletenessText(analysis: BoxBreakoutBuyAnalysis) {
+  const values = Object.values(analysis.data_completeness || {})
+  if (!values.length) return '-'
+  return `${values.filter(Boolean).length}/${values.length}`
 }
 
 async function loadBuyAnalyses(candidates: BoxBreakoutCandidateItem[]) {
@@ -747,30 +815,40 @@ async function loadBuyAnalyses(candidates: BoxBreakoutCandidateItem[]) {
     ]),
   )
 
-  for (const row of candidates) {
-    if (batchId !== buyAnalysisBatchId) return
-    const key = buyAnalysisKey(row)
-    try {
-      const result = await getBoxBreakoutBuyAnalysis({
-        ts_code: row.ts_code,
-        observation_date: row.observation_date || row.trade_date,
-        breakout_date: row.breakout_date,
-        industry_code: row.industry_code || undefined,
-        market_index_code: row.market_index_code,
-        market_category: row.market_category,
-      })
-      if (batchId !== buyAnalysisBatchId) return
-      buyAnalysisStates.value[key] = { loading: false, data: result, error: '' }
-    } catch (error) {
-      if (batchId !== buyAnalysisBatchId) return
-      console.error(`加载 ${row.ts_code} 买入判断失败:`, error)
-      buyAnalysisStates.value[key] = {
-        loading: false,
-        data: null,
-        error: '买入判断加载失败，请稍后重新筛选',
+  let nextIndex = 0
+  async function worker() {
+    while (nextIndex < candidates.length) {
+      const row = candidates[nextIndex++]
+      if (!row || batchId !== buyAnalysisBatchId) return
+      const key = buyAnalysisKey(row)
+      try {
+        const result = await getBoxBreakoutBuyAnalysis({
+          ts_code: row.ts_code,
+          observation_date: row.observation_date || row.trade_date,
+          breakout_date: row.breakout_date,
+          industry_code: row.industry_code || undefined,
+          market_index_code: row.market_index_code,
+          market_category: row.market_category,
+          box_high: row.box.high_close || undefined,
+          box_low: row.box.low_close || undefined,
+          box_avg_volume: row.box.avg_volume || undefined,
+        })
+        if (batchId !== buyAnalysisBatchId) return
+        buyAnalysisStates.value[key] = { loading: false, data: result, error: '' }
+      } catch (error) {
+        if (batchId !== buyAnalysisBatchId) return
+        console.error(`加载 ${row.ts_code} 买入判断失败:`, error)
+        buyAnalysisStates.value[key] = {
+          loading: false,
+          data: null,
+          error: '买入判断加载失败，请稍后重新筛选',
+        }
       }
     }
   }
+
+  const workerCount = Math.min(4, candidates.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
 }
 
 async function loadData() {
@@ -1520,6 +1598,16 @@ watch(
   line-height: 1.5;
 }
 
+.buy-analysis-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
 .buy-dimension-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1540,6 +1628,14 @@ watch(
   background: #ffffff;
 }
 
+.buy-dimension-strip > div.is-gate-failed {
+  background: #fff7ed;
+}
+
+.buy-dimension-strip > div.is-gate-failed strong {
+  color: #c2410c;
+}
+
 .buy-dimension-strip span {
   color: #64748b;
   font-size: 12px;
@@ -1548,6 +1644,39 @@ watch(
 .buy-dimension-strip strong {
   color: #1f2937;
   font-size: 13px;
+}
+
+.buy-trade-plan {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.buy-trade-plan > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-left: 3px solid #2563eb;
+  background: #ffffff;
+}
+
+.buy-trade-plan > div.is-wide {
+  grid-column: 1 / -1;
+  border-left-color: #d97706;
+}
+
+.buy-trade-plan span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.buy-trade-plan strong {
+  color: #1f2937;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .buy-reason-grid {
@@ -1600,6 +1729,26 @@ watch(
   margin: 18px 0 0;
   color: #64748b;
   font-size: 13px;
+}
+
+.buy-exit-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.buy-exit-warnings strong {
+  color: #334155;
+}
+
+.buy-exit-warnings span::before {
+  content: '·';
+  margin-right: 5px;
 }
 
 .trend-preview {
@@ -1810,8 +1959,13 @@ watch(
   }
 
   .buy-dimension-strip,
-  .buy-reason-grid {
+  .buy-reason-grid,
+  .buy-trade-plan {
     grid-template-columns: 1fr;
+  }
+
+  .buy-trade-plan > div.is-wide {
+    grid-column: auto;
   }
 
   .trend-nav {

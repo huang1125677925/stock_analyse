@@ -159,20 +159,17 @@ export async function getIndexRps(
   periods: string = '5,20,60,120,250',
   save: boolean = false,
   idx_type: IndexRpsIdxType = '行业板块',
-  level?: DcIndustryLevel
+  level?: DcIndustryLevel,
 ): Promise<IndexRpsData> {
   try {
-    const response = await axios.get<IndexRpsData>(
-      `/django/api/strategy/index-rps/`,
-      {
-        params: {
-          periods,
-          save,
-          idx_type,
-          ...(level ? { level } : {})
-        }
-      }
-    )
+    const response = await axios.get<IndexRpsData>(`/django/api/strategy/index-rps/`, {
+      params: {
+        periods,
+        save,
+        idx_type,
+        ...(level ? { level } : {}),
+      },
+    })
     return response.data
   } catch (error) {
     console.error('获取实时指数RPS强度排名失败:', error)
@@ -188,18 +185,15 @@ export async function getIndexRps(
  */
 export async function getMajorIndexRps(
   periods: string = '5,20,60,120,250',
-  tradeDate?: string
+  tradeDate?: string,
 ): Promise<MajorIndexRpsData> {
   try {
-    const response = await axios.get<MajorIndexRpsData>(
-      '/django/api/strategy/major-index-rps/',
-      {
-        params: {
-          periods,
-          ...(tradeDate ? { trade_date: tradeDate } : {})
-        }
-      }
-    )
+    const response = await axios.get<MajorIndexRpsData>('/django/api/strategy/major-index-rps/', {
+      params: {
+        periods,
+        ...(tradeDate ? { trade_date: tradeDate } : {}),
+      },
+    })
     return response.data
   } catch (error) {
     console.error('获取大盘指数RPS强度排名失败:', error)
@@ -217,7 +211,7 @@ export async function getMajorIndexRps(
 export async function getHistoricalRps(
   period: number = 20,
   limit: number = 100,
-  offset: number = 0
+  offset: number = 0,
 ): Promise<HistoricalRpsResponse> {
   try {
     const response = await axios.get<HistoricalRpsResponse>(
@@ -226,9 +220,9 @@ export async function getHistoricalRps(
         params: {
           period,
           limit,
-          offset
-        }
-      }
+          offset,
+        },
+      },
     )
     return response.data
   } catch (error) {
@@ -247,7 +241,7 @@ export async function getHistoricalRps(
 export async function getDcBoardMemberRps(
   tsCode: string,
   periods: string = '5,20,60',
-  tradeDate?: string
+  tradeDate?: string,
 ): Promise<DcBoardMemberRpsData> {
   try {
     const response = await axios.get<DcBoardMemberRpsData>(
@@ -256,9 +250,9 @@ export async function getDcBoardMemberRps(
         params: {
           ts_code: tsCode,
           periods,
-          ...(tradeDate ? { trade_date: tradeDate } : {})
-        }
-      }
+          ...(tradeDate ? { trade_date: tradeDate } : {}),
+        },
+      },
     )
     return response.data
   } catch (error) {
@@ -272,14 +266,9 @@ export async function getDcBoardMemberRps(
  * @param params 查询参数，支持周期、交易日、交易所、市场和 token
  * @returns Promise<StockRpsData>
  */
-export async function getStockRps(
-  params: StockRpsParams = {}
-): Promise<StockRpsData> {
+export async function getStockRps(params: StockRpsParams = {}): Promise<StockRpsData> {
   try {
-    const response = await axios.get<StockRpsData>(
-      '/django/api/strategy/stock-rps/',
-      { params }
-    )
+    const response = await axios.get<StockRpsData>('/django/api/strategy/stock-rps/', { params })
     return response.data
   } catch (error) {
     console.error('获取股票RPS排名失败:', error)
@@ -323,7 +312,7 @@ export interface CandlestickPatternResponse {
 
 export interface CandlestickPatternParams {
   start_date?: string // 格式：YYYY-MM-DD
-  end_date?: string   // 格式：YYYY-MM-DD
+  end_date?: string // 格式：YYYY-MM-DD
   type?: SwingTargetType
 }
 
@@ -335,7 +324,7 @@ export interface CandlestickPatternParams {
  */
 export async function getCandlestickPatterns(
   stockCode: string,
-  params: CandlestickPatternParams = {}
+  params: CandlestickPatternParams = {},
 ): Promise<CandlestickPatternData> {
   try {
     const response = await axios.get<CandlestickPatternData>(
@@ -344,9 +333,9 @@ export async function getCandlestickPatterns(
         params: {
           start_date: params.start_date,
           end_date: params.end_date,
-          type: params.type
-        }
-      }
+          type: params.type,
+        },
+      },
     )
     return response.data
   } catch (error) {
@@ -395,14 +384,11 @@ export interface ValueStocksParams {
   lookback_periods?: number
 }
 
-export async function getValueStocks(
-  params: ValueStocksParams = {}
-): Promise<ValueStocksData> {
+export async function getValueStocks(params: ValueStocksParams = {}): Promise<ValueStocksData> {
   try {
-    const response = await axios.get<ValueStocksData>(
-      '/django/api/strategy/value-stocks/',
-      { params }
-    )
+    const response = await axios.get<ValueStocksData>('/django/api/strategy/value-stocks/', {
+      params,
+    })
     return response.data
   } catch (error) {
     console.error('获取价值股候选列表失败:', error)
@@ -494,14 +480,11 @@ export interface SwingAnalysisParams {
   adjust?: SwingAdjustType
 }
 
-export async function getSwingAnalysis(
-  params: SwingAnalysisParams
-): Promise<SwingAnalysisData> {
+export async function getSwingAnalysis(params: SwingAnalysisParams): Promise<SwingAnalysisData> {
   try {
-    const response = await axios.get<SwingAnalysisData>(
-      '/django/api/strategy/swing-analysis/',
-      { params }
-    )
+    const response = await axios.get<SwingAnalysisData>('/django/api/strategy/swing-analysis/', {
+      params,
+    })
     return response.data
   } catch (error) {
     console.error('获取波段分析数据失败:', error)
@@ -588,12 +571,12 @@ export interface SwingChannelCandidatesParams {
 }
 
 export async function getSwingChannelCandidates(
-  params: SwingChannelCandidatesParams = {}
+  params: SwingChannelCandidatesParams = {},
 ): Promise<SwingChannelCandidatesData> {
   try {
     const response = await axios.get<SwingChannelCandidatesData>(
       '/django/api/strategy/swing-channel-candidates/',
-      { params }
+      { params },
     )
     return response.data
   } catch (error) {
@@ -745,11 +728,19 @@ export interface BoxBreakoutCandidatesParams {
   signal_lookback_days?: number
 }
 
-export type BoxBreakoutBuyStatus = 'supported' | 'rejected' | 'insufficient_data'
+export type BoxBreakoutBuyStatus =
+  | 'buy_now'
+  | 'wait_retest'
+  | 'avoid_chasing'
+  | 'breakout_failed'
+  | 'market_reject'
+  | 'industry_reject'
+  | 'insufficient_data'
 
 export interface BoxBreakoutBuySignal {
   key: string
   passed: boolean
+  available: boolean
   weight: number
   score: number
   hard_reject: boolean
@@ -760,7 +751,8 @@ export interface BoxBreakoutBuyDimension {
   name: string
   score: number
   max_score: number
-  metrics: Record<string, string | number | null>
+  min_score: number
+  metrics: Record<string, string | number | boolean | null>
   signals: BoxBreakoutBuySignal[]
 }
 
@@ -776,15 +768,45 @@ export interface BoxBreakoutBuyAnalysis {
   can_buy: boolean
   score: number | null
   score_threshold: number
+  rule_version: string
+  dimension_thresholds: Record<'stock' | 'industry' | 'market', number>
+  dimension_passed?: Record<'stock' | 'industry' | 'market', boolean>
   summary: string
   support_reasons: string[]
   reject_reasons: string[]
   hard_reject_reasons: string[]
+  unavailable_reasons: string[]
   dimensions: Partial<Record<'stock' | 'industry' | 'market', BoxBreakoutBuyDimension>>
   breakout_close?: number
+  signal_phase?: {
+    key: 'breakout_day' | 'continuation' | 'retest' | 'extended' | 'failed'
+    label: string
+    days_after_breakout: number
+    post_breakout_return_pct: number
+    latest_volume_vs_breakout: number
+    returned_to_box_within_3d: boolean
+    broke_box_low: boolean
+  }
+  box_levels?: {
+    high: number
+    low: number
+    average_volume: number
+  }
+  trade_plan?: {
+    entry_strategy: string
+    add_position_trigger: string
+    stop_loss_price: number
+    stop_loss_basis: string
+    hard_stop_price: number
+    hard_stop_basis: string
+    position_reference: string
+    exit_warnings: string[]
+  }
   data_scope: string
   data_sources: Record<string, string>
   data_errors: string[]
+  data_warnings?: string[]
+  data_completeness?: Record<string, boolean>
   risk_notice: string
 }
 
@@ -795,15 +817,18 @@ export interface BoxBreakoutBuyAnalysisParams {
   industry_code?: string
   market_index_code?: string
   market_category?: BoxBreakoutMarketCategory
+  box_high?: number
+  box_low?: number
+  box_avg_volume?: number
 }
 
 export async function getBoxBreakoutCandidates(
-  params: BoxBreakoutCandidatesParams = {}
+  params: BoxBreakoutCandidatesParams = {},
 ): Promise<BoxBreakoutCandidatesData> {
   try {
     const response = await axios.get<BoxBreakoutCandidatesData>(
       '/django/api/strategy/box-breakout-candidates/',
-      { params }
+      { params },
     )
     return response.data
   } catch (error) {
@@ -813,12 +838,12 @@ export async function getBoxBreakoutCandidates(
 }
 
 export async function getBoxBreakoutBuyAnalysis(
-  params: BoxBreakoutBuyAnalysisParams
+  params: BoxBreakoutBuyAnalysisParams,
 ): Promise<BoxBreakoutBuyAnalysis> {
   try {
     const response = await axios.get<BoxBreakoutBuyAnalysis>(
       '/django/api/strategy/box-breakout-buy-analysis/',
-      { params }
+      { params },
     )
     return response.data
   } catch (error) {
