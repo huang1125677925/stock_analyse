@@ -1,1 +1,0 @@
-import{M as s,N as o,O as t,P as i}from"./index-BhWxRXgv.js";function p(r,e={}){const a=s(()=>o(r));return t()?i(a):console.warn(`[ai-analysis] useAiPageData${e.name?`(${e.name})`:""} 需在组件 setup 中调用，当前不在响应式作用域内，注册不会随组件卸载自动注销。`),a}export{p as u};

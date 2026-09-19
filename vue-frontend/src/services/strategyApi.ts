@@ -699,7 +699,6 @@ export interface BoxBreakoutCandidatesData {
     unmapped_count: number
   }
   filters: {
-    min_match_count: number
     limit: number
     codes: string[]
     include_failed: boolean
@@ -710,7 +709,7 @@ export interface BoxBreakoutCandidatesData {
     trade_dates: string[]
     description: string
   }
-  mandatory_condition_keys?: string[]
+  required_condition_keys?: string[]
   condition_definitions: Array<{ key: string; name: string; threshold: string }>
   post_performance_definition?: {
     buy_rule: string
@@ -725,7 +724,6 @@ export interface BoxBreakoutCandidatesData {
 
 export interface BoxBreakoutCandidatesParams {
   trade_date?: string
-  min_match_count?: number
   limit?: number
   codes?: string
   include_failed?: boolean

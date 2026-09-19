@@ -38,10 +38,6 @@
           </div>
         </div>
         <div class="control compact">
-          <span class="control-label">命中数</span>
-          <el-input-number v-model="query.min_match_count" :min="1" :max="8" />
-        </div>
-        <div class="control compact">
           <span class="control-label">箱体天数</span>
           <el-input-number v-model="query.min_box_days" :min="10" :max="70" />
         </div>
@@ -68,7 +64,7 @@
         <strong>{{ signalWindowText }}</strong>
       </div>
       <div class="summary-item">
-        <span>命中</span>
+        <span>筛选通过</span>
         <strong>{{ data?.matched_total ?? '-' }}</strong>
       </div>
       <div class="summary-item">
@@ -248,7 +244,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="8 条条件" min-width="360">
+        <el-table-column label="8 条条件（全部满足）" min-width="380">
           <template #default="{ row }">
             <div class="condition-tags">
               <el-tooltip
@@ -258,8 +254,7 @@
                 placement="top"
               >
                 <el-tag :type="condition.passed ? 'success' : 'danger'" effect="plain">
-                  {{ condition.key.toUpperCase() }}{{ condition.required ? ' 必选' : '' }}
-                  {{ condition.passed ? '✓' : '×' }}
+                  {{ condition.key.toUpperCase() }} {{ condition.passed ? '✓' : '×' }}
                 </el-tag>
               </el-tooltip>
             </div>
@@ -391,7 +386,7 @@
           <div class="trend-condition-heading">
             <div>
               <h3>条件状态</h3>
-              <p>观察日对应的箱体突破条件</p>
+              <p>突破日 C1-C8 全部满足后通过筛选</p>
             </div>
             <strong>
               {{ selectedTrendCandidate?.match_count ?? 0 }}/{{ selectedTrendConditions.length }}
@@ -408,7 +403,7 @@
             >
               <div class="trend-condition-topline">
                 <span class="trend-condition-key">
-                  {{ condition.key.toUpperCase() }}{{ condition.required ? ' · 必选' : '' }}
+                  {{ condition.key.toUpperCase() }}
                 </span>
                 <el-tag :type="condition.passed ? 'success' : 'danger'" effect="plain" size="small">
                   {{ condition.passed ? '满足' : '未满足' }}
@@ -462,14 +457,13 @@ const query = reactive<
   Required<
     Pick<
       BoxBreakoutCandidatesParams,
-      'min_match_count' | 'limit' | 'include_failed' | 'min_box_days' | 'signal_lookback_days'
+      'limit' | 'include_failed' | 'min_box_days' | 'signal_lookback_days'
     >
   > & {
     trade_date: string
   }
 >({
   trade_date: '',
-  min_match_count: 7,
   limit: 100,
   include_failed: false,
   min_box_days: 20,
@@ -547,21 +541,19 @@ const skippedText = computed(() => {
   return [
     `市值门槛 ${skipped.pool_gate ?? 0}`,
     `涨幅粗筛 ${skipped.latest_strength_gate ?? 0}`,
-    `核心条件 ${skipped.mandatory_condition_miss ?? 0}`,
     `条件不足 ${skipped.condition_miss ?? 0}`,
   ].join(' / ')
 })
 
 useAiPageData(() => ({
   title: '箱体整理放量突破选股',
-  summary: `按主板、低价、小市值股票池筛选，至少命中 ${query.min_match_count}/8 条形态条件。`,
+  summary: '按主板、低价、小市值股票池筛选，C1-C8 全部满足后输出。',
   data: data.value,
 }))
 
 function buildParams(): BoxBreakoutCandidatesParams {
   return {
     trade_date: query.trade_date || undefined,
-    min_match_count: query.min_match_count,
     limit: query.limit,
     include_failed: query.include_failed,
     min_box_days: query.min_box_days,
