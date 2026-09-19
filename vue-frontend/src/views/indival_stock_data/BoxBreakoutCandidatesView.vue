@@ -2,18 +2,40 @@
   <div class="box-breakout-page">
     <section class="toolbar">
       <div class="toolbar-main">
-        <div class="control">
+        <div class="control trade-date-control">
           <span class="control-label">观察日期</span>
-          <el-date-picker
-            v-model="query.trade_date"
-            type="date"
-            value-format="YYYYMMDD"
-            format="YYYY-MM-DD"
-            clearable
-            placeholder="默认最新交易日"
-            :disabled-date="disableFutureDate"
-            class="date-picker"
-          />
+          <div class="trade-date-selector">
+            <el-button
+              :icon="ArrowLeft"
+              :loading="dateShiftLoading === -1"
+              :disabled="loading || dateShiftLoading !== 0 || !effectiveTradeDate"
+              title="上一个交易日"
+              aria-label="切换到上一个交易日"
+              @click="shiftObservationDate(-1)"
+            >
+              <span class="date-nav-label">上一日</span>
+            </el-button>
+            <el-date-picker
+              v-model="query.trade_date"
+              type="date"
+              value-format="YYYYMMDD"
+              format="YYYY-MM-DD"
+              clearable
+              placeholder="默认最新交易日"
+              :disabled-date="disableFutureDate"
+              class="date-picker"
+            />
+            <el-button
+              :loading="dateShiftLoading === 1"
+              :disabled="loading || dateShiftLoading !== 0 || !effectiveTradeDate"
+              title="下一个交易日"
+              aria-label="切换到下一个交易日"
+              @click="shiftObservationDate(1)"
+            >
+              <span class="date-nav-label">下一日</span>
+              <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+            </el-button>
+          </div>
         </div>
         <div class="control compact">
           <span class="control-label">命中数</span>
@@ -30,10 +52,6 @@
         <div class="control compact">
           <span class="control-label">返回数</span>
           <el-input-number v-model="query.limit" :min="1" :max="500" />
-        </div>
-        <div class="control codes">
-          <span class="control-label">股票代码</span>
-          <el-input v-model="query.codes" clearable placeholder="可选，逗号分隔" />
         </div>
         <el-switch v-model="query.include_failed" active-text="包含失效" />
       </div>
@@ -220,10 +238,7 @@
                 {{ row.post_performance?.message || '待观察' }}
               </span>
               <div class="holding-return-values">
-                <span
-                  v-for="item in row.post_performance?.returns || []"
-                  :key="item.holding_days"
-                >
+                <span v-for="item in row.post_performance?.returns || []" :key="item.holding_days">
                   <em>{{ item.holding_days }}日</em>
                   <strong :class="holdingReturnClass(item.return_pct)">
                     {{ formatHoldingReturn(item.return_pct) }}
@@ -362,7 +377,11 @@
             />
             <el-empty
               v-else-if="!industryTrendLoading"
-              :description="selectedTrendStock.industryCode ? '该日期区间暂无行业K线数据' : '未匹配到东财二级行业代码'"
+              :description="
+                selectedTrendStock.industryCode
+                  ? '该日期区间暂无行业K线数据'
+                  : '未匹配到东财二级行业代码'
+              "
               :image-size="80"
             />
           </div>
@@ -424,6 +443,7 @@ import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { useAiPageData } from '@/composables/useAiPageData'
 import { fetchDcDaily } from '@/services/dcDailyApi'
+import { fetchIndexDailyKline } from '@/services/indexDailyApi'
 import { fetchStockHistoryData, type StockHistoryDataItem } from '@/services/stockHistoryApi'
 import {
   getBoxBreakoutCandidates,
@@ -433,6 +453,7 @@ import {
 } from '@/services/strategyApi'
 
 const loading = ref(false)
+const dateShiftLoading = ref<-1 | 0 | 1>(0)
 const data = ref<BoxBreakoutCandidatesData | null>(null)
 let latestRequestId = 0
 let trendRequestId = 0
@@ -445,19 +466,18 @@ const query = reactive<
     >
   > & {
     trade_date: string
-    codes: string
   }
 >({
   trade_date: '',
   min_match_count: 7,
   limit: 100,
-  codes: '',
   include_failed: false,
   min_box_days: 20,
   signal_lookback_days: 3,
 })
 
 const rows = computed<BoxBreakoutCandidateItem[]>(() => data.value?.data ?? [])
+const effectiveTradeDate = computed(() => query.trade_date || data.value?.trade_date || '')
 const trendDialogVisible = ref(false)
 const trendLoading = ref(false)
 const trendData = ref<StockHistoryDataItem[]>([])
@@ -481,8 +501,8 @@ const trendEventLines = computed(() => {
     lines.push({ date: selectedTrendStock.breakoutDate, label: '突破日', color: '#dc2626' })
   }
   if (
-    selectedTrendStock.observationDate
-    && selectedTrendStock.observationDate !== selectedTrendStock.breakoutDate
+    selectedTrendStock.observationDate &&
+    selectedTrendStock.observationDate !== selectedTrendStock.breakoutDate
   ) {
     lines.push({ date: selectedTrendStock.observationDate, label: '观察日', color: '#2563eb' })
   }
@@ -491,14 +511,16 @@ const trendEventLines = computed(() => {
 const trendPriceRanges = computed(() => {
   const box = selectedTrendCandidate.value?.box
   if (!box?.start_date || !box?.end_date) return []
-  return [{
-    startDate: box.start_date,
-    endDate: box.end_date,
-    label: `箱体 ${box.days}个交易日`,
-    low: box.low_close,
-    high: box.high_close,
-    color: '#2563eb',
-  }]
+  return [
+    {
+      startDate: box.start_date,
+      endDate: box.end_date,
+      label: `箱体 ${box.days}个交易日`,
+      low: box.low_close,
+      high: box.high_close,
+      color: '#2563eb',
+    },
+  ]
 })
 const latestTrendPoint = computed(() =>
   trendData.value.length ? trendData.value[trendData.value.length - 1] : null,
@@ -541,7 +563,6 @@ function buildParams(): BoxBreakoutCandidatesParams {
     trade_date: query.trade_date || undefined,
     min_match_count: query.min_match_count,
     limit: query.limit,
-    codes: query.codes || undefined,
     include_failed: query.include_failed,
     min_box_days: query.min_box_days,
     signal_lookback_days: query.signal_lookback_days,
@@ -567,6 +588,52 @@ function disableFutureDate(date: Date) {
   const today = new Date()
   today.setHours(23, 59, 59, 999)
   return date.getTime() > today.getTime()
+}
+
+async function shiftObservationDate(direction: -1 | 1) {
+  const baseDate = parseCompactDate(effectiveTradeDate.value)
+  if (!baseDate || dateShiftLoading.value !== 0) return
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const rangeStart = shiftCalendarDays(baseDate, -20)
+  const rangeEnd =
+    direction === 1
+      ? new Date(Math.min(shiftCalendarDays(baseDate, 20).getTime(), today.getTime()))
+      : baseDate
+
+  dateShiftLoading.value = direction
+  try {
+    const calendarRows = await fetchIndexDailyKline(
+      '000001.SH',
+      formatDate(rangeStart, ''),
+      formatDate(rangeEnd, ''),
+    )
+    const baseDateText = formatDate(baseDate, '')
+    const tradeDates = [
+      ...new Set(
+        calendarRows
+          .map((item) => String(item.date || '').replace(/[^0-9]/g, ''))
+          .filter((date) => date.length === 8),
+      ),
+    ].sort()
+    const earlierTradeDates = tradeDates.filter((date) => date < baseDateText)
+    const targetDate =
+      direction === -1
+        ? earlierTradeDates[earlierTradeDates.length - 1]
+        : tradeDates.find((date) => date > baseDateText)
+
+    if (!targetDate) {
+      ElMessage.info(direction === 1 ? '已经是最新交易日' : '未找到上一个交易日')
+      return
+    }
+    query.trade_date = targetDate
+  } catch (error) {
+    console.error('切换箱体突破观察日期失败:', error)
+    ElMessage.error('获取相邻交易日失败，请稍后重试')
+  } finally {
+    dateShiftLoading.value = 0
+  }
 }
 
 function formatNumber(value: number | null | undefined, digits = 2) {
@@ -665,8 +732,8 @@ function setTrendDateRange(row: BoxBreakoutCandidateItem, observationDate: strin
   }
   // 后端返回的箱体起点来自真实交易日序列，优先使用它以准确跨过周末和休市日。
   // 旧数据缺少起点时，按工作日回推箱体大小作为兼容兜底。
-  const boxStartedAt = parseCompactDate(row.box?.start_date)
-    ?? shiftWeekdays(observedAt, row.box?.days ?? 0)
+  const boxStartedAt =
+    parseCompactDate(row.box?.start_date) ?? shiftWeekdays(observedAt, row.box?.days ?? 0)
   trendDateRange.start = formatDate(shiftCalendarDays(boxStartedAt, -30))
   trendDateRange.end = formatDate(shiftCalendarMonths(observedAt, 1))
   return true
@@ -730,7 +797,8 @@ async function loadIndustryTrendData() {
       idx_type: '行业板块',
       start_date: trendDateRange.start.replace(/-/g, ''),
       end_date: trendDateRange.end.replace(/-/g, ''),
-      fields: 'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate',
+      fields:
+        'ts_code,trade_date,open,high,low,close,change,pct_change,vol,amount,swing,turnover_rate',
     })
     if (requestId !== industryTrendRequestId) return
     industryTrendData.value = [...(result.records || [])]
@@ -856,8 +924,14 @@ watch(
   width: 118px;
 }
 
-.control.codes {
-  width: 220px;
+.control.trade-date-control {
+  width: 404px;
+}
+
+.trade-date-selector {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr) auto;
+  gap: 6px;
 }
 
 .date-picker {
@@ -1278,8 +1352,18 @@ watch(
 
   .control,
   .control.compact,
-  .control.codes {
+  .control.trade-date-control {
     width: 100%;
+  }
+
+  @media (max-width: 480px) {
+    .trade-date-selector {
+      grid-template-columns: auto minmax(120px, 1fr) auto;
+    }
+
+    .date-nav-label {
+      display: none;
+    }
   }
 
   .toolbar-main,
