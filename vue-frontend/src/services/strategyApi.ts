@@ -729,13 +729,33 @@ export interface BoxBreakoutCandidatesParams {
 }
 
 export type BoxBreakoutBuyStatus =
-  | 'buy_now'
-  | 'wait_retest'
-  | 'avoid_chasing'
+  | 'demon_candidate'
+  | 'countertrend_leader'
+  | 'trend_candidate'
+  | 'retest_candidate'
+  | 'wait_second_confirmation'
+  | 'weak_followthrough_reject'
+  | 'distribution_reject'
   | 'breakout_failed'
   | 'market_reject'
   | 'industry_reject'
   | 'insufficient_data'
+
+export interface BoxBreakoutSetupGate {
+  key: string
+  label: string
+  passed: boolean
+  available: boolean
+  description: string
+}
+
+export interface BoxBreakoutSetupResult {
+  label: string
+  passed: boolean
+  matched_count: number
+  required_count: number
+  gates: BoxBreakoutSetupGate[]
+}
 
 export interface BoxBreakoutBuySignal {
   key: string
@@ -766,6 +786,26 @@ export interface BoxBreakoutBuyAnalysis {
   status: BoxBreakoutBuyStatus
   status_label: string
   can_buy: boolean
+  setup_type?: 'demon_acceleration' | 'normal_breakout' | 'retest' | 'none'
+  setup_label?: string
+  confidence?: 'high' | 'medium' | 'low'
+  setup_analysis?: {
+    demon: BoxBreakoutSetupResult
+    normal: BoxBreakoutSetupResult
+  }
+  limit_context?: {
+    data_available?: boolean
+    limit_days_in_window?: number
+    latest_limit_times?: number
+    latest_limit_date?: string | null
+    open_times?: number
+    first_time?: string | null
+    last_time?: string | null
+    up_stat?: string | null
+    seal_order_ratio_pct?: number | null
+    turnover_rate?: number | null
+    max_market_board_height?: number
+  }
   score: number | null
   score_threshold: number
   rule_version: string

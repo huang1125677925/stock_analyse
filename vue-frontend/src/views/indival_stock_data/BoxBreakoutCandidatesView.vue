@@ -210,7 +210,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="买入判断" width="168" align="center">
+        <el-table-column label="买入判断" width="190" align="center">
           <template #default="{ row }">
             <div class="buy-status-cell">
               <el-tag
@@ -226,9 +226,19 @@
               <el-tag v-else-if="buyAnalysisState(row)?.error" type="danger" effect="plain">
                 分析失败
               </el-tag>
-              <span v-if="buyAnalysisState(row)?.data?.score != null">
-                {{ buyAnalysisState(row)?.data?.signal_phase?.label || '阶段待定' }} ·
-                {{ buyAnalysisState(row)?.data?.score ?? '-' }}/100
+              <span v-if="buyAnalysisState(row)?.data">
+                {{ buyAnalysisState(row)?.data?.setup_label || '未形成买点' }} ·
+                {{ buyConfidenceText(buyAnalysisState(row)?.data?.confidence) }}
+              </span>
+              <span v-if="buyAnalysisState(row)?.data?.setup_analysis">
+                妖股
+                {{ buyAnalysisState(row)?.data?.setup_analysis?.demon.matched_count }}/{{
+                  buyAnalysisState(row)?.data?.setup_analysis?.demon.required_count
+                }}
+                · 普通
+                {{ buyAnalysisState(row)?.data?.setup_analysis?.normal.matched_count }}/{{
+                  buyAnalysisState(row)?.data?.setup_analysis?.normal.required_count
+                }}
               </span>
             </div>
           </template>
@@ -366,7 +376,7 @@
           <div class="buy-analysis-heading">
             <div>
               <h3>观察日买入判断</h3>
-              <p>总分达到 70，且个股/行业/大盘分别达到 42/10/10 分，无硬性拒绝项</p>
+              <p>妖股加速与普通突破分别执行硬门槛；综合分只解释环境，不参与放行</p>
             </div>
             <el-tag
               v-if="selectedBuyAnalysisState?.data"
@@ -375,9 +385,6 @@
               size="large"
             >
               {{ selectedBuyAnalysisState.data.status_label }}
-              <template v-if="selectedBuyAnalysisState.data.score !== null">
-                {{ selectedBuyAnalysisState.data.score }}/100
-              </template>
             </el-tag>
           </div>
 
@@ -387,15 +394,50 @@
               <el-tag type="primary" effect="plain">
                 {{ selectedBuyAnalysisState.data.signal_phase?.label || '阶段待定' }}
               </el-tag>
+              <el-tag
+                :type="selectedBuyAnalysisState.data.can_buy ? 'success' : 'info'"
+                effect="plain"
+              >
+                {{ selectedBuyAnalysisState.data.setup_label || '未形成买点' }}
+              </el-tag>
+              <span>置信度 {{ buyConfidenceText(selectedBuyAnalysisState.data.confidence) }}</span>
               <span>规则 v{{ selectedBuyAnalysisState.data.rule_version }}</span>
               <span>
                 突破后
-                {{
-                  selectedBuyAnalysisState.data.signal_phase?.days_after_breakout ?? '-'
-                }}
+                {{ selectedBuyAnalysisState.data.signal_phase?.days_after_breakout ?? '-' }}
                 个交易日
               </span>
               <span> 数据完整度 {{ buyDataCompletenessText(selectedBuyAnalysisState.data) }} </span>
+            </div>
+            <div v-if="buySetupAnalyses.length" class="buy-setup-grid">
+              <section
+                v-for="setup in buySetupAnalyses"
+                :key="setup.label"
+                :class="['buy-setup-group', { 'is-passed': setup.passed }]"
+              >
+                <div class="buy-setup-title">
+                  <strong>{{ setup.label }}</strong>
+                  <el-tag :type="setup.passed ? 'success' : 'info'" effect="plain" size="small">
+                    {{ setup.matched_count }}/{{ setup.required_count }}
+                  </el-tag>
+                </div>
+                <div class="buy-gate-list">
+                  <div
+                    v-for="gate in setup.gates"
+                    :key="setup.label + '-' + gate.key"
+                    :class="[
+                      'buy-gate-row',
+                      { 'is-passed': gate.passed, 'is-unavailable': !gate.available },
+                    ]"
+                  >
+                    <span>{{ gate.passed ? '通过' : gate.available ? '未通过' : '缺数据' }}</span>
+                    <div>
+                      <strong>{{ gate.label }}</strong>
+                      <p>{{ gate.description }}</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
             <div v-if="buyAnalysisDimensions.length" class="buy-dimension-strip">
               <div
@@ -403,7 +445,7 @@
                 :key="dimension.name"
                 :class="{ 'is-gate-failed': dimension.score < dimension.min_score }"
               >
-                <span>{{ dimension.name }}门槛 {{ dimension.min_score }}</span>
+                <span>{{ dimension.name }}解释分</span>
                 <strong>{{ dimension.score }}/{{ dimension.max_score }}</strong>
               </div>
             </div>
@@ -741,6 +783,10 @@ const buyAnalysisDimensions = computed(() => {
     (dimension): dimension is NonNullable<typeof dimension> => Boolean(dimension),
   )
 })
+const buySetupAnalyses = computed(() => {
+  const setupAnalysis = selectedBuyAnalysisState.value?.data?.setup_analysis
+  return setupAnalysis ? [setupAnalysis.demon, setupAnalysis.normal] : []
+})
 const hasPrevTrendStock = computed(() => currentTrendIndex.value > 0)
 const hasNextTrendStock = computed(
   () => currentTrendIndex.value >= 0 && currentTrendIndex.value < rows.value.length - 1,
@@ -792,12 +838,31 @@ function buyAnalysisState(row: BoxBreakoutCandidateItem) {
 }
 
 function buyStatusTagType(status: BoxBreakoutBuyStatus | undefined) {
-  if (status === 'buy_now') return 'success'
-  if (status === 'wait_retest' || status === 'avoid_chasing') return 'warning'
-  if (status === 'breakout_failed' || status === 'market_reject' || status === 'industry_reject') {
+  if (
+    status === 'demon_candidate' ||
+    status === 'trend_candidate' ||
+    status === 'retest_candidate'
+  ) {
+    return 'success'
+  }
+  if (status === 'countertrend_leader' || status === 'wait_second_confirmation') return 'warning'
+  if (
+    status === 'breakout_failed' ||
+    status === 'market_reject' ||
+    status === 'industry_reject' ||
+    status === 'distribution_reject' ||
+    status === 'weak_followthrough_reject'
+  ) {
     return 'danger'
   }
   return 'info'
+}
+
+function buyConfidenceText(confidence: BoxBreakoutBuyAnalysis['confidence']) {
+  if (confidence === 'high') return '高'
+  if (confidence === 'medium') return '中'
+  if (confidence === 'low') return '低'
+  return '-'
 }
 
 function buyDataCompletenessText(analysis: BoxBreakoutBuyAnalysis) {
@@ -1608,6 +1673,83 @@ watch(
   font-size: 12px;
 }
 
+.buy-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.buy-setup-group {
+  min-width: 0;
+  border: 1px solid #dbe3ee;
+  border-top: 3px solid #64748b;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.buy-setup-group.is-passed {
+  border-top-color: #16a34a;
+}
+
+.buy-setup-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.buy-setup-title strong {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.buy-gate-list {
+  display: grid;
+}
+
+.buy-gate-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 9px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.buy-gate-row:last-child {
+  border-bottom: 0;
+}
+
+.buy-gate-row > span {
+  align-self: start;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.buy-gate-row.is-passed > span {
+  color: #15803d;
+}
+
+.buy-gate-row.is-unavailable > span {
+  color: #64748b;
+}
+
+.buy-gate-row strong {
+  display: block;
+  color: #334155;
+  font-size: 12px;
+}
+
+.buy-gate-row p {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .buy-dimension-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1959,6 +2101,7 @@ watch(
   }
 
   .buy-dimension-strip,
+  .buy-setup-grid,
   .buy-reason-grid,
   .buy-trade-plan {
     grid-template-columns: 1fr;
