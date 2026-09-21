@@ -34,6 +34,7 @@ interface EventLine {
   date: string
   label: string
   color?: string
+  mode?: 'line' | 'marker'
 }
 
 interface OverlayLinePoint {
@@ -165,10 +166,17 @@ const updateChart = () => {
     return dates.length > 0 ? dates.length - 1 : undefined
   }
 
-  const alignedEventLines = (props.eventLines || [])
+  const alignedEvents = (props.eventLines || [])
     .map((eventLine) => {
       const index = alignEventLineIndex(eventLine.date)
       if (index === undefined) return null
+      return { eventLine, index }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+
+  const alignedEventLines = alignedEvents
+    .filter(({ eventLine }) => eventLine.mode !== 'marker')
+    .map(({ eventLine, index }) => {
       return {
         xAxis: dates[index],
         name: eventLine.label,
@@ -188,6 +196,54 @@ const updateChart = () => {
           borderColor: eventLine.color || '#dc2626',
           borderWidth: 1,
           borderRadius: 4
+        }
+      }
+    })
+
+  const markerEvents = alignedEvents.filter(({ eventLine }) => eventLine.mode === 'marker')
+  const alignedEventMarkers = markerEvents
+    .map(({ eventLine, index }, markerIndex) => {
+      const highPrice = Number(props.klineData[index]?.high_price)
+      if (!Number.isFinite(highPrice)) return null
+
+      const previousIndex = markerEvents[markerIndex - 1]?.index
+      const nextIndex = markerEvents[markerIndex + 1]?.index
+      const isCloseToAnotherMarker =
+        (previousIndex !== undefined && Math.abs(index - previousIndex) <= 2) ||
+        (nextIndex !== undefined && Math.abs(nextIndex - index) <= 2)
+      const labelOffset = isCloseToAnotherMarker ? (markerIndex % 2 === 0 ? -22 : 22) : 0
+      const color = eventLine.color || '#dc2626'
+
+      return {
+        name: eventLine.label,
+        coord: [dates[index], highPrice],
+        value: eventLine.label,
+        symbol: 'triangle',
+        symbolSize: [11, 8],
+        symbolRotate: 180,
+        symbolOffset: [0, -9],
+        itemStyle: {
+          color,
+          borderColor: '#ffffff',
+          borderWidth: 1
+        },
+        label: {
+          show: true,
+          formatter: eventLine.label,
+          position: 'top',
+          distance: 7,
+          offset: [labelOffset, -1],
+          color,
+          fontSize: 11,
+          fontWeight: 'bold',
+          backgroundColor: 'rgba(255, 255, 255, 0.94)',
+          padding: [3, 6],
+          borderColor: color,
+          borderWidth: 1,
+          borderRadius: 4
+        },
+        tooltip: {
+          formatter: `${eventLine.label}<br/>日期: ${dates[index]}`
         }
       }
     })
@@ -594,7 +650,7 @@ console.log('卖出信号详情:', JSON.stringify(sellSignals))
         markPoint: {
           symbol: 'arrow',
           symbolSize: 50,
-          data: [...buySignals, ...sellSignals],
+          data: [...alignedEventMarkers, ...buySignals, ...sellSignals],
           clipByCoordinateSystem: false,
           silent: false,
           animation: false,

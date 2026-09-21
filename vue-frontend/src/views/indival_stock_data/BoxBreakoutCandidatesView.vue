@@ -361,17 +361,6 @@
               区间末收盘 {{ formatNumber(latestTrendPoint.close_price) }}
             </el-tag>
           </div>
-
-          <div class="trend-nav" aria-label="切换观察日筛选股票">
-            <el-button :icon="ArrowLeft" :disabled="!hasPrevTrendStock" @click="stepTrendStock(-1)">
-              上一只
-            </el-button>
-            <span class="trend-nav-position">{{ trendNavPositionText }}</span>
-            <el-button :disabled="!hasNextTrendStock" @click="stepTrendStock(1)">
-              下一只
-              <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-            </el-button>
-          </div>
         </div>
 
         <section class="buy-analysis-panel" v-loading="selectedBuyAnalysisState?.loading">
@@ -565,11 +554,28 @@
               </p>
               <p v-else>当前股票未匹配到本地东财二级行业</p>
             </div>
-            <el-radio-group v-model="activeTrendView" size="small" aria-label="切换走势图">
-              <el-radio-button value="stock">个股</el-radio-button>
-              <el-radio-button value="market">大盘</el-radio-button>
-              <el-radio-button value="industry">行业</el-radio-button>
-            </el-radio-group>
+            <div class="trend-chart-actions">
+              <div class="trend-nav" aria-label="切换观察日筛选股票">
+                <el-button
+                  size="small"
+                  :icon="ArrowLeft"
+                  :disabled="!hasPrevTrendStock"
+                  @click="stepTrendStock(-1)"
+                >
+                  上一只
+                </el-button>
+                <span class="trend-nav-position">{{ trendNavPositionText }}</span>
+                <el-button size="small" :disabled="!hasNextTrendStock" @click="stepTrendStock(1)">
+                  下一只
+                  <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+                </el-button>
+              </div>
+              <el-radio-group v-model="activeTrendView" size="small" aria-label="切换走势图">
+                <el-radio-button value="stock">个股</el-radio-button>
+                <el-radio-button value="market">大盘</el-radio-button>
+                <el-radio-button value="industry">行业</el-radio-button>
+              </el-radio-group>
+            </div>
           </div>
           <div v-if="activeTrendView === 'stock'" class="trend-preview" v-loading="trendLoading">
             <StockKLineChart
@@ -786,13 +792,23 @@ const selectedTrendStock = reactive({
 const trendEventLines = computed(() => {
   const lines = []
   if (selectedTrendStock.breakoutDate) {
-    lines.push({ date: selectedTrendStock.breakoutDate, label: '突破日', color: '#dc2626' })
+    lines.push({
+      date: selectedTrendStock.breakoutDate,
+      label: '突破日',
+      color: '#dc2626',
+      mode: 'marker' as const,
+    })
   }
   if (
     selectedTrendStock.observationDate &&
     selectedTrendStock.observationDate !== selectedTrendStock.breakoutDate
   ) {
-    lines.push({ date: selectedTrendStock.observationDate, label: '观察日', color: '#2563eb' })
+    lines.push({
+      date: selectedTrendStock.observationDate,
+      label: '观察日',
+      color: '#2563eb',
+      mode: 'marker' as const,
+    })
   }
   return lines
 })
@@ -1667,8 +1683,6 @@ watch(
 .trend-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
 }
 
 .trend-meta {
@@ -2040,6 +2054,21 @@ watch(
   flex: 0 0 auto;
 }
 
+.trend-chart-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 12px;
+}
+
+.trend-chart-actions .trend-nav {
+  gap: 6px;
+}
+
+.trend-chart-actions .trend-nav-position {
+  min-width: 44px;
+}
+
 .trend-preview {
   min-height: 390px;
 }
@@ -2231,6 +2260,13 @@ watch(
 
   .trend-chart-heading .el-radio-group {
     align-self: stretch;
+  }
+
+  .trend-chart-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
   }
 
   .trend-chart-heading :deep(.el-radio-button) {
