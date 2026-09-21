@@ -318,8 +318,9 @@
 
     <el-dialog
       v-model="trendDialogVisible"
-      width="88%"
-      top="6vh"
+      class="box-breakout-trend-dialog"
+      width="92%"
+      top="3vh"
       destroy-on-close
       append-to-body
       :close-on-click-modal="false"
@@ -411,112 +412,135 @@
               </span>
               <span> 数据完整度 {{ buyDataCompletenessText(selectedBuyAnalysisState.data) }} </span>
             </div>
-            <div v-if="buySetupAnalyses.length" class="buy-setup-grid">
-              <section
-                v-for="setup in buySetupAnalyses"
-                :key="setup.label"
-                :class="['buy-setup-group', { 'is-passed': setup.passed }]"
-              >
-                <div class="buy-setup-title">
-                  <strong>{{ setup.label }}</strong>
-                  <el-tag :type="setup.passed ? 'success' : 'info'" effect="plain" size="small">
-                    {{ setup.matched_count }}/{{ setup.required_count }}
-                  </el-tag>
-                </div>
-                <div class="buy-gate-list">
-                  <div
-                    v-for="gate in setup.gates"
-                    :key="setup.label + '-' + gate.key"
-                    :class="[
-                      'buy-gate-row',
-                      { 'is-passed': gate.passed, 'is-unavailable': !gate.available },
-                    ]"
+            <button
+              class="detail-toggle"
+              type="button"
+              :aria-expanded="buyDetailsExpanded"
+              @click="buyDetailsExpanded = !buyDetailsExpanded"
+            >
+              <span>{{ buyDetailsExpanded ? '收起判断明细' : '展开判断明细' }}</span>
+              <el-icon :class="{ 'is-expanded': buyDetailsExpanded }"><ArrowDown /></el-icon>
+            </button>
+            <el-collapse-transition>
+              <div v-show="buyDetailsExpanded" class="buy-analysis-details">
+                <div v-if="buySetupAnalyses.length" class="buy-setup-grid">
+                  <section
+                    v-for="setup in buySetupAnalyses"
+                    :key="setup.label"
+                    :class="['buy-setup-group', { 'is-passed': setup.passed }]"
                   >
-                    <span>{{ gate.passed ? '通过' : gate.available ? '未通过' : '缺数据' }}</span>
-                    <div>
-                      <strong>{{ gate.label }}</strong>
-                      <p>{{ gate.description }}</p>
+                    <div class="buy-setup-title">
+                      <strong>{{ setup.label }}</strong>
+                      <el-tag :type="setup.passed ? 'success' : 'info'" effect="plain" size="small">
+                        {{ setup.matched_count }}/{{ setup.required_count }}
+                      </el-tag>
                     </div>
+                    <div class="buy-gate-list">
+                      <div
+                        v-for="gate in setup.gates"
+                        :key="setup.label + '-' + gate.key"
+                        :class="[
+                          'buy-gate-row',
+                          { 'is-passed': gate.passed, 'is-unavailable': !gate.available },
+                        ]"
+                      >
+                        <span>{{
+                          gate.passed ? '通过' : gate.available ? '未通过' : '缺数据'
+                        }}</span>
+                        <div>
+                          <strong>{{ gate.label }}</strong>
+                          <p>{{ gate.description }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+                <div v-if="buyAnalysisDimensions.length" class="buy-dimension-strip">
+                  <div
+                    v-for="dimension in buyAnalysisDimensions"
+                    :key="dimension.name"
+                    :class="{ 'is-gate-failed': dimension.score < dimension.min_score }"
+                  >
+                    <span>{{ dimension.name }}解释分</span>
+                    <strong>{{ dimension.score }}/{{ dimension.max_score }}</strong>
                   </div>
                 </div>
-              </section>
-            </div>
-            <div v-if="buyAnalysisDimensions.length" class="buy-dimension-strip">
-              <div
-                v-for="dimension in buyAnalysisDimensions"
-                :key="dimension.name"
-                :class="{ 'is-gate-failed': dimension.score < dimension.min_score }"
-              >
-                <span>{{ dimension.name }}解释分</span>
-                <strong>{{ dimension.score }}/{{ dimension.max_score }}</strong>
-              </div>
-            </div>
-            <div v-if="selectedBuyAnalysisState.data.trade_plan" class="buy-trade-plan">
-              <div>
-                <span>入场判断</span>
-                <strong>{{ selectedBuyAnalysisState.data.trade_plan.entry_strategy }}</strong>
-              </div>
-              <div>
-                <span>加仓触发</span>
-                <strong>{{ selectedBuyAnalysisState.data.trade_plan.add_position_trigger }}</strong>
-              </div>
-              <div>
-                <span>预警止损</span>
-                <strong>
-                  {{ formatNumber(selectedBuyAnalysisState.data.trade_plan.stop_loss_price, 3) }} ·
-                  {{ selectedBuyAnalysisState.data.trade_plan.stop_loss_basis }}
-                </strong>
-              </div>
-              <div>
-                <span>形态硬止损</span>
-                <strong>
-                  {{ formatNumber(selectedBuyAnalysisState.data.trade_plan.hard_stop_price, 3) }} ·
-                  {{ selectedBuyAnalysisState.data.trade_plan.hard_stop_basis }}
-                </strong>
-              </div>
-              <div class="is-wide">
-                <span>仓位参考</span>
-                <strong>{{ selectedBuyAnalysisState.data.trade_plan.position_reference }}</strong>
-              </div>
-            </div>
-            <div class="buy-reason-grid">
-              <div class="buy-reason-group is-support">
-                <h4>支持理由</h4>
-                <p
-                  v-for="reason in selectedBuyAnalysisState.data.support_reasons"
-                  :key="`support-${reason}`"
+                <div v-if="selectedBuyAnalysisState.data.trade_plan" class="buy-trade-plan">
+                  <div>
+                    <span>入场判断</span>
+                    <strong>{{ selectedBuyAnalysisState.data.trade_plan.entry_strategy }}</strong>
+                  </div>
+                  <div>
+                    <span>加仓触发</span>
+                    <strong>{{
+                      selectedBuyAnalysisState.data.trade_plan.add_position_trigger
+                    }}</strong>
+                  </div>
+                  <div>
+                    <span>预警止损</span>
+                    <strong>
+                      {{
+                        formatNumber(selectedBuyAnalysisState.data.trade_plan.stop_loss_price, 3)
+                      }}
+                      · {{ selectedBuyAnalysisState.data.trade_plan.stop_loss_basis }}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>形态硬止损</span>
+                    <strong>
+                      {{
+                        formatNumber(selectedBuyAnalysisState.data.trade_plan.hard_stop_price, 3)
+                      }}
+                      · {{ selectedBuyAnalysisState.data.trade_plan.hard_stop_basis }}
+                    </strong>
+                  </div>
+                  <div class="is-wide">
+                    <span>仓位参考</span>
+                    <strong>{{
+                      selectedBuyAnalysisState.data.trade_plan.position_reference
+                    }}</strong>
+                  </div>
+                </div>
+                <div class="buy-reason-grid">
+                  <div class="buy-reason-group is-support">
+                    <h4>支持理由</h4>
+                    <p
+                      v-for="reason in selectedBuyAnalysisState.data.support_reasons"
+                      :key="`support-${reason}`"
+                    >
+                      {{ reason }}
+                    </p>
+                    <span v-if="!selectedBuyAnalysisState.data.support_reasons.length">暂无</span>
+                  </div>
+                  <div class="buy-reason-group is-reject">
+                    <h4>拒绝与风险理由</h4>
+                    <p
+                      v-for="reason in selectedBuyAnalysisState.data.reject_reasons"
+                      :key="`reject-${reason}`"
+                      :class="{
+                        'is-hard-reject':
+                          selectedBuyAnalysisState.data.hard_reject_reasons.includes(reason),
+                      }"
+                    >
+                      {{ reason }}
+                    </p>
+                    <span v-if="!selectedBuyAnalysisState.data.reject_reasons.length">暂无</span>
+                  </div>
+                </div>
+                <div
+                  v-if="selectedBuyAnalysisState.data.trade_plan?.exit_warnings.length"
+                  class="buy-exit-warnings"
                 >
-                  {{ reason }}
-                </p>
-                <span v-if="!selectedBuyAnalysisState.data.support_reasons.length">暂无</span>
+                  <strong>退出观察项</strong>
+                  <span
+                    v-for="warning in selectedBuyAnalysisState.data.trade_plan.exit_warnings"
+                    :key="warning"
+                  >
+                    {{ warning }}
+                  </span>
+                </div>
               </div>
-              <div class="buy-reason-group is-reject">
-                <h4>拒绝与风险理由</h4>
-                <p
-                  v-for="reason in selectedBuyAnalysisState.data.reject_reasons"
-                  :key="`reject-${reason}`"
-                  :class="{
-                    'is-hard-reject':
-                      selectedBuyAnalysisState.data.hard_reject_reasons.includes(reason),
-                  }"
-                >
-                  {{ reason }}
-                </p>
-                <span v-if="!selectedBuyAnalysisState.data.reject_reasons.length">暂无</span>
-              </div>
-            </div>
-            <div
-              v-if="selectedBuyAnalysisState.data.trade_plan?.exit_warnings.length"
-              class="buy-exit-warnings"
-            >
-              <strong>退出观察项</strong>
-              <span
-                v-for="warning in selectedBuyAnalysisState.data.trade_plan.exit_warnings"
-                :key="warning"
-              >
-                {{ warning }}
-              </span>
-            </div>
+            </el-collapse-transition>
           </template>
           <el-empty
             v-else-if="selectedBuyAnalysisState?.error"
@@ -526,14 +550,28 @@
           <p v-else class="buy-analysis-pending">买入判断正在排队分析</p>
         </section>
 
-        <section class="trend-chart-section">
+        <section class="trend-chart-panel">
           <div class="trend-chart-heading">
             <div>
-              <h3>个股走势</h3>
-              <p>{{ selectedTrendStock.name }} · {{ selectedTrendStock.code }}</p>
+              <h3>走势对比</h3>
+              <p v-if="activeTrendView === 'stock'">
+                {{ selectedTrendStock.name }} · {{ selectedTrendStock.code }}
+              </p>
+              <p v-else-if="activeTrendView === 'market'">
+                {{ selectedTrendStock.marketIndexName }} · {{ selectedTrendStock.marketIndexCode }}
+              </p>
+              <p v-else-if="selectedTrendStock.industry">
+                {{ selectedTrendStock.industry }} · {{ selectedTrendStock.industryCode }}
+              </p>
+              <p v-else>当前股票未匹配到本地东财二级行业</p>
             </div>
+            <el-radio-group v-model="activeTrendView" size="small" aria-label="切换走势图">
+              <el-radio-button value="stock">个股</el-radio-button>
+              <el-radio-button value="market">大盘</el-radio-button>
+              <el-radio-button value="industry">行业</el-radio-button>
+            </el-radio-group>
           </div>
-          <div class="trend-preview" v-loading="trendLoading">
+          <div v-if="activeTrendView === 'stock'" class="trend-preview" v-loading="trendLoading">
             <StockKLineChart
               v-if="trendData.length"
               :stock-code="selectedTrendStock.tsCode || selectedTrendStock.code"
@@ -542,26 +580,19 @@
               :event-lines="trendEventLines"
               :price-ranges="trendPriceRanges"
               show-volume
-              height="500px"
+              height="390px"
             />
             <el-empty
               v-else-if="!trendLoading"
               description="箱体起点前30天至观察日后1个月区间暂无K线数据"
-              :image-size="80"
+              :image-size="64"
             />
           </div>
-        </section>
-
-        <section class="trend-chart-section market-trend-section">
-          <div class="trend-chart-heading">
-            <div>
-              <h3>对应大盘走势</h3>
-              <p>
-                {{ selectedTrendStock.marketIndexName }} · {{ selectedTrendStock.marketIndexCode }}
-              </p>
-            </div>
-          </div>
-          <div class="trend-preview market-trend-preview" v-loading="marketTrendLoading">
+          <div
+            v-else-if="activeTrendView === 'market'"
+            class="trend-preview"
+            v-loading="marketTrendLoading"
+          >
             <StockKLineChart
               v-if="marketTrendData.length"
               :stock-code="selectedTrendStock.marketIndexCode"
@@ -569,27 +600,15 @@
               :kline-data="marketTrendData"
               :event-lines="trendEventLines"
               show-volume
-              height="420px"
+              height="390px"
             />
             <el-empty
               v-else-if="!marketTrendLoading"
               description="该日期区间暂无对应大盘K线数据"
-              :image-size="80"
+              :image-size="64"
             />
           </div>
-        </section>
-
-        <section class="trend-chart-section industry-trend-section">
-          <div class="trend-chart-heading">
-            <div>
-              <h3>所属东财二级行业走势</h3>
-              <p v-if="selectedTrendStock.industry">
-                {{ selectedTrendStock.industry }} · {{ selectedTrendStock.industryCode }}
-              </p>
-              <p v-else>当前股票未匹配到本地东财二级行业</p>
-            </div>
-          </div>
-          <div class="trend-preview industry-trend-preview" v-loading="industryTrendLoading">
+          <div v-else class="trend-preview" v-loading="industryTrendLoading">
             <StockKLineChart
               v-if="industryTrendData.length"
               :stock-code="selectedTrendStock.industryCode"
@@ -597,7 +616,7 @@
               :kline-data="industryTrendData"
               :event-lines="trendEventLines"
               show-volume
-              height="420px"
+              height="390px"
             />
             <el-empty
               v-else-if="!industryTrendLoading"
@@ -606,7 +625,7 @@
                   ? '该日期区间暂无行业K线数据'
                   : '未匹配到东财二级行业代码'
               "
-              :image-size="80"
+              :image-size="64"
             />
           </div>
         </section>
@@ -617,43 +636,61 @@
               <h3>条件状态</h3>
               <p>突破日 C1-C8 全部满足后通过筛选</p>
             </div>
-            <strong>
-              {{ selectedTrendCandidate?.match_count ?? 0 }}/{{ selectedTrendConditions.length }}
-              条满足
-            </strong>
+            <div class="trend-condition-actions">
+              <strong>
+                {{ selectedTrendCandidate?.match_count ?? 0 }}/{{ selectedTrendConditions.length }}
+                条满足
+              </strong>
+              <button
+                class="detail-toggle is-inline"
+                type="button"
+                :aria-expanded="conditionDetailsExpanded"
+                @click="conditionDetailsExpanded = !conditionDetailsExpanded"
+              >
+                <span>{{ conditionDetailsExpanded ? '收起' : '查看条件' }}</span>
+                <el-icon :class="{ 'is-expanded': conditionDetailsExpanded }">
+                  <ArrowDown />
+                </el-icon>
+              </button>
+            </div>
           </div>
-
-          <div class="trend-condition-grid">
-            <article
-              v-for="condition in selectedTrendConditions"
-              :key="condition.key"
-              class="trend-condition-item"
-              :class="condition.passed ? 'is-passed' : 'is-failed'"
-            >
-              <div class="trend-condition-topline">
-                <span class="trend-condition-key">
-                  {{ condition.key.toUpperCase() }}
-                </span>
-                <el-tag :type="condition.passed ? 'success' : 'danger'" effect="plain" size="small">
-                  {{ condition.passed ? '满足' : '未满足' }}
-                </el-tag>
-              </div>
-              <strong class="trend-condition-name">{{ condition.name }}</strong>
-              <dl class="trend-condition-values">
-                <div>
-                  <dt>指标值</dt>
-                  <dd>{{ formatConditionValue(condition.value) }}</dd>
+          <el-collapse-transition>
+            <div v-show="conditionDetailsExpanded" class="trend-condition-grid">
+              <article
+                v-for="condition in selectedTrendConditions"
+                :key="condition.key"
+                class="trend-condition-item"
+                :class="condition.passed ? 'is-passed' : 'is-failed'"
+              >
+                <div class="trend-condition-topline">
+                  <span class="trend-condition-key">
+                    {{ condition.key.toUpperCase() }}
+                  </span>
+                  <el-tag
+                    :type="condition.passed ? 'success' : 'danger'"
+                    effect="plain"
+                    size="small"
+                  >
+                    {{ condition.passed ? '满足' : '未满足' }}
+                  </el-tag>
                 </div>
-                <div>
-                  <dt>判定阈值</dt>
-                  <dd>{{ condition.threshold || '-' }}</dd>
-                </div>
-              </dl>
-              <p v-if="condition.description" class="trend-condition-description">
-                {{ condition.description }}
-              </p>
-            </article>
-          </div>
+                <strong class="trend-condition-name">{{ condition.name }}</strong>
+                <dl class="trend-condition-values">
+                  <div>
+                    <dt>指标值</dt>
+                    <dd>{{ formatConditionValue(condition.value) }}</dd>
+                  </div>
+                  <div>
+                    <dt>判定阈值</dt>
+                    <dd>{{ condition.threshold || '-' }}</dd>
+                  </div>
+                </dl>
+                <p v-if="condition.description" class="trend-condition-description">
+                  {{ condition.description }}
+                </p>
+              </article>
+            </div>
+          </el-collapse-transition>
         </section>
       </div>
     </el-dialog>
@@ -663,7 +700,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import StockKLineChart from '@/components/StockKLineChart.vue'
 import { useAiPageData } from '@/composables/useAiPageData'
 import { fetchDcDaily } from '@/services/dcDailyApi'
@@ -728,6 +765,9 @@ const industryTrendLoading = ref(false)
 const industryTrendData = ref<StockHistoryDataItem[]>([])
 const marketTrendLoading = ref(false)
 const marketTrendData = ref<StockHistoryDataItem[]>([])
+const activeTrendView = ref<'stock' | 'market' | 'industry'>('stock')
+const buyDetailsExpanded = ref(false)
+const conditionDetailsExpanded = ref(false)
 const trendDateRange = reactive({ start: '', end: '' })
 const selectedTrendCandidate = ref<BoxBreakoutCandidateItem | null>(null)
 const currentTrendIndex = ref(-1)
@@ -1253,6 +1293,8 @@ function showTrendStock(row: BoxBreakoutCandidateItem) {
   trendData.value = []
   industryTrendData.value = []
   marketTrendData.value = []
+  buyDetailsExpanded.value = false
+  conditionDetailsExpanded.value = false
   loadTrendData()
   loadMarketTrendData()
   loadIndustryTrendData()
@@ -1263,6 +1305,7 @@ function openTrendDialog(row: BoxBreakoutCandidateItem) {
   const rowIndex = rows.value.findIndex((item) => item.stock_code === row.stock_code)
   if (!showTrendStock(row)) return
   currentTrendIndex.value = rowIndex
+  activeTrendView.value = 'stock'
   trendDialogVisible.value = true
 }
 
@@ -1283,6 +1326,9 @@ function handleTrendDialogClosed() {
   trendData.value = []
   industryTrendData.value = []
   marketTrendData.value = []
+  activeTrendView.value = 'stock'
+  buyDetailsExpanded.value = false
+  conditionDetailsExpanded.value = false
   selectedTrendCandidate.value = null
   currentTrendIndex.value = -1
 }
@@ -1581,6 +1627,26 @@ watch(
   gap: 4px;
 }
 
+:global(.box-breakout-trend-dialog) {
+  display: flex;
+  max-height: 94vh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:global(.box-breakout-trend-dialog .el-dialog__header) {
+  flex: 0 0 auto;
+  margin-right: 0;
+  padding: 12px 18px 9px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+:global(.box-breakout-trend-dialog .el-dialog__body) {
+  min-height: 0;
+  padding: 12px 18px 16px;
+  overflow-y: auto;
+}
+
 .trend-dialog-title {
   color: #111827;
   font-size: 18px;
@@ -1595,7 +1661,7 @@ watch(
 .trend-dialog-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .trend-toolbar {
@@ -1627,7 +1693,7 @@ watch(
 
 .buy-analysis-panel {
   min-height: 108px;
-  padding: 14px 16px;
+  padding: 12px 14px 8px;
   border: 1px solid #cbd5e1;
   border-left: 4px solid #2563eb;
   border-radius: 4px;
@@ -1662,7 +1728,7 @@ watch(
 }
 
 .buy-analysis-summary {
-  margin-top: 12px;
+  margin-top: 8px;
   color: #334155;
   font-size: 14px;
   font-weight: 600;
@@ -1674,9 +1740,47 @@ watch(
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
-  margin-top: 10px;
+  margin-top: 7px;
   color: #64748b;
   font-size: 12px;
+}
+
+.detail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  margin-top: 9px;
+  padding: 7px 8px 2px;
+  border: 0;
+  border-top: 1px dashed #cbd5e1;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.detail-toggle:hover {
+  color: #1d4ed8;
+}
+
+.detail-toggle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.detail-toggle .el-icon {
+  transition: transform 160ms ease;
+}
+
+.detail-toggle .el-icon.is-expanded {
+  transform: rotate(180deg);
+}
+
+.buy-analysis-details {
+  padding-bottom: 6px;
 }
 
 .buy-setup-grid {
@@ -1899,17 +2003,12 @@ watch(
   margin-right: 5px;
 }
 
-.trend-preview {
-  min-height: 420px;
-}
-
-.trend-chart-section {
+.trend-chart-panel {
   min-width: 0;
-}
-
-.trend-chart-section + .trend-chart-section {
-  border-top: 1px solid #e2e8f0;
-  padding-top: 16px;
+  padding: 12px 14px 8px;
+  border: 1px solid #dbe3ee;
+  border-radius: 4px;
+  background: #ffffff;
 }
 
 .trend-chart-heading {
@@ -1917,7 +2016,7 @@ watch(
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .trend-chart-heading h3,
@@ -1937,14 +2036,17 @@ watch(
   font-size: 12px;
 }
 
-.industry-trend-preview,
-.market-trend-preview {
-  min-height: 360px;
+.trend-chart-heading .el-radio-group {
+  flex: 0 0 auto;
+}
+
+.trend-preview {
+  min-height: 390px;
 }
 
 .trend-condition-panel {
   border-top: 1px solid #e2e8f0;
-  padding-top: 16px;
+  padding-top: 10px;
 }
 
 .trend-condition-heading {
@@ -1952,7 +2054,7 @@ watch(
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .trend-condition-heading h3,
@@ -1972,15 +2074,29 @@ watch(
   font-size: 12px;
 }
 
-.trend-condition-heading > strong {
+.trend-condition-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.trend-condition-actions > strong {
   color: #1d4ed8;
   font-size: 14px;
+}
+
+.detail-toggle.is-inline {
+  width: auto;
+  margin-top: 0;
+  padding: 4px 0;
+  border-top: 0;
 }
 
 .trend-condition-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  margin-top: 10px;
 }
 
 .trend-condition-item {
@@ -2057,6 +2173,12 @@ watch(
   line-height: 1.5;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .detail-toggle .el-icon {
+    transition: none;
+  }
+}
+
 @media (max-width: 900px) {
   .box-breakout-page {
     padding: 12px;
@@ -2101,6 +2223,24 @@ watch(
     flex-direction: column;
   }
 
+  .trend-chart-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .trend-chart-heading .el-radio-group {
+    align-self: stretch;
+  }
+
+  .trend-chart-heading :deep(.el-radio-button) {
+    flex: 1;
+  }
+
+  .trend-chart-heading :deep(.el-radio-button__inner) {
+    width: 100%;
+  }
+
   .buy-analysis-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -2124,6 +2264,17 @@ watch(
 
   .trend-condition-grid {
     grid-template-columns: 1fr;
+  }
+
+  .trend-condition-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .trend-condition-actions {
+    justify-content: space-between;
+    width: 100%;
   }
 }
 </style>
